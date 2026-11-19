@@ -15,17 +15,15 @@ Aplicação local, leve e em português para organizar URLs de publicações do 
 
 - macOS Intel ou Apple Silicon.
 - Node.js LTS: https://nodejs.org/
-- Chave da API OpenAI para gerar comentários contextualizados.
+- Biblioteca local de comentários por assunto, sem IA ou serviços externos.
 
 ## Configuração inicial
 
 1. Baixe/clonar este repositório no Mac.
 2. Instale o Node.js LTS.
 3. Abra a pasta do projeto no Finder e execute `start.command`. Se o macOS bloquear o arquivo, abra as propriedades/permissões ou execute uma única vez `chmod +x start.command` no Terminal.
-4. Na primeira execução, o projeto cria `.env` e abre o arquivo para configuração.
-5. Preencha `OPENAI_API_KEY=` com sua chave da API OpenAI e salve.
-6. Execute `start.command` novamente. O servidor ficará disponível em `http://127.0.0.1:4173`.
-7. O navegador controlado abre o Instagram; faça login manualmente.
+4. Execute `start.command` novamente. O servidor ficará disponível em `http://127.0.0.1:4173`.
+5. O navegador controlado abre o Instagram; faça login manualmente.
 
 A sessão fica salva em `data/instagram-profile` neste Mac. Não compartilhe essa pasta.
 
@@ -33,9 +31,9 @@ A sessão fica salva em `data/instagram-profile` neste Mac. Não compartilhe ess
 
 O CSV é criado automaticamente em `data/historico.csv` e registra data/hora, URL, legenda lida, curtida, comentário, status e detalhes de erro. O histórico e o perfil do navegador ficam fora do Git.
 
-## Chave da API
+## Biblioteca de comentários
 
-A chave fica no arquivo local `.env`, ignorado pelo Git. O comentário é gerado pela API OpenAI; isso pode gerar cobrança na conta da API, conforme o uso. Não coloque a chave em arquivos do projeto nem a envie ao GitHub.
+Os comentários são montados localmente a partir de uma biblioteca textual autoral incluída em `src/comments.js`. Ela organiza frases por temas (culinária, viagens, pets, família, fitness, beleza, negócios, tecnologia, arte, educação, natureza, casa, automóveis, conquistas e eventos), identifica palavras-chave na legenda e escolhe uma frase relacionada. Não há IA, API, chave, cobrança ou envio da legenda para terceiros. Como é um sistema baseado em regras, ele interpreta texto, não imagens, e pode não reconhecer ironia, contexto implícito ou assuntos fora da biblioteca.
 
 ## Limitações importantes
 
@@ -48,7 +46,5 @@ O aplicativo não contorna CAPTCHA, checkpoint, MFA, limites ou bloqueios. Se su
 ```bash
 npm install
 npx playwright install chromium
-cp .env.example .env
-# configure OPENAI_API_KEY no .env
 npm start
 ```
