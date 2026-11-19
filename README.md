@@ -17,13 +17,18 @@ Aplicação local, leve e em português para coletar publicações compartilhada
 - Node.js LTS: https://nodejs.org/
 - Biblioteca local de comentários por assunto, sem IA ou serviços externos.
 
-## Configuração inicial
+## Aplicativo para macOS
 
-1. Baixe/clonar este repositório no Mac.
-2. Instale o Node.js LTS.
-3. Abra a pasta do projeto no Finder e execute `start.command`. Se o macOS bloquear o arquivo, abra as propriedades/permissões ou execute uma única vez `chmod +x start.command` no Terminal.
-4. Execute `start.command` novamente. O servidor ficará disponível em `http://127.0.0.1:4173`.
-5. O navegador controlado abre o Instagram; faça login manualmente.
+O projeto agora está configurado para gerar um aplicativo desktop Electron e um instalador DMG, sem exigir VS Code, Node.js ou Terminal no uso cotidiano.
+
+1. Abra a aba **Actions** deste repositório no GitHub.
+2. Aguarde a execução **Build macOS app** terminar com sucesso.
+3. Baixe o artefato **curtidorIG-macOS** da execução concluída.
+4. Abra o arquivo DMG, arraste **curtidorIG** para Aplicativos e abra pelo Finder ou Dock.
+
+A primeira compilação é feita em um runner macOS do GitHub Actions. O pacote ainda não é assinado/notarizado com certificado Apple Developer; dependendo das configurações do macOS, pode ser necessário autorizar a abertura em Privacidade e Segurança. O primeiro login no Instagram é manual. Depois disso, a sessão fica armazenada nos dados locais do aplicativo.
+
+Para desenvolvimento, os comandos Node continuam disponíveis, mas não fazem parte do uso normal do aplicativo.
 
 A sessão fica salva em `data/instagram-profile` neste Mac. Não compartilhe essa pasta.
 
