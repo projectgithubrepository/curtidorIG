@@ -1,43 +1,15 @@
 <!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>curtidorIG</title>
-  <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-  <main class="shell">
-    <header>
-      <div class="mark">IG</div>
-      <div><h1>curtidorIG</h1><p>Interações organizadas em um só lugar.</p></div>
-    </header>
-
-    <section class="panel">
-      <label for="urls">URLs das publicações</label>
-      <textarea id="urls" placeholder="Cole uma URL por linha&#10;https://www.instagram.com/p/..."></textarea>
-      <div class="actions">
-        <button id="start">Iniciar</button>
-        <button id="stop" class="secondary" disabled>Parar</button>
-      </div>
-      <p class="hint">A primeira execução abre o Instagram para você entrar na conta. A sessão fica salva localmente neste Mac.</p>
-    </section>
-
-    <section class="panel">
-      <div class="section-head"><h2>Andamento</h2><span id="state">Pronto</span></div>
-      <div class="track"><div id="bar"></div></div>
-      <p id="message">Aguardando URLs.</p>
-      <p id="counter">0 de 0 publicações</p>
-      <p id="current" class="current"></p>
-    </section>
-
-    <section class="panel history">
-      <div class="section-head"><h2>Histórico</h2><a href="/api/history" download="historico.csv">Baixar CSV</a></div>
-      <p>O arquivo historico.csv é atualizado automaticamente dentro da pasta data.</p>
-    </section>
-
-    <footer>Execução local no Mac · A senha do Instagram não é solicitada nem armazenada.</footer>
-  </main>
-  <script src="/app.js"></script>
-</body>
-</html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>curtidorIG</title><link rel="stylesheet" href="/styles.css"></head>
+<body><main class="shell">
+<header><div class="mark">IG</div><div><h1>curtidorIG</h1><p>Coleta de publicações compartilhadas em grupos do Instagram.</p></div></header>
+<section class="panel">
+<label for="groupName">Nome exato do grupo no Instagram</label><input id="groupName" placeholder="Ex.: Grupo de ofertas e novidades">
+<div class="dates"><div><label for="startDate">Data inicial</label><input id="startDate" type="date"></div><div><label for="endDate">Data final</label><input id="endDate" type="date"></div></div>
+<div class="actions"><button id="start">Coletar publicações</button><button id="stop" class="secondary" disabled>Parar coleta</button></div>
+<p class="hint">O navegador abrirá o Instagram com sua sessão local. A coleta considera a data em que o link foi compartilhado no grupo. Se o grupo não for localizado automaticamente, confira o nome exato.</p>
+</section>
+<section class="panel"><div class="section-head"><h2>Andamento</h2><span id="state">Pronto</span></div><div class="track"><div id="bar"></div></div><p id="message">Informe o grupo e o período.</p><p id="counter">0 publicações processadas</p><p id="current" class="current"></p></section>
+<section class="panel"><div class="section-head"><h2>Publicações encontradas</h2><a href="/api/history" download="historico.csv">Baixar histórico CSV</a></div><div id="results" class="results"><p class="muted">Os resultados aparecerão aqui após a coleta.</p></div></section>
+<footer>Execução local no Mac · Login manual · Nenhuma curtida ou comentário é publicado automaticamente.</footer>
+</main><script src="/app.js"></script></body></html>
