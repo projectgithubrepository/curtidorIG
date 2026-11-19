@@ -1,4 +1,6 @@
-const urls = document.querySelector("#urls");
+const groupName = document.querySelector("#groupName");
+const startDate = document.querySelector("#startDate");
+const endDate = document.querySelector("#endDate");
 const start = document.querySelector("#start");
 const stop = document.querySelector("#stop");
 const state = document.querySelector("#state");
@@ -6,46 +8,41 @@ const message = document.querySelector("#message");
 const counter = document.querySelector("#counter");
 const current = document.querySelector("#current");
 const bar = document.querySelector("#bar");
+const results = document.querySelector("#results");
 
 start.addEventListener("click", async () => {
-  const list = urls.value.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
   start.disabled = true;
   try {
-    const response = await fetch("/api/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ urls: list })
-    });
+    const response = await fetch("/api/start", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ groupName:groupName.value, startDate:startDate.value, endDate:endDate.value }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Não foi possível iniciar.");
-    state.textContent = "Executando";
-    stop.disabled = false;
     message.textContent = data.message;
-  } catch (error) {
-    message.textContent = error.message;
-    start.disabled = false;
+    state.textContent = "Coletando";
+    stop.disabled = false;
+  } catch (error) { message.textContent = error.message; start.disabled = false; }
+});
+stop.addEventListener("click", async () => { await fetch("/api/stop",{method:"POST"}); stop.disabled=true; message.textContent="Solicitando parada..."; });
+function render(items) {
+  results.replaceChildren();
+  if (!items.length) { const p=document.createElement("p"); p.className="muted"; p.textContent="Nenhuma publicação listada ainda."; results.append(p); return; }
+  for (const item of items) {
+    const card=document.createElement("article"); card.className="result";
+    const link=document.createElement("a"); link.href=item.url; link.target="_blank"; link.rel="noreferrer"; link.textContent=item.url;
+    const status=document.createElement("strong"); status.textContent=item.status;
+    const date=document.createElement("small"); date.textContent=item.sharedAt ? new Date(item.sharedAt).toLocaleString("pt-BR") : "Data não identificada";
+    const caption=document.createElement("p"); caption.textContent=item.caption || item.detail || "";
+    const comment=document.createElement("p"); comment.className="comment"; comment.textContent=item.comment ? "Comentário sugerido: "+item.comment : "";
+    card.append(status,date,link,caption,comment); results.append(card);
   }
-});
-
-stop.addEventListener("click", async () => {
-  await fetch("/api/stop", { method: "POST" });
-  stop.disabled = true;
-  message.textContent = "Solicitando interrupção...";
-});
-
+}
 async function refresh() {
   try {
-    const response = await fetch("/api/status");
-    const data = await response.json();
-    const p = data.progress;
-    state.textContent = data.running ? "Executando" : "Pronto";
-    message.textContent = p.message;
-    counter.textContent = `${p.done} de ${p.total} publicações`;
-    current.textContent = p.current || "";
-    bar.style.width = p.total ? `${Math.min(100, p.done / p.total * 100)}%` : "0%";
-    start.disabled = data.running;
-    stop.disabled = !data.running;
+    const [sr,rr]=await Promise.all([fetch("/api/status"),fetch("/api/results")]);
+    const data=await sr.json(), p=data.progress, r=await rr.json();
+    state.textContent=data.running?"Coletando":"Pronto"; message.textContent=p.message;
+    counter.textContent=`${p.done} de ${p.total} publicações processadas`;
+    current.textContent=p.current||""; bar.style.width=p.total?`${Math.min(100,p.done/p.total*100)}%`:"0%";
+    start.disabled=data.running; stop.disabled=!data.running; render(r.results||[]);
   } catch {}
 }
-setInterval(refresh, 1200);
-refresh();
+setInterval(refresh,1500); refresh();
