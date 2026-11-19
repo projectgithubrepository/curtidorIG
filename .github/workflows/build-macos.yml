@@ -14,15 +14,7 @@ on:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-latest
-            arch: arm64
-          - runner: macos-15-intel
-            arch: x64
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,11 +24,11 @@ jobs:
       - name: Install Chromium for Playwright
         run: PLAYWRIGHT_BROWSERS_PATH=playwright-browsers npx playwright install chromium
       - name: Build macOS app and DMG
-        run: npm run dist:mac -- --${{ matrix.arch }}
+        run: npm run dist:mac -- --arm64
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: curtidorIG-macOS-${{ matrix.arch }}
+          name: curtidorIG-macOS-arm64
           path: release/*.dmg
           if-no-files-found: error
           retention-days: 30
