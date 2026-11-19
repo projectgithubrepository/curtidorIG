@@ -11,30 +11,26 @@ Aplicação local, leve e em português para coletar publicações compartilhada
 - Deduplicação, leitura de legenda, sugestão de comentário local e revisão dos resultados na interface. Não publica curtidas/comentários nem salva coleções automaticamente.
 - Botão para interromper a fila.
 
-## Requisitos
+## Aplicativo para Mac Neo
 
-- macOS Intel ou Apple Silicon.
-- Node.js LTS: https://nodejs.org/
-- Biblioteca local de comentários por assunto, sem IA ou serviços externos.
+O build é direcionado exclusivamente ao Mac Neo com Apple Silicon (ARM64). Não são geradas versões para Macs Intel ou outras arquiteturas.
 
-## Aplicativo para macOS
-
-O projeto agora está configurado para gerar um aplicativo desktop Electron e um instalador DMG, sem exigir VS Code, Node.js ou Terminal no uso cotidiano.
+O projeto gera um aplicativo desktop Electron e um instalador DMG, sem exigir VS Code, Node.js ou Terminal no uso cotidiano.
 
 1. Abra a aba **Actions** deste repositório no GitHub.
 2. Aguarde a execução **Build macOS app** terminar com sucesso.
-3. Baixe o artefato **curtidorIG-macOS** da execução concluída.
-4. Abra o arquivo DMG, arraste **curtidorIG** para Aplicativos e abra pelo Finder ou Dock.
+3. Baixe o artefato **curtidorIG-macOS-arm64** da execução concluída.
+4. Extraia o ZIP, abra o arquivo DMG, arraste **curtidorIG** para Aplicativos e abra pelo Finder ou Dock.
 
-A primeira compilação é feita em um runner macOS do GitHub Actions. O pacote ainda não é assinado/notarizado com certificado Apple Developer; dependendo das configurações do macOS, pode ser necessário autorizar a abertura em Privacidade e Segurança. O primeiro login no Instagram é manual. Depois disso, a sessão fica armazenada nos dados locais do aplicativo.
+O pacote ainda não é assinado/notarizado com certificado Apple Developer; dependendo das configurações do macOS, pode ser necessário autorizar a abertura em Privacidade e Segurança. O primeiro login no Instagram é manual. Depois disso, a sessão fica armazenada nos dados locais do aplicativo.
 
 Para desenvolvimento, os comandos Node continuam disponíveis, mas não fazem parte do uso normal do aplicativo.
 
-A sessão fica salva em `data/instagram-profile` neste Mac. Não compartilhe essa pasta.
+A sessão fica salva nos dados locais do aplicativo neste Mac. Não compartilhe essa pasta.
 
 ## Histórico
 
-O CSV é criado automaticamente em `data/historico.csv` e registra data/hora, URL, legenda lida, curtida, comentário, status e detalhes de erro. O histórico e o perfil do navegador ficam fora do Git.
+O CSV é criado automaticamente nos dados locais do aplicativo e registra data/hora, URL, legenda lida, curtida, comentário, status e detalhes de erro. O histórico e o perfil do navegador ficam fora do Git.
 
 ## Regra de origem das publicações
 
