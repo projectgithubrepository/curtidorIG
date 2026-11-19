@@ -4,11 +4,11 @@ Aplicação local, leve e em português para coletar publicações compartilhada
 
 ## Primeira versão
 
-- Fluxo previsto: selecionar um grupo/conversa do Instagram e informar data inicial e final; não depender de colagem manual de URLs.
+- Interface para informar o nome exato do grupo e o período; coleta heurística de links de posts/Reels encontrados nas mensagens carregadas pelo Instagram.
 - Playwright abre um navegador Chromium com perfil persistente; o login é feito manualmente no Instagram.
 - Histórico CSV local em `data/historico.csv`, atualizado a cada publicação.
 - Verificação de URLs já registradas para evitar repetir uma publicação.
-- Coleta prevista por período, deduplicação e histórico local. Ações de interação devem ser iniciadas individualmente pela pessoa, não disparadas em lote.
+- Deduplicação, leitura de legenda, sugestão de comentário local e revisão dos resultados na interface. Não publica curtidas/comentários nem salva coleções automaticamente.
 - Botão para interromper a fila.
 
 ## Requisitos
@@ -33,7 +33,7 @@ O CSV é criado automaticamente em `data/historico.csv` e registra data/hora, UR
 
 ## Regra de origem das publicações
 
-A origem planejada da fila é uma conversa/grupo específico do Instagram. A pessoa seleciona o grupo e informa o período; o filtro usa a data em que cada publicação foi compartilhada na conversa, não a data original do post. A aplicação deverá extrair publicações acessíveis, remover duplicatas e mostrar a lista encontrada antes de qualquer ação. Os detalhes estão em [Regras de negócio](docs/regras-de-negocio.md). Essa coleta ainda precisa ser implementada e validada.
+A pessoa informa o nome do grupo e o período. A coleta procura links de posts/Reels nas mensagens e usa a data/hora exposta no DOM pelo Instagram. O resultado é heurístico: mensagens sem data legível são ignoradas; mudanças na interface podem impedir a coleta. A data usada é a do compartilhamento na conversa, não a publicação original. Os detalhes estão em [Regras de negócio](docs/regras-de-negocio.md).
 
 ## Biblioteca de comentários
 
