@@ -8,12 +8,6 @@ if [ ! -d node_modules ]; then
   npm install
   npx playwright install chromium
 fi
-if [ ! -f .env ]; then
-  cp .env.example .env
-  osascript -e 'display dialog "Foi criado o arquivo .env. Configure sua chave de API antes de iniciar." buttons {"OK"}'
-  open -e .env
-  exit 0
-fi
 npm start &
 SERVER_PID=$!
 sleep 2
