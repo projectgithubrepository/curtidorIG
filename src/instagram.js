@@ -55,7 +55,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
       if (!item.sharedAt) continue;
       const parsed = new Date(item.sharedAt);
       if (Number.isNaN(parsed.getTime())) continue;
-      const day = parsed.toISOString().slice(0, 10);
+      const day = [parsed.getFullYear(), String(parsed.getMonth() + 1).padStart(2, "0"), String(parsed.getDate()).padStart(2, "0")].join("-");
       if (day >= startDate && day <= endDate) found.set(item.url, { ...item, sharedAt: parsed.toISOString() });
     }
     if (found.size === previousCount) stableRounds++; else stableRounds = 0;
