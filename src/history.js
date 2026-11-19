@@ -45,3 +45,23 @@ export function appendHistory(entry) {
   ];
   fs.appendFileSync(HISTORY_FILE, row.map(csvCell).join(",") + "\n", "utf8");
 }
+
+function parseCsvRow(line) {
+  const cells=[]; let value=""; let quoted=false;
+  for(let i=0;i<line.length;i++) {
+    const char=line[i];
+    if(char === '"' && quoted && line[i+1] === '"') { value+='"'; i++; }
+    else if(char === '"') quoted=!quoted;
+    else if(char === "," && !quoted) { cells.push(value); value=""; }
+    else value+=char;
+  }
+  cells.push(value);
+  return cells;
+}
+
+export function getRecentComments(limit=200) {
+  ensureHistory();
+  const lines=fs.readFileSync(HISTORY_FILE,"utf8").split(/\r?\n/).filter(Boolean);
+  return lines.slice(1).reverse().map(line=>parseCsvRow(line)[4] ?? "")
+    .filter(Boolean).slice(0,Math.max(0,limit));
+}
