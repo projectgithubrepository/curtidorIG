@@ -64,12 +64,12 @@ app.post("/api/start", async (req, res) => {
           const comment = createComment(caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
           const result = { ...item, caption, comment, status: "pronta para revisão" };
           results.push(result);
-          appendHistory({ url: item.url, caption, comment, status: "coletada", detail: `Grupo: ${groupName}; mensagem: ${item.sharedAt}` });
+          appendHistory({ url: item.url, caption, comment, status: "coletada", groupName, sharedAt: item.sharedAt, detail: `Grupo: ${groupName}; mensagem: ${item.sharedAt}` });
           processed.add(item.url);
         } catch (error) {
           const result = { ...item, caption: "", comment: "", status: "não foi possível analisar", detail: error.message };
           results.push(result);
-          appendHistory({ url: item.url, status: "erro na análise", detail: error.message });
+          appendHistory({ url: item.url, status: "erro na análise", groupName, sharedAt: item.sharedAt, detail: error.message });
         }
         progress.done++;
       }
