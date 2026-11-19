@@ -14,4 +14,8 @@ if [ ! -f .env ]; then
   open -e .env
   exit 0
 fi
-npm start
+npm start &
+SERVER_PID=$!
+sleep 2
+open "http://127.0.0.1:4173"
+wait $SERVER_PID
