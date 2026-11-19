@@ -1,0 +1,21 @@
+appId: br.com.curtidorig.app
+productName: curtidorIG
+directories:
+  output: release
+files:
+  - "electron/**/*"
+  - "src/**/*"
+  - "public/**/*"
+  - "package.json"
+  - "!**/*.test.js"
+extraResources:
+  - from: playwright-browsers
+    to: playwright-browsers
+asarUnpack:
+  - "node_modules/playwright/**"
+mac:
+  category: public.app-category.social-networking
+  target:
+    - dmg
+dmg:
+  artifactName: curtidorIG-${version}-macOS.${ext}
