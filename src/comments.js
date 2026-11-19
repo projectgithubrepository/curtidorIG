@@ -80,7 +80,7 @@ export function createComment(caption, previousComments = []) {
       `${noun.charAt(0).toUpperCase()+noun.slice(1)} ficou ${reaction}; ${detail} chama atenção! ${emoji}`,
       `É muito legal ver ${noun}; ${detail} deixa a publicação ainda mais interessante! ${emoji}`,
       `Gostei do cuidado com ${detail}; ${noun} ficou ${reaction}! ${emoji}`,
-      `Que ${noun.replace(/^(essa|esse) /,"")} ${reaction}! ${detail.charAt(0).toLowerCase()+detail.slice(1)} faz diferença. ${emoji}`
+      `Vale destacar ${detail}; ${noun} ficou muito interessante! ${emoji}`
     ];
     candidates.push(templates[i%templates.length]);
   }
@@ -90,7 +90,7 @@ export function createComment(caption, previousComments = []) {
     const candidate=candidates[(seed+i)%candidates.length].replace(/\s+/g," ").trim();
     if(countWords(candidate)>=2 && /\p{Extended_Pictographic}/u.test(candidate) && !used.has(normalize(candidate))) return candidate;
   }
-  return null;
+  return "Gostei de acompanhar essa publicação! 👏";
 }
 
 export function getCommentLibraryStats() {
