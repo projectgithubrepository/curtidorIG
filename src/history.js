@@ -46,17 +46,20 @@ export function appendHistory(entry) {
   fs.appendFileSync(HISTORY_FILE, row.map(csvCell).join(",") + "\n", "utf8");
 }
 
-function parseCsvRow(line) {
-  const cells=[]; let value=""; let quoted=false;
-  for(let i=0;i<line.length;i++) {
-    const char=line[i];
-    if(char === '"' && quoted && line[i+1] === '"') { value+='"'; i++; }
+function parseCsvRows(content) {
+  const rows=[]; let row=[]; let value=""; let quoted=false;
+  for(let i=0;i<content.length;i++) {
+    const char=content[i];
+    if(char === '"' && quoted && content[i+1] === '"') { value+='"'; i++; }
     else if(char === '"') quoted=!quoted;
-    else if(char === "," && !quoted) { cells.push(value); value=""; }
-    else value+=char;
+    else if(char === "," && !quoted) { row.push(value); value=""; }
+    else if((char === "\n" || char === "\r") && !quoted) {
+      if(char === "\r" && content[i+1] === "\n") i++;
+      row.push(value); rows.push(row); row=[]; value="";
+    } else value+=char;
   }
-  cells.push(value);
-  return cells;
+  if(value.length || row.length) { row.push(value); rows.push(row); }
+  return rows;
 }
 
 export function getRecentComments(limit=200) {
