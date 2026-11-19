@@ -73,18 +73,18 @@ export function createComment(caption, previousComments = []) {
   if(intent) for(let i=0;i<intent.prefixes.length;i++) candidates.push(pick(intent.prefixes,seed,i)+" "+pick(vocabulary.emojis ?? GENERIC.emojis,seed,i+1));
   for(let i=0;i<24;i++) {
     const noun=pick(vocabulary.nouns,seed,i);
-    const reaction=pick(vocabulary.reactions,seed,i+2);
+    const reaction=pick(["muito interessante","bem apresentada","cheia de personalidade","especial"],seed,i+2);
     const detail=pick(vocabulary.details,seed,i+3);
     const emoji=pick(vocabulary.emojis,seed,i+4);
     const templates=[
-      `${noun.charAt(0).toUpperCase()+noun.slice(1)} ficou ${reaction}; ${detail} chama atenção! ${emoji}`,
-      `É muito legal ver ${noun}; ${detail} deixa a publicação ainda mais interessante! ${emoji}`,
-      `Gostei do cuidado com ${detail}; ${noun} ficou ${reaction}! ${emoji}`,
-      `Vale destacar ${detail}; ${noun} ficou muito interessante! ${emoji}`
+      `${noun.charAt(0).toUpperCase()+noun.slice(1)} merece destaque; ${detail} chama atenção! ${emoji}`,
+      `A publicação ficou ${reaction}; ${detail} também merece destaque! ${emoji}`,
+      `É muito legal ver ${noun}; ${detail} faz diferença! ${emoji}`,
+      `O cuidado com ${detail} valoriza ${noun}! ${emoji}`
     ];
     candidates.push(templates[i%templates.length]);
   }
-  const genericCandidates=GENERIC.nouns.map((noun,i)=>`Gostei de ver ${noun}; ${pick(GENERIC.details,seed,i)} ficou ${pick(GENERIC.reactions,seed,i+1)!} ${pick(GENERIC.emojis,seed,i+2)}`);
+  const genericCandidates=GENERIC.nouns.map((noun,i)=>`Gostei de ver ${noun}; ${pick(GENERIC.details,seed,i)} ficou ${pick(GENERIC.reactions,seed,i+1)} ${pick(GENERIC.emojis,seed,i+2)}`);
   candidates.push(...genericCandidates);
   for(let i=0;i<candidates.length;i++) {
     const candidate=candidates[(seed+i)%candidates.length].replace(/\s+/g," ").trim();
