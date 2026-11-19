@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>curtidorIG</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="mark">IG</div>
+      <div><h1>curtidorIG</h1><p>Interações organizadas em um só lugar.</p></div>
+    </header>
+
+    <section class="panel">
+      <label for="urls">URLs das publicações</label>
+      <textarea id="urls" placeholder="Cole uma URL por linha&#10;https://www.instagram.com/p/..."></textarea>
+      <div class="actions">
+        <button id="start">Iniciar</button>
+        <button id="stop" class="secondary" disabled>Parar</button>
+      </div>
+      <p class="hint">A primeira execução abre o Instagram para você entrar na conta. A sessão fica salva localmente neste Mac.</p>
+    </section>
+
+    <section class="panel">
+      <div class="section-head"><h2>Andamento</h2><span id="state">Pronto</span></div>
+      <div class="track"><div id="bar"></div></div>
+      <p id="message">Aguardando URLs.</p>
+      <p id="counter">0 de 0 publicações</p>
+      <p id="current" class="current"></p>
+    </section>
+
+    <section class="panel history">
+      <div class="section-head"><h2>Histórico</h2><a href="/api/history" download="historico.csv">Baixar CSV</a></div>
+      <p>O arquivo historico.csv é atualizado automaticamente dentro da pasta data.</p>
+    </section>
+
+    <footer>Execução local no Mac · A senha do Instagram não é solicitada nem armazenada.</footer>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
