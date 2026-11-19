@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openInstagram, inspectPost, likePost, commentPost } from "./instagram.js";
 import { createComment } from "./comments.js";
-import { appendHistory, getProcessedUrls, readHistory } from "./history.js";
+import { appendHistory, getProcessedUrls, getRecentComments, readHistory } from "./history.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -56,7 +56,7 @@ app.post("/api/start", async (req, res) => {
 
         try {
           const caption = await inspectPost(page, url);
-          const comment = await createComment(caption);
+          const comment = await createComment(caption, getRecentComments(200));
           progress.message = "Publicando interação...";
           const liked = await likePost(page);
           await commentPost(page, comment);
