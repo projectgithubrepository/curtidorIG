@@ -33,7 +33,7 @@ O CSV é criado automaticamente em `data/historico.csv` e registra data/hora, UR
 
 ## Biblioteca de comentários
 
-Os comentários são montados localmente a partir de uma biblioteca textual autoral incluída em `src/comments.js`. Ela organiza frases por temas (culinária, viagens, pets, família, fitness, beleza, negócios, tecnologia, arte, educação, natureza, casa, automóveis, conquistas e eventos), identifica palavras-chave na legenda e escolhe uma frase relacionada. Não há IA, API, chave, cobrança ou envio da legenda para terceiros. Como é um sistema baseado em regras, ele interpreta texto, não imagens, e pode não reconhecer ironia, contexto implícito ou assuntos fora da biblioteca.
+Os comentários são gerados localmente por composição, não pela escolha de uma lista curta de frases prontas. O motor identifica assunto, palavras-chave e intenção textual (pergunta, tutorial, conquista ou divulgação) e combina estruturas com vocabulário contextual. A biblioteca cobre 15 temas, mais de 100 palavras-chave e milhares de combinações possíveis. Todo comentário gerado precisa ter pelo menos duas palavras e um emoji. O histórico CSV é consultado para evitar repetir comentários recentes. Não há IA, API, chave, cobrança ou envio da legenda para terceiros. Como é um sistema baseado em regras, ele interpreta texto, não imagens, e pode não reconhecer ironia, contexto implícito ou assuntos fora da biblioteca.
 
 ## Limitações importantes
 
