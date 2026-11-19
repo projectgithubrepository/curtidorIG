@@ -77,10 +77,10 @@ export function createComment(caption, previousComments = []) {
     const detail=pick(vocabulary.details,seed,i+3);
     const emoji=pick(vocabulary.emojis,seed,i+4);
     const templates=[
-      `Esse ${noun.replace(/^esse |^essa /,"")} ficou ${reaction}, e ${detail} merece destaque! ${emoji}`,
-      `Gostei de ver ${noun}: ${detail} deixa tudo ainda mais ${reaction}! ${emoji}`,
-      `${noun.charAt(0).toUpperCase()+noun.slice(1)} realmente chama atenção; ${detail} ficou ${reaction}! ${emoji}`,
-      `Muito bom! ${detail.charAt(0).toUpperCase()+detail.slice(1)} faz ${noun} ficar ${reaction}. ${emoji}`
+      `${noun.charAt(0).toUpperCase()+noun.slice(1)} ficou ${reaction}; ${detail} chama atenção! ${emoji}`,
+      `É muito legal ver ${noun}; ${detail} deixa a publicação ainda mais interessante! ${emoji}`,
+      `Gostei do cuidado com ${detail}; ${noun} ficou ${reaction}! ${emoji}`,
+      `Que ${noun.replace(/^(essa|esse) /,"")} ${reaction}! ${detail.charAt(0).toLowerCase()+detail.slice(1)} faz diferença. ${emoji}`
     ];
     candidates.push(templates[i%templates.length]);
   }
