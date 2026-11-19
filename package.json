@@ -9,7 +9,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "desktop": "electron .",
-    "dist:mac": "PLAYWRIGHT_BROWSERS_PATH=playwright-browsers playwright install chromium && electron-builder --mac dmg",
+    "dist:mac": "PLAYWRIGHT_BROWSERS_PATH=playwright-browsers playwright install chromium && electron-builder --mac dmg --publish never",
     "test": "node --test"
   },
   "dependencies": {
