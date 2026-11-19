@@ -14,6 +14,10 @@ extraResources:
 asarUnpack:
   - "node_modules/playwright/**"
 mac:
+  # Assinatura ad-hoc: valida a integridade do bundle, mas não substitui
+  # Developer ID nem a notarização exigida pelo Gatekeeper para distribuição.
+  identity: "-"
+  hardenedRuntime: true
   category: public.app-category.social-networking
   target:
     - dmg
