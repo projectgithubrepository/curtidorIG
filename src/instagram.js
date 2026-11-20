@@ -138,7 +138,23 @@ export async function inspectPost(page, url) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1800);
   if (page.url().includes("/accounts/login")) throw new Error("A sessão do Instagram expirou. Faça login novamente.");
-  const caption = await page.locator("article").first().innerText({ timeout: 12000 }).catch(() => "");
+  const article = page.locator("article").first();
+  const caption = await article.innerText({ timeout: 12000 }).catch(() => "");
   if (!caption.trim()) throw new Error("Não consegui ler a publicação; ela pode ser privada ou indisponível.");
-  return caption.slice(0, 5000);
+  const observedState = await article.evaluate(element => {
+    const labels = [...element.querySelectorAll('button,[role="button"]')].map(node =>
+      [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText].filter(Boolean).join(" ")
+    ).join(" ");
+    const profileLink = [...document.querySelectorAll("nav a[href]")].find(node =>
+      /perfil|profile/i.test([node.getAttribute("aria-label"), node.innerText].filter(Boolean).join(" "))
+    );
+    const username = (profileLink?.getAttribute("href") || "").match(/^\/([^/]+)\/?$/)?.[1] || "";
+    let commented = false;
+    if (username) commented = [...element.querySelectorAll("li")].some(item =>
+      [...item.querySelectorAll("a[href]")].some(link => link.getAttribute("href") === "/" + username + "/") &&
+      (item.innerText || "").trim().length > username.length
+    );
+    return { liked: /descurtir|unlike/i.test(labels), saved: /remover dos salvos|remove from saved/i.test(labels), commented };
+  }).catch(() => ({ liked: false, saved: false, commented: false }));
+  return { caption: caption.slice(0, 5000), observedState };
 }
