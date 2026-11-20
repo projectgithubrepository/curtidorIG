@@ -75,7 +75,7 @@ async function readVisibleAdministrativeMilestones(page) {
 }
 
 async function scrollToOlderMessages(page) {
-  const target = await page.evaluate(() => {
+  const before = await page.evaluate(() => {
     const candidates = [...document.querySelectorAll("body *")].filter(element => {
       const style = getComputedStyle(element);
       return /(auto|scroll)/.test(style.overflowY) &&
@@ -92,20 +92,52 @@ async function scrollToOlderMessages(page) {
     const element = candidates[0];
     if (!element) return null;
     const rect = element.getBoundingClientRect();
-    element.scrollTop = Math.max(0, element.scrollTop - Math.max(500, element.clientHeight * 0.8));
-    return {
+    const state = {
+      top: element.scrollTop,
+      height: element.scrollHeight,
+      textLength: (element.innerText || "").length,
+      anchorCount: element.querySelectorAll("a[href]").length,
       x: Math.max(5, Math.min(innerWidth - 5, rect.left + rect.width / 2)),
       y: Math.max(5, Math.min(innerHeight - 5, rect.top + rect.height / 2))
     };
+    element.scrollTop = Math.max(0, element.scrollTop - Math.max(500, element.clientHeight * 0.8));
+    return state;
   });
-  if (target) {
-    await page.mouse.move(target.x, target.y);
-    await page.mouse.wheel(0, -850);
-  } else {
-    await page.mouse.move(1100, 700);
-    await page.mouse.wheel(0, -850);
-  }
-  await page.waitForTimeout(900);
+
+  const point = before || { x: 1100, y: 700 };
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.wheel(0, -900);
+  await page.waitForTimeout(1200);
+
+  const after = await page.evaluate(() => {
+    const candidates = [...document.querySelectorAll("body *")].filter(element => {
+      const style = getComputedStyle(element);
+      return /(auto|scroll)/.test(style.overflowY) &&
+        element.scrollHeight > element.clientHeight + 80 &&
+        element.clientHeight > 120;
+    });
+    candidates.sort((a, b) => {
+      const ar = a.getBoundingClientRect();
+      const br = b.getBoundingClientRect();
+      const aRight = ar.left > innerWidth * 0.35 ? 1 : 0;
+      const bRight = br.left > innerWidth * 0.35 ? 1 : 0;
+      return (bRight - aRight) || ((br.height * br.width) - (ar.height * ar.width));
+    });
+    const element = candidates[0];
+    if (!element) return null;
+    return {
+      top: element.scrollTop,
+      height: element.scrollHeight,
+      textLength: (element.innerText || "").length,
+      anchorCount: element.querySelectorAll("a[href]").length
+    };
+  });
+
+  if (!before || !after) return false;
+  return after.top < before.top - 2 ||
+    after.height > before.height + 20 ||
+    after.textLength > before.textLength + 30 ||
+    after.anchorCount > before.anchorCount;
 }
 
 function addNetworkMessages(records, { groupThreadId, startDate, endDate, found, fallback, milestones }) {
@@ -204,20 +236,25 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   const found = new Map();
   const fallback = new Map();
   const milestones = new Map();
-  let previousCount = -1;
-  let stableRounds = 0;
+  let noScrollProgressRounds = 0;
+  let historyRounds = 0;
 
-  for (let round = 0; round < 35 && !shouldStop(); round++) {
+  // Não interrompe a varredura só porque ainda não encontrou links:
+  // conversas longas podem começar com dezenas de mensagens administrativas.
+  // Continua subindo até detectar o topo/ausência real de carregamento do histórico.
+  for (let round = 0; round < 70 && !shouldStop(); round++) {
+    historyRounds++;
     for (const marker of await readVisibleAdministrativeMilestones(page)) milestones.set(marker.text, marker);
     const batch = await readVisiblePostLinks(page);
     for (const item of batch) {
       const date = dateInRange(item.sharedAt, startDate, endDate);
       if (date.known && date.inRange) found.set(item.url, { ...item, sharedAt: date.iso, dateUnknown: false, collectionMode: "date" });
     }
-    if (found.size === previousCount) stableRounds++; else stableRounds = 0;
-    previousCount = found.size;
-    if (stableRounds >= 4) break;
-    await scrollToOlderMessages(page);
+
+    const progressed = await scrollToOlderMessages(page);
+    noScrollProgressRounds = progressed ? 0 : noScrollProgressRounds + 1;
+    // Garante uma varredura mínima antes de concluir que chegou ao início.
+    if (historyRounds >= 12 && noScrollProgressRounds >= 6) break;
   }
 
   await networkCapture.stop();
