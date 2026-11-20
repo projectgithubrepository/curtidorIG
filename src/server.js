@@ -87,25 +87,32 @@ app.post("/api/start", async (req, res) => {
       const previous = getRecentComments(200);
       for (const item of collected) {
         if (stopRequested) break;
-        const taskState = mergeTaskState(getTaskState(item.url), { groupCheck: item.groupCheck });
-        if (taskState.complete) {
-          results.push({ ...item, taskState, status: "fluxo completo — ignorar", comment: "" });
+        const previousState = mergeTaskState(getTaskState(item.url), { groupCheck: item.groupCheck });
+        if (previousState.complete) {
+          results.push({ ...item, taskState: previousState, status: "fluxo completo — ignorar", comment: "" });
           progress.done++;
           continue;
         }
         if (item.contentType === "story") {
-          const result = { ...item, taskState, caption: "", comment: "", status: "Story identificada — análise e ações específicas ainda não disponíveis" };
+          const result = { ...item, taskState: previousState, caption: "", comment: "", status: "Story identificada — análise e ações específicas ainda não disponíveis" };
           results.push(result);
-          appendHistory({ url: item.url, status: result.status, groupName, sharedAt: item.sharedAt, saved: taskState.saved, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, milestone: item.administrativeMilestones, detail: result.status });
+          appendHistory({ url: item.url, status: result.status, groupName, sharedAt: item.sharedAt, saved: previousState.saved, liked: previousState.liked, commented: previousState.commented, groupCheck: previousState.groupCheck, milestone: item.administrativeMilestones, detail: result.status });
           progress.done++;
           continue;
         }
         try {
-          const caption = await inspectPost(page, item.url);
-          const comment = taskState.commented ? "" : createComment(caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
-          const result = { ...item, caption, comment, taskState, status: item.dateUnknown ? "data do compartilhamento não identificada" : taskStateLabel(taskState) };
+          const inspection = await inspectPost(page, item.url);
+          const taskState = mergeTaskState(previousState, inspection.observedState);
+          if (taskState.complete) {
+            results.push({ ...item, caption: inspection.caption, taskState, status: "fluxo completo — ignorar", comment: "" });
+            appendHistory({ url: item.url, caption: inspection.caption, status: "fluxo completo — ignorar", groupName, sharedAt: item.sharedAt, saved: taskState.saved, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: true, milestone: item.administrativeMilestones });
+            progress.done++;
+            continue;
+          }
+          const comment = taskState.commented ? "" : createComment(inspection.caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
+          const result = { ...item, caption: inspection.caption, comment, taskState, status: item.dateUnknown ? "data do compartilhamento não identificada" : taskStateLabel(taskState) };
           results.push(result);
-          appendHistory({ url: item.url, caption, comment, status: result.status, groupName, sharedAt: item.sharedAt, saved: taskState.saved, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: taskState.complete, milestone: item.administrativeMilestones, detail: `Grupo: ${groupName}; mensagem: ${item.sharedAt}; ${result.status}` });
+          appendHistory({ url: item.url, caption: inspection.caption, comment, status: result.status, groupName, sharedAt: item.sharedAt, saved: taskState.saved, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: taskState.complete, milestone: item.administrativeMilestones, detail: `Grupo: ${groupName}; mensagem: ${item.sharedAt}; ${result.status}` });
         } catch (error) {
           const result = { ...item, caption: "", comment: "", status: "não foi possível analisar", detail: error.message };
           results.push(result);
