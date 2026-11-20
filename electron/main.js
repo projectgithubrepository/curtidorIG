@@ -19,15 +19,25 @@ async function waitForServer(url, attempts = 40) {
 }
 
 async function ensureChromium() {
-  const browsersPath = path.join(app.getPath("userData"), "playwright-browsers");
+  const bundledBrowsersPath = path.join(process.resourcesPath, "playwright-browsers");
+  const browsersPath = process.platform === "win32"
+    ? bundledBrowsersPath
+    : path.join(app.getPath("userData"), "playwright-browsers");
+
   process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath;
-  process.env.PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT = "120000";
   const { chromium } = await import("playwright");
   try {
     await fs.access(chromium.executablePath());
     return;
   } catch {}
 
+  // No Windows, o Chromium já vem dentro do instalador. Não deve depender
+  // de uma conexão externa nem tentar baixá-lo durante a primeira abertura.
+  if (process.platform === "win32") {
+    throw new Error("O Chromium não foi encontrado dentro do instalador. Baixe novamente a versão mais recente do curtidorIG.");
+  }
+
+  process.env.PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT = "120000";
   await dialog.showMessageBox({
     type: "info",
     title: "Primeira inicialização",
@@ -60,7 +70,7 @@ async function ensureChromium() {
     child.once("error", reject);
     child.once("exit", code => code === 0
       ? resolve()
-      : reject(new Error("A instalação do Chromium terminou com erro.\n\nDetalhes técnicos:\n" + (output.trim() || "O instalador não retornou detalhes. Verifique se a rede permite acesso a https://cdn.playwright.dev."))));
+      : reject(new Error("A instalação do Chromium terminou com erro.\n\nDetalhes técnicos:\n" + (output.trim() || "O instalador não retornou detalhes."))));
   });
 
   await fs.access(chromium.executablePath());
