@@ -163,7 +163,7 @@ app.post("/api/confirm-action", (req, res) => {
     caption: item.caption || "",
     comment: item.comment || "",
     status: item.status,
-    groupName: item.groupName || "",
+    groupName: diagnosticReport?.request?.groupName || item.groupName || "",
     sharedAt: item.sharedAt || "",
     saved: taskState.saved,
     savedFolderVerified: taskState.savedFolderVerified,
@@ -173,6 +173,13 @@ app.post("/api/confirm-action", (req, res) => {
     milestone: item.administrativeMilestones,
     detail: "Confirmação manual: " + labels[action]
   });
+  if (diagnosticReport?.publications) {
+    const reportItem = diagnosticReport.publications.find(entry => entry.url === url);
+    if (reportItem) {
+      reportItem.taskState = taskState;
+      reportItem.status = item.status;
+    }
+  }
   logDiagnostic("INFO", "Ação confirmada manualmente", { action, url, messageId: item.messageId });
   res.json({ ok: true, taskState, status: item.status });
 });
