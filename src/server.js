@@ -83,7 +83,11 @@ app.post("/api/start", async (req, res) => {
       const withoutDate = collected.filter(item => item.dateUnknown).length;
       const usedFallback = collected.some(item => item.collectionMode === "last-300-fallback");
       const milestoneCount = new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size;
-      progress.message = `${collected.length} links encontrados${usedFallback ? " pela varredura de recuperação" : ""}; ${withoutDate} sem data identificável; ${milestoneCount} marcos administrativos identificados. Verificando histórico...`;
+      const network = collected[0]?.networkDiagnostics;
+      const networkStatus = network
+        ? `Rede Instagram: ${network.capturedResponses} respostas; ${network.messageLikeObjects} objetos de mensagem; reações ${network.hasReactionFields ? "presentes" : "não detectadas"}; compartilhamentos ${network.hasShareFields ? "presentes" : "não detectados"}.`
+        : "Diagnóstico de rede indisponível.";
+      progress.message = `${collected.length} links encontrados${usedFallback ? " pela varredura de recuperação" : ""}; ${withoutDate} sem data identificável; ${milestoneCount} marcos administrativos identificados. ${networkStatus} Verificando histórico...`;
       const previous = getRecentComments(200);
       for (const item of collected) {
         if (stopRequested) break;
@@ -120,7 +124,11 @@ app.post("/api/start", async (req, res) => {
         }
         progress.done++;
       }
-      progress.message = `Coleta concluída: ${results.length} itens listados. Revise antes de qualquer interação no Instagram.`;
+      const network = results[0]?.networkDiagnostics;
+      const networkStatus = network
+        ? ` Captura de rede: ${network.capturedResponses} respostas, ${network.messageLikeObjects} objetos de mensagem; reações ${network.hasReactionFields ? "detectadas" : "não detectadas"}.`
+        : "";
+      progress.message = `Coleta concluída: ${results.length} itens listados.${networkStatus} Nenhuma ação de curtir, comentar, salvar ou reagir foi executada.`;
     } catch (error) {
       progress.message = error.message;
     } finally {
