@@ -88,12 +88,20 @@ export const getProcessedUrls = getCompletedUrls;
 
 export function appendHistory(entry) {
   ensureHistory();
+  const previous = entry.url ? getTaskState(entry.url) : {};
+  const state = {
+    saved: Boolean(previous.saved || entry.saved),
+    liked: Boolean(previous.liked || entry.liked),
+    commented: Boolean(previous.commented || entry.commented),
+    groupCheck: Boolean(previous.groupCheck || entry.groupCheck)
+  };
+  const complete = state.saved && state.liked && state.commented && state.groupCheck;
   const row = [
     entry.date ?? new Date().toISOString(), entry.url, entry.caption ?? "",
-    entry.liked ? "sim" : "não", entry.comment ?? "", entry.status ?? "pendente",
+    state.liked ? "sim" : "não", entry.comment ?? "", entry.status ?? "pendente",
     entry.detail ?? "", entry.groupName ?? "", entry.sharedAt ?? "",
-    entry.saved ? "sim" : "não", entry.commented ? "sim" : "não",
-    entry.groupCheck ? "sim" : "não", entry.complete ? "sim" : "não",
+    state.saved ? "sim" : "não", state.commented ? "sim" : "não",
+    state.groupCheck ? "sim" : "não", complete ? "sim" : "não",
     entry.milestone ? JSON.stringify(entry.milestone) : ""
   ];
   fs.appendFileSync(HISTORY_FILE, row.map(csvCell).join(",") + "\n", "utf8");
