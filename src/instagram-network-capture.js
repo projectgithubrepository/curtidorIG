@@ -80,7 +80,8 @@ export function createInstagramNetworkCapture(page) {
     } catch {
       return;
     }
-    if (!url.pathname.includes("/api/graphql") && !url.pathname.includes("/api/v1/direct")) return;
+    if (!["www.instagram.com", "instagram.com"].includes(url.hostname.toLowerCase())) return;
+    if (!url.pathname.includes("/graphql") && !url.pathname.includes("/api/v1/direct")) return;
 
     const contentLength = Number(response.headers()["content-length"] || 0);
     if (contentLength > 10 * 1024 * 1024) return;
