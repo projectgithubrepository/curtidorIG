@@ -10,6 +10,25 @@ const current = document.querySelector("#current");
 const bar = document.querySelector("#bar");
 const results = document.querySelector("#results");
 
+const connect = document.querySelector("#connect");
+
+connect.addEventListener("click", async () => {
+  connect.disabled = true;
+  message.textContent = "Abrindo a janela do Instagram...";
+  try {
+    const response = await fetch("/api/connect", { method: "POST" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Não foi possível abrir o Instagram.");
+    message.textContent = data.message;
+    state.textContent = "Aguardando login";
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    connect.disabled = false;
+    refresh();
+  }
+});
+
 start.addEventListener("click", async () => {
   start.disabled = true;
   try {
@@ -39,7 +58,7 @@ async function refresh() {
   try {
     const [sr,rr]=await Promise.all([fetch("/api/status"),fetch("/api/results")]);
     const data=await sr.json(), p=data.progress, r=await rr.json();
-    state.textContent=data.running?"Coletando":"Pronto"; message.textContent=p.message;
+    state.textContent=data.running?"Coletando":(data.connected?"Instagram conectado":"Pronto"); if (p.message) message.textContent=p.message;
     counter.textContent=`${p.done} de ${p.total} publicações processadas`;
     current.textContent=p.current||""; bar.style.width=p.total?`${Math.min(100,p.done/p.total*100)}%`:"0%";
     start.disabled=data.running; stop.disabled=!data.running; render(r.results||[]);
