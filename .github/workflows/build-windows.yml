@@ -33,40 +33,51 @@ jobs:
         run: |
           $env:PLAYWRIGHT_BROWSERS_PATH = "$env:GITHUB_WORKSPACE\.playwright-browsers"
           npm run dist:win
-      - name: Inspect packaged application files
+      - name: Validate packaged application
         shell: pwsh
         run: |
-          Write-Host "Conteúdo de release:"
-          Get-ChildItem release -Force | Select-Object FullName, Mode
-          Write-Host "Conteúdo de release/win-unpacked:"
-          if (Test-Path release/win-unpacked) {
-            Get-ChildItem release/win-unpacked -Force | Select-Object FullName, Mode
-          } else {
-            throw "A pasta release/win-unpacked não foi criada pelo electron-builder."
+          $required = @(
+            "release/win-unpacked/resources/app.asar",
+            "release/win-unpacked/resources/app.asar.unpacked",
+            "release/win-unpacked/resources/playwright-browsers"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) {
+              throw "Arquivo/pasta obrigatório ausente: $path"
+            }
           }
-          Write-Host "Conteúdo de resources:"
-          if (Test-Path release/win-unpacked/resources) {
-            Get-ChildItem release/win-unpacked/resources -Force | Select-Object FullName, Mode
-          } else {
-            throw "A pasta resources não foi criada."
-          }
+          Get-Item "release/win-unpacked/resources/app.asar" | Select-Object FullName, Length
+          Get-ChildItem "release/win-unpacked/resources/app.asar.unpacked" -Force | Select-Object FullName, Mode
       - name: Install NSIS
         run: choco install nsis --no-progress -y
       - name: Build lightweight update executable
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force release | Out-Null
-          $makensis = "${env:ProgramFiles(x86)}\\NSIS\\makensis.exe"
+          $programFilesX86 = [Environment]::GetFolderPath('ProgramFilesX86')
+          $makensis = Join-Path $programFilesX86 "NSIS\makensis.exe"
           if (-not (Test-Path $makensis)) {
-            $makensis = "$env:ProgramFiles\\NSIS\\makensis.exe"
+            $makensis = Join-Path $env:ProgramFiles "NSIS\makensis.exe"
           }
           if (-not (Test-Path $makensis)) {
-            throw "NSIS foi instalado, mas makensis.exe não foi encontrado nos diretórios padrão."
+            throw "NSIS foi instalado, mas makensis.exe não foi encontrado."
           }
-          & $makensis /V3 installer/windows-update.nsi
+
+          $outputDir = Join-Path $env:GITHUB_WORKSPACE "release"
+          New-Item -ItemType Directory -Force $outputDir | Out-Null
+          & $makensis "/DOUTPUT_DIR=$outputDir" /V3 "installer/windows-update.nsi"
           if ($LASTEXITCODE -ne 0) {
             throw "A geração do atualizador NSIS falhou com código $LASTEXITCODE."
           }
+
+          $patch = Join-Path $outputDir "curtidorIG-Atualizacao-Windows.exe"
+          if (-not (Test-Path $patch)) {
+            throw "NSIS terminou sem erro, mas o atualizador não foi criado em: $patch"
+          }
+          $patchInfo = Get-Item $patch
+          if ($patchInfo.Length -lt 100KB) {
+            throw "O atualizador foi criado, mas o tamanho parece inválido: $($patchInfo.Length) bytes."
+          }
+          Write-Host "Atualizador gerado: $($patchInfo.FullName) ($($patchInfo.Length) bytes)"
       - name: Upload installer and update patch
         uses: actions/upload-artifact@v4
         with:
