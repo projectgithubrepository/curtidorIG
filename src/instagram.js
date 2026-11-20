@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 import path from "node:path";
-import { isAdministrativeMessage } from "./group-state.js";
+import { isAdministrativeMessage, parseAdministrativeMilestone } from "./group-state.js";
 
 const PROFILE_DIR = path.resolve("data", "instagram-profile");
 
@@ -44,6 +44,11 @@ async function readVisiblePostLinks(page) {
   }).then(items => items.filter(item => !isAdministrativeMessage(item.messageText)));
 }
 
+async function readVisibleAdministrativeMilestones(page) {
+  const texts = await page.locator('[role="row"],[role="listitem"],[data-testid*="message"]').allInnerTexts().catch(() => []);
+  return texts.map(parseAdministrativeMilestone).filter(Boolean);
+}
+
 async function scrollToOlderMessages(page) {
   await page.mouse.wheel(0, -750);
   await page.waitForTimeout(650);
@@ -69,11 +74,13 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   await page.waitForTimeout(1800);
 
   const found = new Map();
+  const milestones = new Map();
   let previousCount = -1;
   let stableRounds = 0;
 
   // Estratégia principal: só aceita mensagens cuja data possa ser lida e esteja no período.
   for (let round = 0; round < 35 && !shouldStop(); round++) {
+    for (const marker of await readVisibleAdministrativeMilestones(page)) milestones.set(marker.text, marker);
     const batch = await readVisiblePostLinks(page);
     for (const item of batch) {
       const date = dateInRange(item.sharedAt, startDate, endDate);
@@ -93,6 +100,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     let stableFallbackRounds = 0;
     let previousFallbackSize = -1;
     for (let round = 0; round < 30 && !shouldStop(); round++) {
+      for (const marker of await readVisibleAdministrativeMilestones(page)) milestones.set(marker.text, marker);
       const batch = await readVisiblePostLinks(page);
       for (const item of batch) {
         if (fallback.has(item.url)) continue;
@@ -117,7 +125,8 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   if (!found.size) {
     throw new Error("Não encontrei links de publicações no grupo, mesmo após tentar a leitura por data e a varredura de até 300 mensagens recentes. Confira se a conversa carregou e se há links compartilhados nesse trecho; nenhuma interação foi feita.");
   }
-  return [...found.values()].sort((a, b) => {
+  const milestoneList = [...milestones.values()];
+  return [...found.values()].map(item => ({ ...item, administrativeMilestones: milestoneList })).sort((a, b) => {
     if (!a.sharedAt) return 1;
     if (!b.sharedAt) return -1;
     return a.sharedAt.localeCompare(b.sharedAt);
