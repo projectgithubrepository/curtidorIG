@@ -15,7 +15,7 @@ export function isAdministrativeMessage(value) {
 export function parseAdministrativeMilestone(value) {
   const text = normalizeGroupText(value);
   if (!isAdministrativeMessage(value)) return null;
-  const dateMatch = String(value ?? "").match(/\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b/);
+  const dateMatch = String(value ?? "").match(/\b(\d{1,2})(?:\s+do\s+|[/-])(\d{1,2})(?:(?:[/-]|\s+de\s+)(\d{2,4}))?\b/i);
   let date = "";
   if (dateMatch) {
     const year = dateMatch[3] ? (dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3]) : "";
