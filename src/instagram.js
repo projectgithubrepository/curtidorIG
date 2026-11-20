@@ -360,21 +360,111 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   });
 }
 
+export function interpretPostSnapshot(snapshot) {
+  const finalUrl = String(snapshot.url || "");
+  const title = String(snapshot.title || "");
+  const bodyText = String(snapshot.bodyText || "").trim();
+  const articleText = String(snapshot.articleText || "").trim();
+  const mainText = String(snapshot.mainText || "").trim();
+  const dialogText = String(snapshot.dialogText || "").trim();
+  const ogDescription = String(snapshot.ogDescription || "").trim();
+  const selectors = snapshot.selectors || {};
+  const combined = [title, bodyText].join("\\n").toLowerCase();
+  const diagnostics = {
+    requestedUrl: String(snapshot.requestedUrl || ""),
+    finalUrl,
+    httpStatus: snapshot.httpStatus ?? null,
+    title: title.slice(0, 180),
+    selectors,
+    visibleText: bodyText.slice(0, 500),
+    detectedMedia: Boolean(snapshot.hasVideo || snapshot.hasImage),
+    hasArticle: Boolean(selectors.article),
+    hasMain: Boolean(selectors.main),
+    hasDialog: Boolean(selectors.dialog)
+  };
+
+  if (/\\/accounts\\/(login|signup)/i.test(finalUrl) || /login|entrar na sua conta|log in to instagram/i.test(combined)) {
+    throw Object.assign(new Error("Instagram redirecionou para login; a sessão precisa ser autenticada."), { inspectionDiagnostics: { ...diagnostics, reason: "login" } });
+  }
+  if (/challenge|checkpoint|\\/accounts/suspended/i.test(finalUrl) || /confirme que é você|confirm it’s you|security code|atividade suspeita|suspicious activity/i.test(combined)) {
+    throw Object.assign(new Error("Instagram apresentou uma etapa de segurança ou confirmação; a publicação não foi analisada."), { inspectionDiagnostics: { ...diagnostics, reason: "security-check" } });
+  }
+  if (snapshot.httpStatus && snapshot.httpStatus >= 400) {
+    throw Object.assign(new Error("Instagram respondeu com HTTP " + snapshot.httpStatus + " ao abrir a publicação."), { inspectionDiagnostics: { ...diagnostics, reason: "http-error" } });
+  }
+  if (/content unavailable|this page isn't available|página não está disponível|conteúdo indisponível|link que você acessou pode estar quebrado/i.test(combined)) {
+    throw Object.assign(new Error("O Instagram exibiu uma mensagem de conteúdo indisponível. Não é possível concluir se a publicação é privada ou foi removida."), { inspectionDiagnostics: { ...diagnostics, reason: "unavailable-message" } });
+  }
+
+  const caption = (articleText || dialogText || mainText || ogDescription).trim();
+  if (!caption) {
+    const reason = snapshot.hasVideo || snapshot.hasImage ? "media-without-readable-caption" : "post-content-not-rendered";
+    const message = reason === "media-without-readable-caption"
+      ? "A página carregou mídia, mas não foi possível extrair a legenda ou o texto da publicação."
+      : "A página abriu, mas o conteúdo da publicação não apareceu nas estruturas reconhecidas.";
+    throw Object.assign(new Error(message), { inspectionDiagnostics: { ...diagnostics, reason } });
+  }
+  return { caption: caption.slice(0, 5000), diagnostics };
+}
+
 export async function inspectPost(page, url) {
-  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-  await page.waitForTimeout(1800);
-  if (page.url().includes("/accounts/login")) throw new Error("A sessão do Instagram expirou. Faça login novamente.");
-  const article = page.locator("article").first();
-  const caption = await article.innerText({ timeout: 12000 }).catch(() => "");
-  if (!caption.trim()) throw new Error("Não consegui ler a publicação; ela pode ser privada ou indisponível.");
-  const observedState = await article.evaluate(element => {
+  let response = null;
+  try {
+    response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+  } catch (error) {
+    throw Object.assign(new Error("Falha de navegação ao abrir a publicação: " + error.message), {
+      inspectionDiagnostics: { requestedUrl: url, finalUrl: page.url(), reason: "navigation-error", navigationError: error.message }
+    });
+  }
+
+  // Aguarda a renderização real do post, de uma tela de segurança ou de um erro.
+  // Não depende de um atraso fixo nem de networkidle (o Instagram mantém conexões abertas).
+  await page.waitForFunction(() => {
+    const text = (document.body?.innerText || "").toLowerCase();
+    return Boolean(document.querySelector("article, main, [role='dialog']") ||
+      /content unavailable|this page isn't available|página não está disponível|conteúdo indisponível|login|entrar na sua conta|challenge|checkpoint|confirme que é você/.test(text));
+  }, { timeout: 18000 }).catch(() => {});
+
+  const snapshot = await page.evaluate(() => {
+    const article = document.querySelector("article");
+    const main = document.querySelector("main");
+    const dialog = document.querySelector("[role='dialog']");
+    const meta = document.querySelector('meta[property="og:description"],meta[name="description"]');
+    const bodyText = (document.body?.innerText || "").trim();
+    return {
+      url: location.href,
+      title: document.title || "",
+      bodyText: bodyText.slice(0, 1000),
+      articleText: article?.innerText || "",
+      mainText: main?.innerText || "",
+      dialogText: dialog?.innerText || "",
+      ogDescription: meta?.content || "",
+      hasVideo: Boolean(document.querySelector("video")),
+      hasImage: Boolean(document.querySelector("article img, main img, [role='dialog'] img")),
+      selectors: {
+        article: Boolean(article),
+        main: Boolean(main),
+        dialog: Boolean(dialog),
+        video: Boolean(document.querySelector("video")),
+        image: Boolean(document.querySelector("article img, main img, [role='dialog'] img"))
+      }
+    };
+  });
+  const interpreted = interpretPostSnapshot({
+    ...snapshot,
+    requestedUrl: url,
+    httpStatus: response?.status?.() ?? null
+  });
+
+  const rootSelector = snapshot.selectors.article ? "article" : snapshot.selectors.dialog ? '[role="dialog"]' : "main";
+  const observedState = await page.locator(rootSelector).first().evaluate(element => {
     const labels = [...element.querySelectorAll('button,[role="button"]')].map(node =>
       [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText].filter(Boolean).join(" ")
     ).join(" ");
     const profileLink = [...document.querySelectorAll("nav a[href]")].find(node =>
       /perfil|profile/i.test([node.getAttribute("aria-label"), node.innerText].filter(Boolean).join(" "))
     );
-    const username = (profileLink?.getAttribute("href") || "").match(/^\/([^/]+)\/?$/)?.[1] || "";
+    const username = (profileLink?.getAttribute("href") || "").match(/^\\/([^/]+)\\/?$/)?.[1] || "";
     let commented = false;
     if (username) commented = [...element.querySelectorAll("li")].some(item =>
       [...item.querySelectorAll("a[href]")].some(link => link.getAttribute("href") === "/" + username + "/") &&
@@ -382,5 +472,5 @@ export async function inspectPost(page, url) {
     );
     return { liked: /descurtir|unlike/i.test(labels), saved: /remover dos salvos|remove from saved/i.test(labels), commented };
   }).catch(() => ({ liked: false, saved: false, commented: false }));
-  return { caption: caption.slice(0, 5000), observedState };
+  return { caption: interpreted.caption, observedState, inspectionDiagnostics: interpreted.diagnostics };
 }
