@@ -40,9 +40,10 @@ export function hasGroupCheck(_value) {
 
 export function mergeTaskState(previous = {}, observed = {}) {
   const merged = {};
-  for (const key of ["saved", "savedFolderVerified", "liked", "commented", "groupCheck"]) {
+  for (const key of ["saved", "liked", "commented", "groupCheck"]) {
     merged[key] = Boolean(previous[key] || observed[key]);
   }
+  merged.savedFolderVerified = merged.saved && Boolean(previous.savedFolderVerified || observed.savedFolderVerified);
   merged.complete = merged.saved && merged.savedFolderVerified && merged.liked && merged.commented && merged.groupCheck;
   return merged;
 }
