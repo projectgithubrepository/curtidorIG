@@ -70,8 +70,9 @@ export function createInstagramNetworkCapture(page) {
   const responses = [];
   const operations = new Set();
   let stopped = false;
+  const pending = new Set();
 
-  const onResponse = async response => {
+  const onResponse = response => {
     if (stopped || responses.length >= MAX_RESPONSES) return;
     let url;
     try {
@@ -80,6 +81,9 @@ export function createInstagramNetworkCapture(page) {
       return;
     }
     if (!url.pathname.includes("/api/graphql") && !url.pathname.includes("/api/v1/direct")) return;
+
+    const contentLength = Number(response.headers()["content-length"] || 0);
+    if (contentLength > 10 * 1024 * 1024) return;
 
     const request = response.request();
     const operation = operationNameFromRequest(request);
@@ -94,20 +98,26 @@ export function createInstagramNetworkCapture(page) {
       parseError: false
     };
 
-    try {
-      const payload = await response.json();
-      entry.payload = inspectPayload(payload);
-    } catch {
-      entry.parseError = true;
-    }
-    if (!stopped && responses.length < MAX_RESPONSES) responses.push(entry);
+    const task = (async () => {
+      try {
+        const payload = await response.json();
+        entry.payload = inspectPayload(payload);
+      } catch {
+        entry.parseError = true;
+      }
+      if (responses.length < MAX_RESPONSES) responses.push(entry);
+    })();
+    pending.add(task);
+    task.finally(() => pending.delete(task));
   };
 
   page.on("response", onResponse);
-  const stop = () => {
-    if (stopped) return;
-    stopped = true;
-    page.off("response", onResponse);
+  const stop = async () => {
+    if (!stopped) {
+      stopped = true;
+      page.off("response", onResponse);
+    }
+    await Promise.allSettled([...pending]);
   };
 
   return {
