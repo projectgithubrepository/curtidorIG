@@ -112,8 +112,13 @@ function addNetworkMessages(records, { groupThreadId, startDate, endDate, found,
   let accepted = 0;
   let unknownDateCandidates = 0;
   let rejectedThread = 0;
+  let rejectedUnscoped = 0;
   for (const record of records) {
-    if (record.threadId && groupThreadId && record.threadId !== groupThreadId) {
+    if (!groupThreadId || !record.threadId) {
+      rejectedUnscoped++;
+      continue;
+    }
+    if (record.threadId !== groupThreadId) {
       rejectedThread++;
       continue;
     }
@@ -146,7 +151,7 @@ function addNetworkMessages(records, { groupThreadId, startDate, endDate, found,
       }
     }
   }
-  return { accepted, unknownDateCandidates, rejectedThread };
+  return { accepted, unknownDateCandidates, rejectedThread, rejectedUnscoped };
 }
 
 export async function collectGroupPosts(page, { groupName, startDate, endDate, shouldStop = () => false }) {
@@ -177,6 +182,10 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   await exact.click();
   await page.waitForTimeout(1800);
   const activeThreadId = page.url().match(/\/direct\/t\/(\d+)/)?.[1] || "";
+  if (!activeThreadId) {
+    await networkCapture.stop();
+    throw new Error("Não foi possível confirmar o ID da conversa aberta. Coleta cancelada para evitar misturar mensagens de outros grupos.");
+  }
 
   const found = new Map();
   const fallback = new Map();
@@ -217,7 +226,8 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
       ". Rede: " + networkDiagnostics.capturedResponses + " respostas; " +
       networkDiagnostics.distinctMessageIds + " mensagens deduplicadas; " +
       networkDiagnostics.extractedShareUrls + " URLs extraídas; " + fallback.size + " candidatas sem data; " +
-      networkMerge.rejectedThread + " mensagens descartadas por divergência de conversa. Nenhuma interação foi feita.");
+      networkMerge.rejectedThread + " mensagens descartadas por divergência de conversa; " +
+      networkMerge.rejectedUnscoped + " mensagens sem identificação de conversa descartadas. Nenhuma interação foi feita.");
     error.networkDiagnostics = networkDiagnostics;
     error.pageDiagnostics = diagnostics;
     throw error;
@@ -232,7 +242,8 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
       normalizedNetworkMessages: networkRecords.length,
       acceptedNetworkPosts: networkMerge.accepted,
       unknownDateCandidates: networkMerge.unknownDateCandidates,
-      rejectedOtherThreads: networkMerge.rejectedThread
+      rejectedOtherThreads: networkMerge.rejectedThread,
+      rejectedUnscopedMessages: networkMerge.rejectedUnscoped
     }
   })).sort((a, b) => {
     if (!a.sharedAt) return 1;
