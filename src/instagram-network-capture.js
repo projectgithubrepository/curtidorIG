@@ -175,6 +175,7 @@ function extractPayload(payload, context = {}) {
     objectsVisited++;
     const ownKeys = Object.keys(value);
     ownKeys.forEach(key => keys.add(key));
+    const currentThreadId = String(value.thread_id ?? value.threadId ?? value.conversation_id ?? value.thread_v2_id ?? (inheritedThreadId || context.threadId) ?? "");
     if (ownKeys.some(key => /reaction|emoji|reactor/i.test(key))) hasReactionFields = true;
     if (value.share || value.media || value.media_share || value.xma || value.slide_messages) sharedMediaObjects++;
 
@@ -339,7 +340,9 @@ export function createInstagramNetworkCapture(page) {
         websocketConnections: websocketStats.connections,
         websocketFrames: websocketStats.frames,
         parsedWebSocketFrames: websocketStats.parsedFrames,
-        unparsedWebSocketFrames: websocketStats.unparsedFrames,\n        webSocketMessageLikeObjects: websocketStats.messageLikeObjects,\n        webSocketSharedMediaObjects: websocketStats.sharedMediaObjects,
+        unparsedWebSocketFrames: websocketStats.unparsedFrames,
+        webSocketMessageLikeObjects: websocketStats.messageLikeObjects,
+        webSocketSharedMediaObjects: websocketStats.sharedMediaObjects,
         operationDetails: [...byOperation.values()].slice(0, 30),
         distinctMessageIds: recordsByKey.size,
         extractedShareUrls: [...recordsByKey.values()].reduce((sum, item) => sum + item.urls.length, 0),
