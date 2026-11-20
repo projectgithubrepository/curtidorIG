@@ -3,7 +3,7 @@ import path from "node:path";
 
 const DATA_DIR = path.resolve("data");
 const HISTORY_FILE = path.join(DATA_DIR, "historico.csv");
-const HEADER = ["data_hora","url","legenda","curtida","comentario","status","detalhe","grupo_origem","data_compartilhamento","salva","comentada","check_grupo","fluxo_completo","marco_administrativo","pasta_correta"];
+const HEADER = ["data_hora","url","id_conversa","id_mensagem","legenda","curtida","comentario","status","detalhe","grupo_origem","data_compartilhamento","salva","comentada","check_grupo","fluxo_completo","marco_administrativo","pasta_correta"];
 
 function csvCell(value) {
   const text = String(value ?? "");
@@ -67,8 +67,10 @@ function historyEntries() {
   );
 }
 
-export function getTaskState(url) {
-  const entries = historyEntries().filter(entry => entry.url === url);
+export function getTaskState(url, groupThreadId = "", messageId = "") {
+  // A publicação só tem identidade suficiente quando está vinculada à conversa e à mensagem exatas.
+  if (!url || !groupThreadId || !messageId) return { saved: false, savedFolderVerified: false, liked: false, commented: false, groupCheck: false, complete: false };
+  const entries = historyEntries().filter(entry => entry.url === url && entry.id_conversa === String(groupThreadId) && entry.id_mensagem === String(messageId));
   const latest = entries.at(-1) ?? {};
   const saved = truthy(latest.salva);
   const savedFolderVerified = truthy(latest.pasta_correta);
@@ -89,7 +91,10 @@ export const getProcessedUrls = getCompletedUrls;
 
 export function appendHistory(entry) {
   ensureHistory();
-  const previous = entry.url ? getTaskState(entry.url) : {};
+  const groupThreadId = String(entry.groupThreadId ?? "");
+  const messageId = String(entry.messageId ?? "");
+  const identityVerified = Boolean(entry.url && groupThreadId && messageId);
+  const previous = identityVerified ? getTaskState(entry.url, groupThreadId, messageId) : {};
   const state = {
     saved: Boolean(previous.saved || entry.saved),
     savedFolderVerified: Boolean(previous.savedFolderVerified || entry.savedFolderVerified),
@@ -97,9 +102,9 @@ export function appendHistory(entry) {
     commented: Boolean(previous.commented || entry.commented),
     groupCheck: Boolean(previous.groupCheck || entry.groupCheck)
   };
-  const complete = state.saved && state.savedFolderVerified && state.liked && state.commented && state.groupCheck;
+  const complete = identityVerified && state.saved && state.savedFolderVerified && state.liked && state.commented && state.groupCheck;
   const row = [
-    entry.date ?? new Date().toISOString(), entry.url, entry.caption ?? "",
+    entry.date ?? new Date().toISOString(), entry.url, groupThreadId, messageId, entry.caption ?? "",
     state.liked ? "sim" : "não", entry.comment ?? "", entry.status ?? "pendente",
     entry.detail ?? "", entry.groupName ?? "", entry.sharedAt ?? "",
     state.saved ? "sim" : "não", state.commented ? "sim" : "não",

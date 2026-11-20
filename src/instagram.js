@@ -113,6 +113,7 @@ function addNetworkMessages(records, { groupThreadId, startDate, endDate, found,
   let unknownDateCandidates = 0;
   let rejectedThread = 0;
   let rejectedUnscoped = 0;
+  let rejectedIdentity = 0;
   for (const record of records) {
     if (!groupThreadId || !record.threadId) {
       rejectedUnscoped++;
@@ -122,6 +123,7 @@ function addNetworkMessages(records, { groupThreadId, startDate, endDate, found,
       rejectedThread++;
       continue;
     }
+    if (!record.messageId) { rejectedIdentity++; continue; }
     const text = record.text || "";
     if (text && isAdministrativeMessage(text)) {
       const marker = parseAdministrativeMilestone(text);
@@ -133,7 +135,9 @@ function addNetworkMessages(records, { groupThreadId, startDate, endDate, found,
       if (date.known && !date.inRange) continue;
       const item = {
         url,
-        messageId: record.messageId,
+        messageId: String(record.messageId),
+        threadId: String(groupThreadId),
+        identityVerified: true,
         sender: record.sender || "",
         messageText: text,
         sharedAt: date.iso,
@@ -144,14 +148,18 @@ function addNetworkMessages(records, { groupThreadId, startDate, endDate, found,
         networkReactionDataPresent: Boolean(record.hasReactionData)
       };
       if (date.known) {
-        if (!found.has(url)) { found.set(url, item); accepted++; }
-      } else if (!fallback.has(url)) {
-        fallback.set(url, item);
+        const previous = found.get(url) || {};
+        found.set(url, { ...previous, ...item, sharedAt: date.iso, dateUnknown: false, collectionMode: "network-date" });
+        accepted++;
+      } else {
+        const previous = fallback.get(url) || found.get(url) || {};
+        const merged = { ...previous, ...item, dateUnknown: true, collectionMode: "network-date-unknown" };
+        if (found.has(url)) found.set(url, merged); else fallback.set(url, merged);
         unknownDateCandidates++;
       }
     }
   }
-  return { accepted, unknownDateCandidates, rejectedThread, rejectedUnscoped };
+  return { accepted, unknownDateCandidates, rejectedThread, rejectedUnscoped, rejectedIdentity };
 }
 
 export async function collectGroupPosts(page, { groupName, startDate, endDate, shouldStop = () => false }) {
@@ -236,6 +244,8 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   const milestoneList = [...milestones.values()];
   return [...found.values()].map(item => ({
     ...item,
+    threadId: String(item.threadId || activeThreadId),
+    identityVerified: Boolean(item.messageId && (item.threadId || activeThreadId)),
     administrativeMilestones: milestoneList,
     networkDiagnostics: {
       ...networkDiagnostics,
@@ -243,7 +253,8 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
       acceptedNetworkPosts: networkMerge.accepted,
       unknownDateCandidates: networkMerge.unknownDateCandidates,
       rejectedOtherThreads: networkMerge.rejectedThread,
-      rejectedUnscopedMessages: networkMerge.rejectedUnscoped
+      rejectedUnscopedMessages: networkMerge.rejectedUnscoped,
+      rejectedMessagesWithoutId: networkMerge.rejectedIdentity
     }
   })).sort((a, b) => {
     if (!a.sharedAt) return 1;

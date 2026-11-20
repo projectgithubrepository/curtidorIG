@@ -37,7 +37,8 @@ function reportItem(item) {
     dateUnknown: Boolean(item.dateUnknown),
     collectionMode: item.collectionMode || "",
     status: item.status || "",
-    taskState: item.taskState || null
+    taskState: item.taskState || null,
+    identityVerified: Boolean(item.identityVerified)
   };
 }
 
@@ -155,18 +156,19 @@ app.post("/api/start", async (req, res) => {
       });
       progress.total = collected.length;
       const withoutDate = collected.filter(item => item.dateUnknown).length;
+      const withoutIdentity = collected.filter(item => !item.identityVerified).length;
       const usedFallback = collected.some(item => item.collectionMode === "last-300-fallback");
       const milestoneCount = new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size;
       const network = collected[0]?.networkDiagnostics;
       const networkStatus = network
         ? `Rede Instagram: ${network.capturedResponses} respostas; ${network.messageLikeObjects} objetos de mensagem; reações ${network.hasReactionFields ? "presentes" : "não detectadas"}; compartilhamentos ${network.hasShareFields ? "presentes" : "não detectados"}.`
         : "Diagnóstico de rede indisponível.";
-      progress.message = `${collected.length} links encontrados${usedFallback ? " pela varredura de recuperação" : ""}; ${withoutDate} sem data identificável; ${milestoneCount} marcos administrativos identificados. ${networkStatus} Verificando histórico...`;
+      progress.message = `${collected.length} links encontrados${usedFallback ? " pela varredura de recuperação" : ""}; ${withoutDate} sem data identificável; ${milestoneCount} marcos administrativos identificados; ${withoutIdentity} itens sem vínculo comprovado com mensagem. ${networkStatus} Verificando histórico...`;
       const previous = getRecentComments(200);
       logDiagnostic("INFO", "Iniciando inspeção das publicações encontradas", { total: collected.length });
       for (const item of collected) {
         if (stopRequested) break;
-        const previousState = mergeTaskState(getTaskState(item.url), { groupCheck: item.groupCheck });
+        const previousState = mergeTaskState(getTaskState(item.url, item.threadId, item.messageId), { groupCheck: false });
         if (previousState.complete) {
           results.push({ ...item, taskState: previousState, status: "fluxo completo — ignorar", comment: "" });
           progress.done++;
@@ -175,7 +177,7 @@ app.post("/api/start", async (req, res) => {
         if (item.contentType === "story") {
           const result = { ...item, taskState: previousState, caption: "", comment: "", status: "Story identificada — análise e ações específicas ainda não disponíveis" };
           results.push(result);
-          appendHistory({ url: item.url, status: result.status, groupName, sharedAt: item.sharedAt, saved: previousState.saved, savedFolderVerified: previousState.savedFolderVerified, liked: previousState.liked, commented: previousState.commented, groupCheck: previousState.groupCheck, milestone: item.administrativeMilestones, detail: result.status });
+          appendHistory({ url: item.url, groupThreadId: item.threadId, messageId: item.messageId, status: result.status, groupName, sharedAt: item.sharedAt, saved: previousState.saved, savedFolderVerified: previousState.savedFolderVerified, liked: previousState.liked, commented: previousState.commented, groupCheck: previousState.groupCheck, milestone: item.administrativeMilestones, detail: result.status });
           progress.done++;
           continue;
         }
@@ -184,19 +186,19 @@ app.post("/api/start", async (req, res) => {
           const taskState = mergeTaskState(previousState, inspection.observedState);
           if (taskState.complete) {
             results.push({ ...item, caption: inspection.caption, taskState, status: "fluxo completo — ignorar", comment: "" });
-            appendHistory({ url: item.url, caption: inspection.caption, status: "fluxo completo — ignorar", groupName, sharedAt: item.sharedAt, saved: taskState.saved, savedFolderVerified: taskState.savedFolderVerified, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: true, milestone: item.administrativeMilestones });
+            appendHistory({ url: item.url, groupThreadId: item.threadId, messageId: item.messageId, caption: inspection.caption, status: "fluxo completo — ignorar", groupName, sharedAt: item.sharedAt, saved: taskState.saved, savedFolderVerified: taskState.savedFolderVerified, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: true, milestone: item.administrativeMilestones });
             progress.done++;
             continue;
           }
           const comment = taskState.commented ? "" : createComment(inspection.caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
           const result = { ...item, caption: inspection.caption, comment, taskState, status: item.dateUnknown ? "data do compartilhamento não identificada" : taskStateLabel(taskState) };
           results.push(result);
-          appendHistory({ url: item.url, caption: inspection.caption, comment, status: result.status, groupName, sharedAt: item.sharedAt, saved: taskState.saved, savedFolderVerified: taskState.savedFolderVerified, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: taskState.complete, milestone: item.administrativeMilestones, detail: `Grupo: ${groupName}; mensagem: ${item.sharedAt}; ${result.status}` });
+          appendHistory({ url: item.url, groupThreadId: item.threadId, messageId: item.messageId, caption: inspection.caption, comment, status: result.status, groupName, sharedAt: item.sharedAt, saved: taskState.saved, savedFolderVerified: taskState.savedFolderVerified, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: taskState.complete, milestone: item.administrativeMilestones, detail: `Grupo: ${groupName}; mensagem: ${item.sharedAt}; ${result.status}` });
         } catch (error) {
           logDiagnostic("ERROR", "Falha ao inspecionar publicação", { url: item.url, error: error.message });
           const result = { ...item, caption: "", comment: "", status: "não foi possível analisar", detail: error.message };
           results.push(result);
-          appendHistory({ url: item.url, status: "erro na análise", groupName, sharedAt: item.sharedAt, detail: error.message });
+          appendHistory({ url: item.url, groupThreadId: item.threadId, messageId: item.messageId, status: "erro na análise", groupName, sharedAt: item.sharedAt, detail: error.message });
         }
         progress.done++;
       }

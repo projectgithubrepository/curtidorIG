@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isAdministrativeMessage, parseAdministrativeMilestone, mergeTaskState, taskStateLabel } from "./group-state.js";
+import { isAdministrativeMessage, parseAdministrativeMilestone, mergeTaskState, taskStateLabel, hasGroupCheck } from "./group-state.js";
 
 const notice = "Aviso, hoje no grupo tiveram esse total de pedidos. Data 18 do 11, 66 feed, nosso recorde 34 stories, nosso recorde. Lembre-se que na quinta-feira teremos conferência do grupo, é muito importante que sua pasta de salvos esteja completa. Sempre que atualizar, deixe um check nas publicações aqui no grupo.";
 
@@ -21,4 +21,10 @@ test("completion state is monotonic and never clears a completed action", () => 
 
 test("ordinary shared-post text is not treated as an administrative notice", () => {
   assert.equal(isAdministrativeMessage("Olha essa publicação nova, gostei muito!"), false);
+});
+
+
+test("emoji in message text never counts as a reaction on the exact group message", () => {
+  assert.equal(hasGroupCheck("Publicação concluída ✅"), false);
+  assert.equal(hasGroupCheck({ reactions: [{ emoji: "✅" }] }), false);
 });

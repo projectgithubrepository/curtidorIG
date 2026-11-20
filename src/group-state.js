@@ -32,9 +32,10 @@ export function parseAdministrativeMilestone(value) {
   };
 }
 
-export function hasGroupCheck(value) {
-  const text = String(value ?? "");
-  return /(?:✅|☑️|✔️|✓)/u.test(text);
+// Texto/emoji no corpo da mensagem não comprova uma reação aplicada à mensagem correta.
+// Mantido por compatibilidade; sem dados estruturados de reação, o estado é sempre desconhecido/falso.
+export function hasGroupCheck(_value) {
+  return false;
 }
 
 export function mergeTaskState(previous = {}, observed = {}) {
