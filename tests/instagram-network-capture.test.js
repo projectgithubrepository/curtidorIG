@@ -121,4 +121,9 @@ test("captures JSON WebSocket frames and inherits the enclosing thread id", asyn
   assert.equal(capture.summary().websocketFrames, 1);
   assert.equal(capture.summary().parsedWebSocketFrames, 1);
   assert.equal(capture.summary().webSocketMessageLikeObjects, 1);
+  assert.equal(capture.summary().messageLikeObjects, 1);
+  assert.equal(capture.summary().sharedMediaObjects, 1);
+  assert.equal(capture.summary().hasMessageId, true);
+  assert.equal(capture.summary().hasShareFields, true);
+  assert.equal(capture.summary().hasPermalinkOrUrl, true);
 });
