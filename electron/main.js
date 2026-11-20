@@ -21,6 +21,7 @@ async function waitForServer(url, attempts = 40) {
 async function ensureChromium() {
   const browsersPath = path.join(app.getPath("userData"), "playwright-browsers");
   process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath;
+  process.env.PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT = "120000";
   const { chromium } = await import("playwright");
   try {
     await fs.access(chromium.executablePath());
@@ -35,14 +36,34 @@ async function ensureChromium() {
   });
 
   const cliPath = path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "playwright", "cli.js");
+  try {
+    await fs.access(cliPath);
+  } catch {
+    throw new Error("O instalador não encontrou o componente de instalação do Chromium. Reinstale o aplicativo.");
+  }
+
+  let output = "";
   await new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [cliPath, "install", "chromium"], {
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", PLAYWRIGHT_BROWSERS_PATH: browsersPath },
-      stdio: "inherit"
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: "1",
+        PLAYWRIGHT_BROWSERS_PATH: browsersPath,
+        PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT: "120000"
+      },
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"]
     });
+    const collect = chunk => { output = (output + chunk.toString()).slice(-12000); };
+    child.stdout.on("data", collect);
+    child.stderr.on("data", collect);
     child.once("error", reject);
-    child.once("exit", code => code === 0 ? resolve() : reject(new Error("Não foi possível baixar o Chromium. Verifique a conexão com a internet e abra o aplicativo novamente.")));
+    child.once("exit", code => code === 0
+      ? resolve()
+      : reject(new Error("A instalação do Chromium terminou com erro.\n\nDetalhes técnicos:\n" + (output.trim() || "O instalador não retornou detalhes. Verifique se a rede permite acesso a https://cdn.playwright.dev."))));
   });
+
+  await fs.access(chromium.executablePath());
 }
 
 async function createWindow() {
