@@ -5,7 +5,7 @@ Aplicação local, leve e em português para coletar publicações compartilhada
 ## Primeira versão
 
 - Interface para informar o nome exato do grupo e o período; coleta heurística de links de posts/Reels encontrados nas mensagens carregadas pelo Instagram.
-- Playwright abre um navegador Chromium com perfil persistente; o login é feito manualmente no Instagram.
+- Playwright abre um navegador Chromium com perfil persistente e isolado do Chrome/Edge. Na primeira utilização, use **Conectar Instagram / fazer login** e entre manualmente; cookies e sessão ficam salvos nos dados locais do aplicativo para as próximas execuções. O navegador permanece aberto entre coletas.
 - Histórico CSV local em `data/historico.csv`, atualizado a cada publicação.
 - Verificação de URLs já registradas para evitar repetir uma publicação.
 - Deduplicação, leitura de legenda, sugestão de comentário local e revisão dos resultados na interface. Não publica curtidas/comentários nem salva coleções automaticamente.
@@ -22,7 +22,7 @@ O projeto gera um aplicativo desktop Electron e um instalador DMG, sem exigir VS
 3. Baixe o artefato **curtidorIG-macOS-arm64** da execução concluída.
 4. Extraia o ZIP, abra o arquivo DMG, arraste **curtidorIG** para Aplicativos e abra pelo Finder ou Dock.
 
-O pacote ainda não é assinado/notarizado com certificado Apple Developer; dependendo das configurações do macOS, pode ser necessário autorizar a abertura em Privacidade e Segurança. O primeiro login no Instagram é manual. Depois disso, a sessão fica armazenada nos dados locais do aplicativo.
+O pacote ainda não é assinado/notarizado com certificado Apple Developer; dependendo das configurações do macOS, pode ser necessário autorizar a abertura em Privacidade e Segurança. O primeiro login no Instagram é manual, pelo botão **Conectar Instagram / fazer login**. Depois disso, a sessão fica armazenada nos dados locais do aplicativo.
 
 Para desenvolvimento, os comandos Node continuam disponíveis, mas não fazem parte do uso normal do aplicativo.
 
