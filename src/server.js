@@ -3,7 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openInstagram, collectGroupPosts, inspectPost } from "./instagram.js";
 import { createComment } from "./comments.js";
-import { appendHistory, getProcessedUrls, getRecentComments, readHistory } from "./history.js";
+import { appendHistory, getTaskState, getRecentComments, readHistory } from "./history.js";
+import { mergeTaskState, taskStateLabel } from "./group-state.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -78,26 +79,26 @@ app.post("/api/start", async (req, res) => {
       progress.message = "Localizando a conversa. O nome precisa corresponder exatamente.";
       const collected = await collectGroupPosts(page, { groupName, startDate, endDate, shouldStop: () => stopRequested });
       if (stopRequested) return;
-      const processed = getProcessedUrls();
       progress.total = collected.length;
       const withoutDate = collected.filter(item => item.dateUnknown).length;
       const usedFallback = collected.some(item => item.collectionMode === "last-300-fallback");
-      progress.message = `${collected.length} links encontrados${usedFallback ? " pela varredura de recuperação" : ""}; ${withoutDate} sem data identificável. Preparando comentários...`;
+      const milestoneCount = new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size;
+      progress.message = `${collected.length} links encontrados${usedFallback ? " pela varredura de recuperação" : ""}; ${withoutDate} sem data identificável; ${milestoneCount} marcos administrativos identificados. Verificando histórico...`;
       const previous = getRecentComments(200);
       for (const item of collected) {
         if (stopRequested) break;
-        if (processed.has(item.url)) {
-          results.push({ ...item, status: "já registrada", comment: "" });
+        const taskState = mergeTaskState(getTaskState(item.url), { groupCheck: item.groupCheck });
+        if (taskState.complete) {
+          results.push({ ...item, taskState, status: "fluxo completo — ignorar", comment: "" });
           progress.done++;
           continue;
         }
         try {
           const caption = await inspectPost(page, item.url);
-          const comment = createComment(caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
-          const result = { ...item, caption, comment, status: item.dateUnknown ? "data do compartilhamento não identificada" : "pronta para revisão" };
+          const comment = taskState.commented ? "" : createComment(caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
+          const result = { ...item, caption, comment, taskState, status: item.dateUnknown ? "data do compartilhamento não identificada" : taskStateLabel(taskState) };
           results.push(result);
-          appendHistory({ url: item.url, caption, comment, status: "coletada", groupName, sharedAt: item.sharedAt, detail: `Grupo: ${groupName}; mensagem: ${item.sharedAt}` });
-          processed.add(item.url);
+          appendHistory({ url: item.url, caption, comment, status: result.status, groupName, sharedAt: item.sharedAt, saved: taskState.saved, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: taskState.complete, milestone: item.administrativeMilestones, detail: `Grupo: ${groupName}; mensagem: ${item.sharedAt}; ${result.status}` });
         } catch (error) {
           const result = { ...item, caption: "", comment: "", status: "não foi possível analisar", detail: error.message };
           results.push(result);
