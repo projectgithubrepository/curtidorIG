@@ -93,6 +93,13 @@ app.post("/api/start", async (req, res) => {
           progress.done++;
           continue;
         }
+        if (item.contentType === "story") {
+          const result = { ...item, taskState, caption: "", comment: "", status: "Story identificada — análise e ações específicas ainda não disponíveis" };
+          results.push(result);
+          appendHistory({ url: item.url, status: result.status, groupName, sharedAt: item.sharedAt, saved: taskState.saved, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, milestone: item.administrativeMilestones, detail: result.status });
+          progress.done++;
+          continue;
+        }
         try {
           const caption = await inspectPost(page, item.url);
           const comment = taskState.commented ? "" : createComment(caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
