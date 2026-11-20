@@ -23,13 +23,13 @@ function dateInRange(sharedAt, startDate, endDate) {
 
 async function readVisiblePostLinks(page) {
   return page.evaluate(() => {
-    const urlPattern = /https?:\\/\\/(?:www\\.)?instagram\\.com\\/(?:p|reel|tv|stories)\\/[A-Za-z0-9._-]+(?:\\/[^\\s]*)?/gi;
+    const urlPattern = /https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv|stories)\/[A-Za-z0-9._-]+(?:\/[^\s]*)?/gi;
     const normalizeUrl = value => {
       try {
         const parsed = new URL(value, location.origin);
-        if (!/^(?:www\\.)?instagram\\.com$/i.test(parsed.hostname)) return "";
-        if (!/^\\/(?:p|reel|tv|stories)\\//.test(parsed.pathname)) return "";
-        return parsed.origin + parsed.pathname.replace(/\\/$/, "");
+        if (!/^(?:www\.)?instagram\.com$/i.test(parsed.hostname)) return "";
+        if (!/^\/(?:p|reel|tv|stories)\//.test(parsed.pathname)) return "";
+        return parsed.origin + parsed.pathname.replace(/\/$/, "");
       } catch { return ""; }
     };
     const candidates = new Map();
@@ -62,7 +62,7 @@ async function readVisiblePostLinks(page) {
     }
     return [...candidates.values()].map(item => ({
       ...item,
-      contentType: /\\/stories\\//.test(item.url) ? "story" : "feed",
+      contentType: /\/stories\//.test(item.url) ? "story" : "feed",
       sharedAt: item.sharedAt || "",
       groupCheck: false
     }));
@@ -132,7 +132,7 @@ function addNetworkMessages(records, { groupThreadId, startDate, endDate, found,
         messageText: text,
         sharedAt: date.iso,
         dateUnknown: !date.known,
-        contentType: /\\/stories\\//i.test(url) ? "story" : "feed",
+        contentType: /\/stories\//i.test(url) ? "story" : "feed",
         collectionMode: date.known ? "network-date" : "network-date-unknown",
         groupCheck: false,
         networkReactionDataPresent: Boolean(record.hasReactionData)
@@ -175,7 +175,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   networkCapture = createInstagramNetworkCapture(page);
   await exact.click();
   await page.waitForTimeout(1800);
-  const activeThreadId = page.url().match(/\\/direct\\/t\\/(\\d+)/)?.[1] || "";
+  const activeThreadId = page.url().match(/\/direct\/t\/(\d+)/)?.[1] || "";
 
   const found = new Map();
   const fallback = new Map();
@@ -212,7 +212,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   if (!found.size) {
     const diagnostics = await page.evaluate(() => {
       const anchors = [...document.querySelectorAll("a[href]")];
-      const instagramLinks = anchors.filter(a => /instagram\\.com\\/(?:p|reel|tv|stories)\\//i.test(a.href)).length;
+      const instagramLinks = anchors.filter(a => /instagram\.com\/(?:p|reel|tv|stories)\//i.test(a.href)).length;
       const messageNodes = document.querySelectorAll('[role="row"],[role="listitem"],[data-testid*="message"],[data-testid*="Message"]').length;
       return { url: location.href, anchors: anchors.length, instagramLinks, messageNodes };
     });
@@ -259,7 +259,7 @@ export async function inspectPost(page, url) {
     const profileLink = [...document.querySelectorAll("nav a[href]")].find(node =>
       /perfil|profile/i.test([node.getAttribute("aria-label"), node.innerText].filter(Boolean).join(" "))
     );
-    const username = (profileLink?.getAttribute("href") || "").match(/^\\/([^/]+)\\/?$/)?.[1] || "";
+    const username = (profileLink?.getAttribute("href") || "").match(/^\/([^/]+)\/?$/)?.[1] || "";
     let commented = false;
     if (username) commented = [...element.querySelectorAll("li")].some(item =>
       [...item.querySelectorAll("a[href]")].some(link => link.getAttribute("href") === "/" + username + "/") &&
