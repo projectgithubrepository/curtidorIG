@@ -16,9 +16,39 @@ let browserContext = null;
 let results = [];
 let progress = { total: 0, done: 0, current: "", message: "Pronto." };
 
-app.get("/api/status", (_req, res) => res.json({ running, progress }));
+async function getInstagramContext() {
+  if (browserContext) {
+    try {
+      browserContext.pages();
+      return browserContext;
+    } catch {
+      browserContext = null;
+    }
+  }
+  browserContext = await openInstagram();
+  browserContext.on("close", () => { browserContext = null; });
+  return browserContext;
+}
+
+app.get("/api/status", (_req, res) => res.json({
+  running,
+  connected: Boolean(browserContext),
+  progress
+}));
 app.get("/api/results", (_req, res) => res.json({ results }));
 app.get("/api/history", (_req, res) => res.type("text/csv; charset=utf-8").send(readHistory()));
+
+app.post("/api/connect", async (_req, res) => {
+  try {
+    const context = await getInstagramContext();
+    const page = context.pages()[0] || await context.newPage();
+    await page.goto("https://www.instagram.com/direct/inbox/", { waitUntil: "domcontentloaded", timeout: 60000 });
+    progress.message = "Instagram aberto. Faça login nessa janela; a sessão será guardada para as próximas vezes.";
+    res.json({ ok: true, message: "Janela do Instagram aberta. Faça login e depois clique em Coletar publicações." });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 app.post("/api/stop", (_req, res) => {
   stopRequested = true;
@@ -31,7 +61,7 @@ app.post("/api/start", async (req, res) => {
   const startDate = String(req.body.startDate ?? "");
   const endDate = String(req.body.endDate ?? "");
   if (!groupName) return res.status(400).json({ error: "Informe o nome exato do grupo do Instagram." });
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(startDate) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(endDate) || startDate > endDate) {
     return res.status(400).json({ error: "Informe um período válido, com data inicial anterior ou igual à final." });
   }
 
@@ -39,12 +69,12 @@ app.post("/api/start", async (req, res) => {
   stopRequested = false;
   results = [];
   progress = { total: 0, done: 0, current: groupName, message: "Abrindo o Instagram..." };
-  res.json({ ok: true, message: "Coleta iniciada. Faça login se solicitado." });
+  res.json({ ok: true, message: "Coleta iniciada." });
 
   (async () => {
     try {
-      browserContext = await openInstagram();
-      const page = browserContext.pages()[0] || await browserContext.newPage();
+      const context = await getInstagramContext();
+      const page = context.pages()[0] || await context.newPage();
       progress.message = "Localizando a conversa. O nome precisa corresponder exatamente.";
       const collected = await collectGroupPosts(page, { groupName, startDate, endDate, shouldStop: () => stopRequested });
       if (stopRequested) return;
@@ -77,8 +107,7 @@ app.post("/api/start", async (req, res) => {
     } catch (error) {
       progress.message = error.message;
     } finally {
-      if (browserContext) await browserContext.close().catch(() => {});
-      browserContext = null;
+      // Mantém o contexto persistente aberto para preservar a sessão autenticada.
       running = false;
       progress.current = "";
       if (stopRequested) progress.message = "Coleta interrompida.";
