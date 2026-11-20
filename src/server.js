@@ -61,7 +61,7 @@ app.post("/api/start", async (req, res) => {
   const startDate = String(req.body.startDate ?? "");
   const endDate = String(req.body.endDate ?? "");
   if (!groupName) return res.status(400).json({ error: "Informe o nome exato do grupo do Instagram." });
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(startDate) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(endDate) || startDate > endDate) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
     return res.status(400).json({ error: "Informe um período válido, com data inicial anterior ou igual à final." });
   }
 
