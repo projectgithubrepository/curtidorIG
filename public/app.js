@@ -48,10 +48,16 @@ function render(items) {
     const card=document.createElement("article"); card.className="result";
     const link=document.createElement("a"); link.href=item.url; link.target="_blank"; link.rel="noreferrer"; link.textContent=item.url;
     const status=document.createElement("strong"); status.textContent=item.status;
+    const stateLine=document.createElement("small");
+    const task=item.taskState || { saved:false, liked:false, commented:false, groupCheck:Boolean(item.groupCheck) };
+    stateLine.textContent = [`Salva: ${task.saved ? "sim" : "pendente"}`, `Curtida: ${task.liked ? "sim" : "pendente"}`, `Comentada: ${task.commented ? "sim" : "pendente"}`, `Check no grupo: ${task.groupCheck ? "sim" : "pendente"}`].join(" · ");
     const date=document.createElement("small"); date.textContent=item.sharedAt ? new Date(item.sharedAt).toLocaleString("pt-BR") : "Data não identificada";
+    const markers=document.createElement("small");
+    const milestoneCount=(item.administrativeMilestones || []).length;
+    markers.textContent=milestoneCount ? `${milestoneCount} marco(s) administrativo(s) identificado(s) no histórico visível` : "";
     const caption=document.createElement("p"); caption.textContent=item.caption || item.detail || "";
     const comment=document.createElement("p"); comment.className="comment"; comment.textContent=item.comment ? "Comentário sugerido: "+item.comment : "";
-    card.append(status,date,link,caption,comment); results.append(card);
+    card.append(status,stateLine,date,markers,link,caption,comment); results.append(card);
   }
 }
 async function refresh() {
