@@ -22,7 +22,7 @@ function dateInRange(sharedAt, startDate, endDate) {
 
 async function readVisiblePostLinks(page) {
   return page.evaluate(() => {
-    const anchors = [...document.querySelectorAll('a[href*="/p/"],a[href*="/reel/"],a[href*="/tv/"]')];
+    const anchors = [...document.querySelectorAll('a[href*="/p/"],a[href*="/reel/"],a[href*="/tv/"],a[href*="/stories/"]')];
     return anchors.map(anchor => {
       let node = anchor;
       let messageText = "";
@@ -39,7 +39,8 @@ async function readVisiblePostLinks(page) {
         const container = anchor.closest('[role="row"],[role="listitem"],[data-testid*="message"]') || anchor.parentElement;
         messageText = (container?.innerText || anchor.innerText || "").slice(0, 1000);
       }
-      return { url: anchor.href.split("?")[0], sharedAt, messageText, groupCheck: /(?:✅|☑️|✔️|✓)/u.test(messageText) };
+      const url = anchor.href.split("?")[0];
+      return { url, contentType: /\/stories\//.test(url) ? "story" : "feed", sharedAt, messageText, groupCheck: /(?:✅|☑️|✔️|✓)/u.test(messageText) };
     });
   }).then(items => items.filter(item => !isAdministrativeMessage(item.messageText)));
 }
