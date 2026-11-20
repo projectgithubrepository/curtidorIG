@@ -141,6 +141,9 @@ app.post("/api/confirm-action", (req, res) => {
     return res.status(409).json({ error: "Não há vínculo comprovado com a mensagem original. A confirmação foi bloqueada." });
   }
   const current = mergeTaskState({}, item.taskState || {});
+  if (action === "savedFolderVerified" && !diagnosticReport?.request?.collectionName) {
+    return res.status(409).json({ error: "A coleção de destino não foi informada nesta execução." });
+  }
   if (action === "savedFolderVerified" && !current.saved) {
     return res.status(409).json({ error: "Confirme primeiro que a publicação foi salva." });
   }
@@ -164,6 +167,7 @@ app.post("/api/confirm-action", (req, res) => {
     comment: item.comment || "",
     status: item.status,
     groupName: diagnosticReport?.request?.groupName || item.groupName || "",
+    collectionName: diagnosticReport?.request?.collectionName || "",
     sharedAt: item.sharedAt || "",
     saved: taskState.saved,
     savedFolderVerified: taskState.savedFolderVerified,
@@ -205,9 +209,11 @@ app.post("/api/stop", (_req, res) => {
 app.post("/api/start", async (req, res) => {
   if (running) return res.status(409).json({ error: "Já existe uma coleta em andamento." });
   const groupName = String(req.body.groupName ?? "").trim();
+  const collectionName = String(req.body.collectionName ?? "").trim();
   const startDate = String(req.body.startDate ?? "");
   const endDate = String(req.body.endDate ?? "");
   if (!groupName) return res.status(400).json({ error: "Informe o nome exato do grupo do Instagram." });
+  if (!collectionName) return res.status(400).json({ error: "Informe o nome exato da coleção semanal de destino." });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
     return res.status(400).json({ error: "Informe um período válido, com data inicial anterior ou igual à final." });
   }
@@ -295,7 +301,7 @@ app.post("/api/start", async (req, res) => {
         startedAt,
         finishedAt: new Date().toISOString(),
         outcome: stopRequested ? "interrompida" : "concluída",
-        request: { groupName, startDate, endDate },
+        request: { groupName, collectionName, startDate, endDate },
         summary: {
           publicationsFound: collected.length,
           publicationsInspected: results.length,
