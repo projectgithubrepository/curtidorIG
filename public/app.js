@@ -104,7 +104,7 @@ results.addEventListener("click", async event => {
     groupCheck:"Você confirmou o check na mensagem exata do grupo?"
   };
   const action=button.dataset.action;
-  if (!window.confirm(labels[action] + "\\n\\nA aplicação apenas registrará sua confirmação; não executará a ação no Instagram.")) return;
+  if (!window.confirm(labels[action] + "\n\nA aplicação apenas registrará sua confirmação; não executará a ação no Instagram.")) return;
   button.disabled=true;
   try {
     const response=await fetch("/api/confirm-action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:button.dataset.url,action})});
