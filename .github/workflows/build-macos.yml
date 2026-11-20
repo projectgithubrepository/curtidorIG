@@ -21,8 +21,6 @@ jobs:
         with:
           node-version: 22
       - run: npm install
-      - name: Install Chromium for Playwright
-        run: PLAYWRIGHT_BROWSERS_PATH=playwright-browsers npx playwright install chromium
       - name: Build macOS app and DMG
         run: npm run dist:mac -- --arm64
       - name: Upload installer
