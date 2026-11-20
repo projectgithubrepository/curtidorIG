@@ -74,6 +74,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     `Campos: ID ${network.hasMessageId ? "sim" : "não"}; texto ${network.hasTextBody ? "sim" : "não"}; data/hora ${network.hasTimestampMs ? "sim" : "não"}; remetente ${network.hasSender ? "sim" : "não"}; reações ${network.hasReactionFields ? "sim" : "não"}; compartilhamentos ${network.hasShareFields ? "sim" : "não"}; URL ${network.hasPermalinkOrUrl ? "sim" : "não"}`,
     "Operações:",
     ...(operationLines.length ? operationLines : ["- Nenhuma operação identificada"]),
+    ...((network.responseDetails || []).length ? ["Endpoints capturados:", ...(network.responseDetails || []).slice(0, 12).map(item => `- ${item.method || "?"} ${item.path || "?"} | ${item.status || "?"} | ${item.operation || "sem operação"} | ${item.payload?.messageLikeObjects ?? 0} mensagem(ns)`)] : []),
     ...(page.instagramLinks !== undefined ? ["", `PÁGINA: ${page.instagramLinks} links Instagram / ${page.anchors ?? "?"} links totais / ${page.messageNodes ?? "?"} nós de mensagem`] : []),
     ...(errorLines.length ? ["", "ERROS/AVISOS:", ...errorLines] : []),
     "",
