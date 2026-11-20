@@ -61,6 +61,12 @@ app.get("/api/diagnostic-log", (_req, res) => {
   );
   const errorLines = (report.log || []).filter(item => item.level === "ERROR" || item.level === "WARN").slice(-5)
     .map(item => `- [${item.level}] ${item.message}`);
+  const inspectionLines = (report.publications || []).filter(item => item.inspectionDiagnostics).slice(0, 12)
+    .map(item => {
+      const detail = item.inspectionDiagnostics;
+      const selectors = detail.selectors || {};
+      return `- ${item.url || "URL não informada"} | motivo: ${detail.reason || "não classificado"} | HTTP: ${detail.httpStatus ?? "?"} | artigo: ${selectors.article ? "sim" : "não"} | main: ${selectors.main ? "sim" : "não"} | diálogo: ${selectors.dialog ? "sim" : "não"} | mídia: ${detail.detectedMedia ? "sim" : "não"} | URL final: ${detail.finalUrl || "?"}`;
+    });
   const page = report.pageDiagnostics || {};
   const scroll = report.scrollDiagnostics || {};
   const scrollLines = scroll.historyRounds !== undefined ? [
@@ -90,6 +96,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     ...((network.responseDetails || []).length ? ["Endpoints capturados:", ...(network.responseDetails || []).slice(0, 12).map(item => `- ${item.method || "?"} ${item.path || "?"} | ${item.status || "?"} | ${item.operation || "sem operação"} | ${item.payload?.messageLikeObjects ?? 0} mensagem(ns)`)] : []),
     ...(page.instagramLinks !== undefined ? ["", `PÁGINA: ${page.instagramLinks} links Instagram / ${page.anchors ?? "?"} links totais / ${page.messageNodes ?? "?"} nós de mensagem`] : []),
     ...scrollLines,
+    ...(inspectionLines.length ? ["", "INSPEÇÃO DAS PUBLICAÇÕES:", ...inspectionLines] : []),
     ...(errorLines.length ? ["", "ERROS/AVISOS:", ...errorLines] : []),
     "",
     `Gerado: ${report.generatedAt || new Date().toISOString()}`,
