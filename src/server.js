@@ -152,7 +152,6 @@ app.post("/api/start", async (req, res) => {
         administrativeMilestones: new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size,
         networkResponses: collected[0]?.networkDiagnostics?.capturedResponses ?? 0
       });
-      if (stopRequested) return;
       progress.total = collected.length;
       const withoutDate = collected.filter(item => item.dateUnknown).length;
       const usedFallback = collected.some(item => item.collectionMode === "last-300-fallback");
@@ -193,6 +192,7 @@ app.post("/api/start", async (req, res) => {
           results.push(result);
           appendHistory({ url: item.url, caption: inspection.caption, comment, status: result.status, groupName, sharedAt: item.sharedAt, saved: taskState.saved, savedFolderVerified: taskState.savedFolderVerified, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: taskState.complete, milestone: item.administrativeMilestones, detail: `Grupo: ${groupName}; mensagem: ${item.sharedAt}; ${result.status}` });
         } catch (error) {
+          logDiagnostic("ERROR", "Falha ao inspecionar publicação", { url: item.url, error: error.message });
           const result = { ...item, caption: "", comment: "", status: "não foi possível analisar", detail: error.message };
           results.push(result);
           appendHistory({ url: item.url, status: "erro na análise", groupName, sharedAt: item.sharedAt, detail: error.message });
