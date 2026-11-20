@@ -1,7 +1,7 @@
 const MAX_RESPONSES = 160;
 const MAX_DEPTH = 20;
 const MAX_URLS_PER_MESSAGE = 12;
-const URL_PATTERN = /https?:\\?\/?\\?\/?(?:www\\?\.)?instagram\\?\.com\\?\/(?:p|reel|tv|stories)\\?\/[A-Za-z0-9._-]+(?:\\?\/[^\\s"'<>]*)?/gi;
+const URL_PATTERN = /https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv|stories)\/[A-Za-z0-9._-]+(?:\/[^\s"'<>]*)?/gi;
 
 function operationNameFromRequest(request) {
   const candidates = [];
@@ -32,7 +32,7 @@ function requestContext(request) {
     if (!value || typeof value !== "object") return;
     if (!result.threadId) {
       for (const key of ["thread_id", "threadId", "conversation_id"]) {
-        if (value[key] != null && /^\\d{6,}$/.test(String(value[key]))) {
+        if (value[key] != null && /^\d{6,}$/.test(String(value[key]))) {
           result.threadId = String(value[key]);
           break;
         }
@@ -46,7 +46,7 @@ function requestContext(request) {
     const url = new URL(request.url());
     for (const key of ["thread_id", "threadId", "conversation_id"]) {
       const value = url.searchParams.get(key);
-      if (value && /^\\d{6,}$/.test(value)) result.threadId = value;
+      if (value && /^\d{6,}$/.test(value)) result.threadId = value;
     }
   } catch {}
   return result;
@@ -69,11 +69,11 @@ function collectUrls(value, output, seen = new WeakSet(), depth = 0) {
   if (typeof value === "string") {
     const matches = value.match(URL_PATTERN) || [];
     for (const raw of matches) {
-      const normalized = raw.replace(/\\\\\//g, "/").replace(/[),.;]+$/, "");
+      const normalized = raw.replace(/\\\//g, "/").replace(/[),.;]+$/, "");
       try {
         const parsed = new URL(normalized);
-        if (!/^(?:www\\.)?instagram\\.com$/i.test(parsed.hostname)) continue;
-        const match = parsed.pathname.match(/^\\/(p|reel|tv|stories)\\/([A-Za-z0-9._-]+)/i);
+        if (!/^(?:www\.)?instagram\.com$/i.test(parsed.hostname)) continue;
+        const match = parsed.pathname.match(/^\/(p|reel|tv|stories)\/([A-Za-z0-9._-]+)/i);
         if (!match) continue;
         const url = "https://www.instagram.com/" + match[1].toLowerCase() + "/" + match[2];
         if (!output.includes(url) && output.length < MAX_URLS_PER_MESSAGE) output.push(url);
