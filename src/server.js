@@ -55,7 +55,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
   const network = report.networkDiagnostics || {};
   const summary = report.summary || {};
   const operationLines = (network.operationDetails || []).slice(0, 8).map(item =>
-    `- ${item.operation}: ${item.responses} resposta(s), ${item.messageLikeObjects} mensagem(ns), ${item.sharedMediaObjects} compartilhamento(s), reação: ${item.hasReactionFields ? "sim" : "não"}`
+    `- ${item.operation}: ${item.responses} resposta(s), ${item.messageLikeObjects} mensagem(ns), ${item.sharedMediaObjects} compartilhamento(s)`
   );
   const errorLines = (report.log || []).filter(item => item.level === "ERROR" || item.level === "WARN").slice(-5)
     .map(item => `- [${item.level}] ${item.message}`);
@@ -68,6 +68,8 @@ app.get("/api/diagnostic-log", (_req, res) => {
     "",
     "CAPTURA DE REDE",
     `Respostas: ${network.capturedResponses ?? 0} | Lidas: ${network.parsedResponses ?? 0} | Não interpretadas: ${network.unparsedResponses ?? 0}`,
+    `WebSockets: ${network.websocketConnections ?? 0} conexão(ões), ${network.websocketFrames ?? 0} quadro(s), ${network.unparsedWebSocketFrames ?? 0} não interpretado(s)`,
+    ...(network.websocketEndpoints?.length ? [`Canais WS: ${network.websocketEndpoints.join(", ")}`] : []),
     `IDs de mensagens distintos: ${network.distinctMessageIds ?? 0} | Objetos de compartilhamento: ${network.sharedMediaObjects ?? 0}`,
     `Campos: ID ${network.hasMessageId ? "sim" : "não"}; texto ${network.hasTextBody ? "sim" : "não"}; data/hora ${network.hasTimestampMs ? "sim" : "não"}; remetente ${network.hasSender ? "sim" : "não"}; reações ${network.hasReactionFields ? "sim" : "não"}; compartilhamentos ${network.hasShareFields ? "sim" : "não"}; URL ${network.hasPermalinkOrUrl ? "sim" : "não"}`,
     "Operações:",
