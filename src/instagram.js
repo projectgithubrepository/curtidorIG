@@ -85,13 +85,13 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   }
 
   // Plano B: se a interface não expuser datas legíveis, varre o histórico recente
-  // até alcançar aproximadamente 300 mensagens visíveis/carregadas. Links com
+  // até percorrer cerca de 300 mensagens recentes (limite de 30 rolagens). Links com
   // data conhecida fora do período continuam excluídos; datas ausentes são marcadas.
   if (!found.size && !shouldStop()) {
     const fallback = new Map();
     let stableFallbackRounds = 0;
     let previousFallbackSize = -1;
-    for (let round = 0; round < 80 && !shouldStop(); round++) {
+    for (let round = 0; round < 30 && !shouldStop(); round++) {
       const batch = await readVisiblePostLinks(page);
       for (const item of batch) {
         if (fallback.has(item.url)) continue;
@@ -105,15 +105,9 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
         });
       }
 
-      const loadedMessages = await page.evaluate(() => {
-        const rows = document.querySelectorAll('[role="row"],[role="listitem"],[data-testid*="message"]');
-        if (rows.length) return rows.length;
-        return document.querySelectorAll('div[dir="auto"]').length;
-      });
-
       if (fallback.size === previousFallbackSize) stableFallbackRounds++; else stableFallbackRounds = 0;
       previousFallbackSize = fallback.size;
-      if (loadedMessages >= 300 || (stableFallbackRounds >= 5 && round >= 8)) break;
+      if (stableFallbackRounds >= 5 && round >= 20) break;
       await scrollToOlderMessages(page);
     }
     for (const [url, item] of fallback) found.set(url, item);
