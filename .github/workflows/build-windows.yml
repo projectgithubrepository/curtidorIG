@@ -1,4 +1,8 @@
 name: Build Windows app
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
 on:
   workflow_dispatch:
   push:
@@ -23,6 +27,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Run tests
+        run: npm test
       - name: Download Chromium for packaging
         shell: pwsh
         run: |
