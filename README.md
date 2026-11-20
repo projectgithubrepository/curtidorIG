@@ -28,6 +28,12 @@ Para desenvolvimento, os comandos Node continuam disponíveis, mas não fazem pa
 
 A sessão fica salva nos dados locais do aplicativo neste Mac. Não compartilhe essa pasta.
 
+## Atualizações no Windows
+
+Além do instalador completo, a compilação Windows gera `curtidorIG-Atualizacao-Windows.exe`. Esse patch substitui somente o pacote do aplicativo e os arquivos Playwright necessários; não reinstala o Electron nem copia novamente o Chromium. Execute-o com o curtidorIG fechado ou deixe que o atualizador feche o processo. O patch mantém o diretório de dados do usuário, incluindo perfil autenticado do Instagram e histórico CSV. Se a instalação foi feita em uma pasta personalizada, selecione essa pasta na tela do atualizador.
+
+Use o instalador completo apenas na primeira instalação ou quando houver mudança estrutural que exija reinstalação dos componentes nativos.
+
 ## Histórico
 
 O CSV é criado automaticamente nos dados locais do aplicativo e registra data/hora, URL, legenda lida, curtida, comentário, status e detalhes de erro. O histórico e o perfil do navegador ficam fora do Git.
