@@ -196,7 +196,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
       const messageNodes = document.querySelectorAll('[role="row"],[role="listitem"],[data-testid*="message"],[data-testid*="Message"]').length;
       return { url: location.href, anchors: anchors.length, instagramLinks, messageNodes };
     });
-    throw new Error("Nenhuma publicação foi extraída. Diagnóstico: " + diagnostics.instagramLinks +
+    const error = new Error("Nenhuma publicação foi extraída. Diagnóstico: " + diagnostics.instagramLinks +
       " links do Instagram em " + diagnostics.anchors + " links da página; " +
       diagnostics.messageNodes + " elementos de mensagem. Página: " + diagnostics.url +
       ". Diagnóstico de rede: " + networkDiagnostics.capturedResponses + " respostas capturadas; operações: " +
@@ -204,6 +204,9 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
       networkDiagnostics.messageLikeObjects + "; campos de reação: " + (networkDiagnostics.hasReactionFields ? "sim" : "não") +
       "; campos de compartilhamento: " + (networkDiagnostics.hasShareFields ? "sim" : "não") +
       ". Verifique se a conversa correta está aberta e se as mensagens foram carregadas. Nenhuma interação foi feita.");
+    error.networkDiagnostics = networkDiagnostics;
+    error.pageDiagnostics = diagnostics;
+    throw error;
   }
 
   const milestoneList = [...milestones.values()];
