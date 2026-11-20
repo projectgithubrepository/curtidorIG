@@ -45,9 +45,12 @@ export function ensureHistory() {
     if (!oldRow.some(Boolean)) continue;
     const entry = Object.fromEntries(oldHeader.map((key, index) => [key, oldRow[index] ?? ""]));
     migrated.push([
-      entry.data_hora ?? "", entry.url ?? "", entry.legenda ?? "", entry.curtida ?? "não",
-      entry.comentario ?? "", entry.status ?? "", entry.detalhe ?? "", entry.grupo_origem ?? "",
-      entry.data_compartilhamento ?? "", entry.salva ?? "não", entry.comentada ?? "não", entry.check_grupo ?? "não", entry.fluxo_completo ?? "não", entry.marco_administrativo ?? "", entry.pasta_correta ?? "não", entry.colecao_destino ?? ""
+      entry.data_hora ?? "", entry.url ?? "", entry.id_conversa ?? "", entry.id_mensagem ?? "",
+      entry.legenda ?? "", entry.curtida ?? "não", entry.comentario ?? "", entry.status ?? "pendente",
+      entry.detalhe ?? "", entry.grupo_origem ?? "", entry.data_compartilhamento ?? "",
+      entry.salva ?? "não", entry.comentada ?? "não", entry.check_grupo ?? "não",
+      entry.fluxo_completo ?? "não", entry.marco_administrativo ?? "",
+      entry.pasta_correta ?? "não", entry.colecao_destino ?? ""
     ]);
   }
   fs.writeFileSync(HISTORY_FILE, migrated.map(row => row.map(csvCell).join(",")).join("\n") + "\n", "utf8");
