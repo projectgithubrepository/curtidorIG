@@ -1,7 +1,7 @@
 const MAX_RESPONSES = 160;
 const MAX_DEPTH = 20;
 const MAX_URLS_PER_MESSAGE = 12;
-const URL_PATTERN = /https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv|stories)\/[A-Za-z0-9._-]+(?:\/[^\s"'<>]*)?/gi;
+const URL_PATTERN = /(?:https?:\/\/(?:www\.)?instagram\.com)?\/(?:p|reel|tv|stories)\/[A-Za-z0-9._-]+(?:\/[^\s"'<>]*)?/gi;
 
 function operationNameFromRequest(request) {
   const candidates = [];
@@ -71,7 +71,7 @@ function collectUrls(value, output, seen = new WeakSet(), depth = 0) {
     for (const raw of matches) {
       const normalized = raw.replace(/\\\//g, "/").replace(/[),.;]+$/, "");
       try {
-        const parsed = new URL(normalized);
+        const parsed = new URL(normalized, "https://www.instagram.com");
         if (!/^(?:www\.)?instagram\.com$/i.test(parsed.hostname)) continue;
         const match = parsed.pathname.match(/^\/(p|reel|tv|stories)\/([A-Za-z0-9._-]+)/i);
         if (!match) continue;
@@ -85,6 +85,26 @@ function collectUrls(value, output, seen = new WeakSet(), depth = 0) {
   seen.add(value);
   if (Array.isArray(value)) value.forEach(item => collectUrls(item, output, seen, depth + 1));
   else for (const child of Object.values(value)) collectUrls(child, output, seen, depth + 1);
+}
+
+function collectMediaCodes(value, output, seen = new WeakSet(), depth = 0) {
+  if (!value || typeof value !== "object" || depth > MAX_DEPTH || seen.has(value)) return;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    value.forEach(item => collectMediaCodes(item, output, seen, depth + 1));
+    return;
+  }
+  const code = value.code ?? value.shortcode ?? value.short_code;
+  const isMediaContext = Boolean(value.media || value.media_share || value.xma ||
+    value.product_type || value.media_type != null || value.image_versions2 ||
+    value.video_versions || value.carousel_media);
+  if (code && isMediaContext && /^[A-Za-z0-9_-]{5,}$/.test(String(code))) {
+    const productType = String(value.product_type || "").toLowerCase();
+    const path = productType === "clips" ? "reel" : "p";
+    const url = "https://www.instagram.com/" + path + "/" + String(code);
+    if (!output.includes(url) && output.length < MAX_URLS_PER_MESSAGE) output.push(url);
+  }
+  for (const child of Object.values(value)) collectMediaCodes(child, output, seen, depth + 1);
 }
 
 function isMessageObject(value) {
@@ -146,6 +166,7 @@ function extractPayload(payload, context = {}) {
       messageIds.add(id);
       const urls = [];
       collectUrls(value, urls);
+      collectMediaCodes(value, urls);
       const timestamp = normalizeTimestamp(value.timestamp_ms ?? value.timestamp ?? value.created_at ?? value.sent_at);
       const text = messageText(value);
       const localThreadId = String(value.thread_id ?? value.threadId ?? value.conversation_id ?? context.threadId ?? "");
