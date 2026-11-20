@@ -245,13 +245,15 @@ export function createInstagramNetworkCapture(page) {
     websocketOperations.add("websocket:" + (() => {
       try { return new URL(socket.url()).pathname; } catch { return "unknown"; }
     })());
-    socket.on("framereceived", event => {
+    socket.on("framereceived", data => {
       websocketStats.frames++;
       let payload;
       try {
-        const raw = event?.payload;
-        if (typeof raw === "string") payload = JSON.parse(raw);
-        else if (raw && typeof raw.toString === "function") payload = JSON.parse(raw.toString("utf8"));
+        // Playwright emits the frame payload itself (string or Buffer),
+        // not an event object containing a .payload property.
+        if (typeof data === "string") payload = JSON.parse(data);
+        else if (Buffer.isBuffer(data)) payload = JSON.parse(data.toString("utf8"));
+        else if (data && typeof data.toString === "function") payload = JSON.parse(data.toString());
         else throw new Error("unsupported websocket frame");
       } catch {
         websocketStats.unparsedFrames++;
