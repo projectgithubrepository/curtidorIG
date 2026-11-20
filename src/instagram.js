@@ -203,12 +203,6 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     groupThreadId: activeThreadId, startDate, endDate, found, fallback, milestones
   });
 
-  // Sem data confirmada, preserva os links como candidatos separados; eles não
-  // entram no período automaticamente e ficam identificados como data desconhecida.
-  if (!found.size) {
-    for (const [url, item] of fallback) found.set(url, item);
-  }
-
   if (!found.size) {
     const diagnostics = await page.evaluate(() => {
       const anchors = [...document.querySelectorAll("a[href]")];
@@ -221,7 +215,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
       diagnostics.messageNodes + " elementos de mensagem. Página: " + diagnostics.url +
       ". Rede: " + networkDiagnostics.capturedResponses + " respostas; " +
       networkDiagnostics.distinctMessageIds + " mensagens deduplicadas; " +
-      networkDiagnostics.extractedShareUrls + " URLs extraídas; " +
+      networkDiagnostics.extractedShareUrls + " URLs extraídas; " + fallback.size + " candidatas sem data; " +
       networkMerge.rejectedThread + " mensagens descartadas por divergência de conversa. Nenhuma interação foi feita.");
     error.networkDiagnostics = networkDiagnostics;
     error.pageDiagnostics = diagnostics;
