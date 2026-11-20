@@ -110,6 +110,7 @@ async function scrollToOlderMessages(page) {
 
 function addNetworkMessages(records, { groupThreadId, startDate, endDate, found, fallback, milestones }) {
   let accepted = 0;
+  let unknownDateCandidates = 0;
   let rejectedThread = 0;
   for (const record of records) {
     if (record.threadId && groupThreadId && record.threadId !== groupThreadId) {
@@ -141,11 +142,11 @@ function addNetworkMessages(records, { groupThreadId, startDate, endDate, found,
         if (!found.has(url)) { found.set(url, item); accepted++; }
       } else if (!fallback.has(url)) {
         fallback.set(url, item);
-        accepted++;
+        unknownDateCandidates++;
       }
     }
   }
-  return { accepted, rejectedThread };
+  return { accepted, unknownDateCandidates, rejectedThread };
 }
 
 export async function collectGroupPosts(page, { groupName, startDate, endDate, shouldStop = () => false }) {
@@ -230,6 +231,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
       ...networkDiagnostics,
       normalizedNetworkMessages: networkRecords.length,
       acceptedNetworkPosts: networkMerge.accepted,
+      unknownDateCandidates: networkMerge.unknownDateCandidates,
       rejectedOtherThreads: networkMerge.rejectedThread
     }
   })).sort((a, b) => {
