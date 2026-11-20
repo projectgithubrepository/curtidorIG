@@ -221,6 +221,47 @@ export function createInstagramNetworkCapture(page) {
   const operations = new Set();
   let stopped = false;
   const pending = new Set();
+  const websocketStats = { connections: 0, frames: 0, parsedFrames: 0, unparsedFrames: 0 };
+  const websocketOperations = new Set();
+
+  const mergeRecords = (items, context = {}) => {
+    for (const record of items) {
+      const key = record.messageId + "|" + record.threadId;
+      const previous = recordsByKey.get(key);
+      if (!previous || previous.urls.length < record.urls.length || (!previous.timestamp && record.timestamp)) {
+        recordsByKey.set(key, { ...record, responseThreadId: context.threadId || "" });
+      } else {
+        previous.urls = [...new Set([...previous.urls, ...record.urls])].slice(0, MAX_URLS_PER_MESSAGE);
+        if (!previous.timestamp) previous.timestamp = record.timestamp;
+        if (!previous.text) previous.text = record.text;
+        if (!previous.sender) previous.sender = record.sender;
+        previous.hasReactionData ||= record.hasReactionData;
+      }
+    }
+  };
+
+  const onWebSocket = socket => {
+    websocketStats.connections++;
+    websocketOperations.add("websocket:" + (() => {
+      try { return new URL(socket.url()).pathname; } catch { return "unknown"; }
+    })());
+    socket.on("framereceived", event => {
+      websocketStats.frames++;
+      let payload;
+      try {
+        const raw = event?.payload;
+        if (typeof raw === "string") payload = JSON.parse(raw);
+        else if (raw && typeof raw.toString === "function") payload = JSON.parse(raw.toString("utf8"));
+        else throw new Error("unsupported websocket frame");
+      } catch {
+        websocketStats.unparsedFrames++;
+        return;
+      }
+      websocketStats.parsedFrames++;
+      const extracted = extractPayload(payload, { threadId: "", operation: "websocket" });
+      mergeRecords(extracted.records);
+    });
+  };
 
   const onResponse = response => {
     if (stopped || responses.length >= MAX_RESPONSES) return;
@@ -247,19 +288,7 @@ export function createInstagramNetworkCapture(page) {
       try {
         const payload = await response.json();
         entry.payload = extractPayload(payload, context);
-        for (const record of entry.payload.records) {
-          const key = record.messageId + "|" + record.threadId;
-          const previous = recordsByKey.get(key);
-          if (!previous || previous.urls.length < record.urls.length || (!previous.timestamp && record.timestamp)) {
-            recordsByKey.set(key, { ...record, responseThreadId: context.threadId });
-          } else {
-            previous.urls = [...new Set([...previous.urls, ...record.urls])].slice(0, MAX_URLS_PER_MESSAGE);
-            if (!previous.timestamp) previous.timestamp = record.timestamp;
-            if (!previous.text) previous.text = record.text;
-            if (!previous.sender) previous.sender = record.sender;
-            previous.hasReactionData ||= record.hasReactionData;
-          }
-        }
+        mergeRecords(entry.payload.records, context);
       } catch { entry.parseError = true; }
       if (responses.length < MAX_RESPONSES) responses.push(entry);
     })();
@@ -268,10 +297,12 @@ export function createInstagramNetworkCapture(page) {
   };
 
   page.on("response", onResponse);
+  page.on("websocket", onWebSocket);
   const stop = async () => {
     if (!stopped) {
       stopped = true;
       page.off("response", onResponse);
+      page.off("websocket", onWebSocket);
     }
     await Promise.allSettled([...pending]);
   };
@@ -302,7 +333,11 @@ export function createInstagramNetworkCapture(page) {
         capturedResponses: responses.length,
         parsedResponses: parsed.length,
         unparsedResponses: responses.filter(item => item.parseError).length,
-        operations: [...operations].slice(0, 30),
+        operations: [...new Set([...operations, ...websocketOperations])].slice(0, 30),
+        websocketConnections: websocketStats.connections,
+        websocketFrames: websocketStats.frames,
+        parsedWebSocketFrames: websocketStats.parsedFrames,
+        unparsedWebSocketFrames: websocketStats.unparsedFrames,
         operationDetails: [...byOperation.values()].slice(0, 30),
         distinctMessageIds: recordsByKey.size,
         extractedShareUrls: [...recordsByKey.values()].reduce((sum, item) => sum + item.urls.length, 0),
