@@ -147,14 +147,20 @@ function addNetworkMessages(records, { groupThreadId, startDate, endDate, found,
         groupCheck: false,
         networkReactionDataPresent: Boolean(record.hasReactionData)
       };
+      // A mesma publicação pode ser compartilhada mais de uma vez no mesmo grupo.
+      // A identidade é a mensagem, não apenas a URL do post.
+      const identityKey = String(record.messageId) + "::" + url;
       if (date.known) {
-        const previous = found.get(url) || {};
-        found.set(url, { ...previous, ...item, sharedAt: date.iso, dateUnknown: false, collectionMode: "network-date" });
+        const previous = found.get(identityKey) || found.get(url) || {};
+        found.delete(url);
+        found.set(identityKey, { ...previous, ...item, sharedAt: date.iso, dateUnknown: false, collectionMode: "network-date" });
         accepted++;
       } else {
-        const previous = fallback.get(url) || found.get(url) || {};
+        const previous = fallback.get(identityKey) || found.get(identityKey) || found.get(url) || {};
         const merged = { ...previous, ...item, dateUnknown: true, collectionMode: "network-date-unknown" };
-        if (found.has(url)) found.set(url, merged); else fallback.set(url, merged);
+        if (found.has(url)) { found.delete(url); found.set(identityKey, merged); }
+        else if (found.has(identityKey)) found.set(identityKey, merged);
+        else fallback.set(identityKey, merged);
         unknownDateCandidates++;
       }
     }
