@@ -80,7 +80,7 @@ app.post("/api/start", async (req, res) => {
       if (stopRequested) return;
       const processed = getProcessedUrls();
       progress.total = collected.length;
-      progress.message = `${collected.length} publicações encontradas. Preparando comentários...`;
+      const withoutDate = collected.filter(item => item.dateUnknown).length;\n      const usedFallback = collected.some(item => item.collectionMode === "last-300-fallback");\n      progress.message = `${collected.length} links encontrados${usedFallback ? " pela varredura de recuperação" : ""}; ${withoutDate} sem data identificável. Preparando comentários...`;
       const previous = getRecentComments(200);
       for (const item of collected) {
         if (stopRequested) break;
@@ -92,7 +92,7 @@ app.post("/api/start", async (req, res) => {
         try {
           const caption = await inspectPost(page, item.url);
           const comment = createComment(caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
-          const result = { ...item, caption, comment, status: "pronta para revisão" };
+          const result = { ...item, caption, comment, status: item.dateUnknown ? "data do compartilhamento não identificada" : "pronta para revisão" };
           results.push(result);
           appendHistory({ url: item.url, caption, comment, status: "coletada", groupName, sharedAt: item.sharedAt, detail: `Grupo: ${groupName}; mensagem: ${item.sharedAt}` });
           processed.add(item.url);
