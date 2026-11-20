@@ -79,7 +79,7 @@ export function createInstagramNetworkCapture(page) {
     } catch {
       return;
     }
-    if (!/(^|\\/)api\\/(graphql|v1\\/direct)/i.test(url.pathname)) return;
+    if (!url.pathname.includes("/api/graphql") && !url.pathname.includes("/api/v1/direct")) return;
 
     const request = response.request();
     const operation = operationNameFromRequest(request);
