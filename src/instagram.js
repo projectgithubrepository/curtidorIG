@@ -427,8 +427,8 @@ export async function inspectPost(page, url) {
     const dialogText = document.querySelector("[role='dialog']")?.innerText?.trim() || "";
     const hasMedia = Boolean(document.querySelector("video, article img, main img, [role='dialog'] img"));
     const knownState = /content unavailable|this page isn't available|página não está disponível|conteúdo indisponível|entrar na sua conta|log in to instagram|challenge|checkpoint|confirme que é você/.test(text);
-    return articleText.length > 20 || dialogText.length > 20 || mainText.length > 100 || hasMedia || knownState;
-  }, { timeout: 18000 }).catch(() => {});
+    return articleText.length > 20 || dialogText.length > 20 || (mainText.length > 100 && (hasMedia || /comentários|comments|curtidas|likes/i.test(mainText))) || hasMedia || knownState;
+  }, null, { timeout: 18000 }).catch(() => {});
 
   const snapshot = await page.evaluate(() => {
     const article = document.querySelector("article");
