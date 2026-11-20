@@ -61,6 +61,17 @@ app.get("/api/diagnostic-log", (_req, res) => {
   const errorLines = (report.log || []).filter(item => item.level === "ERROR" || item.level === "WARN").slice(-5)
     .map(item => `- [${item.level}] ${item.message}`);
   const page = report.pageDiagnostics || {};
+  const scroll = report.scrollDiagnostics || {};
+  const scrollLines = scroll.historyRounds !== undefined ? [
+    "",
+    "NAVEGAÇÃO DO HISTÓRICO",
+    `Rodadas: ${scroll.historyRounds} | Com avanço: ${scroll.scrollProgressRounds} | Sem avanço no final: ${scroll.stalledRounds}`,
+    `Contêiner de conversa localizado: ${scroll.scrollTargetFound ? "sim" : "não"} | Tentativas com roda do mouse: ${scroll.wheelFallbackRounds}`,
+    ...(scroll.lastScrollState ? [
+      `Antes: scrollTop ${scroll.lastScrollState.before?.scrollTop ?? "?"} / altura ${scroll.lastScrollState.before?.scrollHeight ?? "?"} | Depois: scrollTop ${scroll.lastScrollState.after?.scrollTop ?? "?"} / altura ${scroll.lastScrollState.after?.scrollHeight ?? "?"}`,
+      `Alvo: ${scroll.lastScrollState.before?.tag || "não localizado"} | flex-direction: ${scroll.lastScrollState.before?.flexDirection || "?"} | marcadores de mensagem: ${scroll.lastScrollState.before?.messageMarkers ?? "?"}`
+    ] : [])
+  ] : [];
   const lines = [
     "CURTIDORIG | DIAGNÓSTICO",
     `Resultado: ${report.outcome || "indisponível"}`,
@@ -77,6 +88,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     ...(operationLines.length ? operationLines : ["- Nenhuma operação identificada"]),
     ...((network.responseDetails || []).length ? ["Endpoints capturados:", ...(network.responseDetails || []).slice(0, 12).map(item => `- ${item.method || "?"} ${item.path || "?"} | ${item.status || "?"} | ${item.operation || "sem operação"} | ${item.payload?.messageLikeObjects ?? 0} mensagem(ns)`)] : []),
     ...(page.instagramLinks !== undefined ? ["", `PÁGINA: ${page.instagramLinks} links Instagram / ${page.anchors ?? "?"} links totais / ${page.messageNodes ?? "?"} nós de mensagem`] : []),
+    ...scrollLines,
     ...(errorLines.length ? ["", "ERROS/AVISOS:", ...errorLines] : []),
     "",
     `Gerado: ${report.generatedAt || new Date().toISOString()}`,
@@ -239,7 +251,8 @@ app.post("/api/start", async (req, res) => {
       logDiagnostic("ERROR", error.message, {
         name: error.name || "Error",
         networkResponses: error.networkDiagnostics?.capturedResponses ?? null,
-        pageDiagnostics: error.pageDiagnostics || null
+        pageDiagnostics: error.pageDiagnostics || null,
+        scrollDiagnostics: error.scrollDiagnostics || null
       });
       diagnosticReport = {
         schemaVersion: 1,
@@ -252,6 +265,7 @@ app.post("/api/start", async (req, res) => {
         summary: { publicationsFound: results.length, publicationsInspected: results.length },
         networkDiagnostics: error.networkDiagnostics || results[0]?.networkDiagnostics || null,
         pageDiagnostics: error.pageDiagnostics || null,
+        scrollDiagnostics: error.scrollDiagnostics || null,
         publications: results.map(reportItem),
         log: diagnosticLog,
         error: { name: error.name || "Error", message: error.message }
