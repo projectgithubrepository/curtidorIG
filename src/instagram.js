@@ -112,9 +112,15 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   // Observa somente respostas que a própria interface autenticada do Instagram recebe.
   // Nenhuma requisição privada é criada e nenhum conteúdo de mensagem é persistido no diagnóstico.
   const networkCapture = createInstagramNetworkCapture(page);
-  await page.goto("https://www.instagram.com/direct/inbox/", { waitUntil: "domcontentloaded", timeout: 60000 });
+  try {
+    await page.goto("https://www.instagram.com/direct/inbox/", { waitUntil: "domcontentloaded", timeout: 60000 });
+  } catch (error) {
+    await networkCapture.stop();
+    throw error;
+  }
   await page.waitForTimeout(2500);
   if (page.url().includes("/accounts/login")) {
+    await networkCapture.stop();
     throw new Error("Faça login manualmente no Instagram e inicie a coleta novamente.");
   }
 
@@ -125,6 +131,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   }
   const exact = page.getByText(groupName, { exact: true }).first();
   if (!(await exact.count())) {
+    await networkCapture.stop();
     throw new Error(`Não encontrei o grupo "${groupName}". Confira o nome ou abra a conversa manualmente no Instagram e tente novamente.`);
   }
   await exact.click();
