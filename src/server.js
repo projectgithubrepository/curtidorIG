@@ -67,7 +67,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     "",
     "CAPTURA DE REDE",
     `Respostas: ${network.capturedResponses ?? 0} | Lidas: ${network.parsedResponses ?? 0} | Não interpretadas: ${network.unparsedResponses ?? 0}`,
-    `Mensagens identificadas: ${network.messageLikeObjects ?? 0} | Compartilhamentos identificados: ${network.sharedMediaObjects ?? 0}`,
+    `IDs de mensagens distintos: ${network.distinctMessageIds ?? 0} | Objetos de compartilhamento: ${network.sharedMediaObjects ?? 0}`,
     `Campos: ID ${network.hasMessageId ? "sim" : "não"}; texto ${network.hasTextBody ? "sim" : "não"}; data/hora ${network.hasTimestampMs ? "sim" : "não"}; remetente ${network.hasSender ? "sim" : "não"}; reações ${network.hasReactionFields ? "sim" : "não"}; compartilhamentos ${network.hasShareFields ? "sim" : "não"}; URL ${network.hasPermalinkOrUrl ? "sim" : "não"}`,
     "Operações:",
     ...(operationLines.length ? operationLines : ["- Nenhuma operação identificada"]),
@@ -98,6 +98,7 @@ async function getInstagramContext() {
 app.get("/api/status", (_req, res) => res.json({
   running,
   connected: Boolean(browserContext),
+  hasDiagnostic: Boolean(diagnosticReport),
   progress
 }));
 app.get("/api/results", (_req, res) => res.json({ results }));
