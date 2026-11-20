@@ -6,6 +6,7 @@ import { createComment } from "./comments.js";
 import { appendHistory, getTaskState, getRecentComments, readHistory } from "./history.js";
 import { mergeTaskState, taskStateLabel } from "./group-state.js";
 
+// Keep Direct network diagnostics metadata-only.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json({ limit: "1mb" }));
