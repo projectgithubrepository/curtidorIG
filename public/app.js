@@ -55,7 +55,7 @@ function render(items) {
     const date=document.createElement("small"); date.textContent=item.sharedAt ? new Date(item.sharedAt).toLocaleString("pt-BR") : "Data não identificada";
     const markers=document.createElement("small");
     const milestoneCount=(item.administrativeMilestones || []).length;
-    markers.textContent=milestoneCount ? `${milestoneCount} marco(s) administrativo(s) identificado(s) no histórico visível` : "";
+    markers.textContent=milestoneCount ? "Marcos visíveis: " + (item.administrativeMilestones || []).map(marker => `${marker.date || "data não identificada"} · ${marker.feedCount ?? "?"} Feed · ${marker.storiesCount ?? "?"} Stories`).join(" | ") : "";
     const caption=document.createElement("p"); caption.textContent=item.caption || item.detail || "";
     const comment=document.createElement("p"); comment.className="comment"; comment.textContent=item.comment ? "Comentário sugerido: "+item.comment : "";
     card.append(status,type,stateLine,date,markers,link,caption,comment); results.append(card);
