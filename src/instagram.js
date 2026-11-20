@@ -74,70 +74,104 @@ async function readVisibleAdministrativeMilestones(page) {
   return texts.map(parseAdministrativeMilestone).filter(Boolean);
 }
 
-async function scrollToOlderMessages(page) {
-  const before = await page.evaluate(() => {
+export function olderScrollPosition(currentTop, distance, flexDirection = "") {
+  const top = Number(currentTop) || 0;
+  const amount = Math.max(1, Number(distance) || 1);
+  // Instagram pode usar flex-direction: column-reverse. Nesse modo,
+  // scrollTop começa em zero e fica negativo ao carregar mensagens antigas.
+  return flexDirection === "column-reverse" || top < 0
+    ? top - amount
+    : Math.max(0, top - amount);
+}
+
+async function readConversationScrollState(page, move = false) {
+  return page.evaluate(shouldMove => {
+    const markerSelector = '[role="row"],[role="listitem"],[data-testid*="message"],[data-testid*="Message"],time';
     const candidates = [...document.querySelectorAll("body *")].filter(element => {
+      if (element === document.body || element === document.documentElement) return false;
+      const rect = element.getBoundingClientRect();
+      if (rect.width < 260 || rect.height < 220 || rect.bottom < 0 || rect.top > innerHeight) return false;
+      if (rect.right < innerWidth * 0.45 || rect.left > innerWidth + 20) return false;
+      return element.scrollHeight > element.clientHeight + 80 && element.clientHeight > 160;
+    }).map(element => {
+      const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
-      return /(auto|scroll)/.test(style.overflowY) &&
-        element.scrollHeight > element.clientHeight + 80 &&
-        element.clientHeight > 120;
+      const evidence = element.querySelectorAll(markerSelector).length;
+      return { element, rect, evidence, area: rect.width * rect.height, style };
     });
-    candidates.sort((a, b) => {
-      const ar = a.getBoundingClientRect();
-      const br = b.getBoundingClientRect();
-      const aRight = ar.left > innerWidth * 0.35 ? 1 : 0;
-      const bRight = br.left > innerWidth * 0.35 ? 1 : 0;
-      return (bRight - aRight) || ((br.height * br.width) - (ar.height * ar.width));
-    });
-    const element = candidates[0];
-    if (!element) return null;
-    const rect = element.getBoundingClientRect();
+
+    // Prefere a área rolável que contém sinais de mensagens no painel da conversa.
+    // Em caso de empate, escolhe o contêiner menor (mais interno), não o painel externo.
+    candidates.sort((a, b) =>
+      (b.evidence - a.evidence) ||
+      (a.area - b.area) ||
+      (b.rect.height - a.rect.height)
+    );
+    const selected = candidates[0];
+    if (!selected) {
+      return {
+        found: false,
+        candidateCount: candidates.length,
+        fallbackPoint: { x: Math.round(innerWidth * 0.78), y: Math.round(innerHeight * 0.72) }
+      };
+    }
+
+    const { element, rect, evidence, style } = selected;
+    const beforeTop = element.scrollTop;
+    const distance = Math.max(420, Math.round(element.clientHeight * 0.72));
     const state = {
-      top: element.scrollTop,
-      height: element.scrollHeight,
-      textLength: (element.innerText || "").length,
-      anchorCount: element.querySelectorAll("a[href]").length,
-      x: Math.max(5, Math.min(innerWidth - 5, rect.left + rect.width / 2)),
-      y: Math.max(5, Math.min(innerHeight - 5, rect.top + rect.height / 2))
+      found: true,
+      tag: element.tagName.toLowerCase(),
+      role: element.getAttribute("role") || "",
+      className: String(element.className || "").slice(0, 100),
+      left: Math.round(rect.left),
+      top: Math.round(rect.top),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+      scrollTop: Math.round(beforeTop),
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+      flexDirection: style.flexDirection,
+      messageMarkers: evidence,
+      distance
     };
-    element.scrollTop = Math.max(0, element.scrollTop - Math.max(500, element.clientHeight * 0.8));
+
+    if (shouldMove) {
+      element.scrollTop = olderScrollPosition(beforeTop, distance, style.flexDirection);
+      state.requestedScrollTop = Math.round(element.scrollTop);
+    }
     return state;
-  });
+  }, move);
+}
 
-  const point = before || { x: 1100, y: 700 };
-  await page.mouse.move(point.x, point.y);
-  await page.mouse.wheel(0, -900);
-  await page.waitForTimeout(1200);
+async function scrollToOlderMessages(page) {
+  const before = await readConversationScrollState(page, true);
+  await page.waitForTimeout(900);
+  let after = await readConversationScrollState(page, false);
+  let usedWheelFallback = false;
 
-  const after = await page.evaluate(() => {
-    const candidates = [...document.querySelectorAll("body *")].filter(element => {
-      const style = getComputedStyle(element);
-      return /(auto|scroll)/.test(style.overflowY) &&
-        element.scrollHeight > element.clientHeight + 80 &&
-        element.clientHeight > 120;
-    });
-    candidates.sort((a, b) => {
-      const ar = a.getBoundingClientRect();
-      const br = b.getBoundingClientRect();
-      const aRight = ar.left > innerWidth * 0.35 ? 1 : 0;
-      const bRight = br.left > innerWidth * 0.35 ? 1 : 0;
-      return (bRight - aRight) || ((br.height * br.width) - (ar.height * ar.width));
-    });
-    const element = candidates[0];
-    if (!element) return null;
-    return {
-      top: element.scrollTop,
-      height: element.scrollHeight,
-      textLength: (element.innerText || "").length,
-      anchorCount: element.querySelectorAll("a[href]").length
-    };
-  });
+  // Só usa a roda do mouse se o scroll programático não moveu o contêiner.
+  // Isso evita aplicar duas rolagens em sequência e causar efeito de "piscar".
+  const moved = before.found && after.found &&
+    (after.scrollTop < before.scrollTop - 2 ||
+      after.scrollHeight > before.scrollHeight + 20 ||
+      after.messageMarkers > before.messageMarkers);
+  if (!moved) {
+    const point = before.found
+      ? { x: before.left + Math.round(before.width / 2), y: before.top + Math.round(before.height / 2) }
+      : before.fallbackPoint || { x: 1100, y: 700 };
+    await page.mouse.move(point.x, point.y);
+    await page.mouse.wheel(0, -Math.max(650, before.distance || 800));
+    usedWheelFallback = true;
+    await page.waitForTimeout(1100);
+    after = await readConversationScrollState(page, false);
+  }
 
-  if (!before || !after) return false;
-  return after.top < before.top - 2 ||
-    after.height > before.height + 20 ||
-    after.textLength > before.textLength + 30 ||
-    after.anchorCount > before.anchorCount;
+  const progressed = before.found && after.found &&
+    (after.scrollTop < before.scrollTop - 2 ||
+      after.scrollHeight > before.scrollHeight + 20 ||
+      after.messageMarkers > before.messageMarkers);
+  return { progressed, before, after, usedWheelFallback };
 }
 
 function addNetworkMessages(records, { groupThreadId, startDate, endDate, found, fallback, milestones }) {
@@ -238,6 +272,10 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   const milestones = new Map();
   let noScrollProgressRounds = 0;
   let historyRounds = 0;
+  let scrollProgressRounds = 0;
+  let wheelFallbackRounds = 0;
+  let lastScrollState = null;
+  let scrollTargetFound = false;
 
   // Não interrompe a varredura só porque ainda não encontrou links:
   // conversas longas podem começar com dezenas de mensagens administrativas.
@@ -251,8 +289,12 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
       if (date.known && date.inRange) found.set(item.url, { ...item, sharedAt: date.iso, dateUnknown: false, collectionMode: "date" });
     }
 
-    const progressed = await scrollToOlderMessages(page);
-    noScrollProgressRounds = progressed ? 0 : noScrollProgressRounds + 1;
+    const scroll = await scrollToOlderMessages(page);
+    lastScrollState = { before: scroll.before, after: scroll.after };
+    scrollTargetFound ||= Boolean(scroll.before?.found);
+    if (scroll.usedWheelFallback) wheelFallbackRounds++;
+    noScrollProgressRounds = scroll.progressed ? 0 : noScrollProgressRounds + 1;
+    if (scroll.progressed) scrollProgressRounds++;
     // Garante uma varredura mínima antes de concluir que chegou ao início.
     if (historyRounds >= 12 && noScrollProgressRounds >= 6) break;
   }
@@ -281,6 +323,14 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
       networkMerge.rejectedUnscoped + " mensagens sem identificação de conversa descartadas. Nenhuma interação foi feita.");
     error.networkDiagnostics = networkDiagnostics;
     error.pageDiagnostics = diagnostics;
+    error.scrollDiagnostics = {
+      historyRounds,
+      scrollProgressRounds,
+      stalledRounds: noScrollProgressRounds,
+      wheelFallbackRounds,
+      scrollTargetFound,
+      lastScrollState
+    };
     throw error;
   }
 
