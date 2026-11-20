@@ -6,8 +6,8 @@
 <section class="panel">
 <label for="groupName">Nome exato do grupo no Instagram</label><input id="groupName" placeholder="Ex.: Grupo de ofertas e novidades">
 <div class="dates"><div><label for="startDate">Data inicial</label><input id="startDate" type="date"></div><div><label for="endDate">Data final</label><input id="endDate" type="date"></div></div>
-<div class="actions"><button id="start">Coletar publicações</button><button id="stop" class="secondary" disabled>Parar coleta</button></div>
-<p class="hint">O navegador abrirá o Instagram com sua sessão local. A coleta considera a data em que o link foi compartilhado no grupo. Se o grupo não for localizado automaticamente, confira o nome exato.</p>
+<div class="actions"><button id="connect" class="secondary">Conectar Instagram / fazer login</button><button id="start">Coletar publicações</button><button id="stop" class="secondary" disabled>Parar coleta</button></div>
+<p class="hint">Na primeira utilização, clique em Conectar Instagram, entre na sua conta na janela do Chromium e aguarde. A sessão fica salva neste computador; nas próximas coletas, não será necessário fazer login novamente. Não feche a janela do navegador durante a coleta.</p>
 </section>
 <section class="panel"><div class="section-head"><h2>Andamento</h2><span id="state">Pronto</span></div><div class="track"><div id="bar"></div></div><p id="message">Informe o grupo e o período.</p><p id="counter">0 publicações processadas</p><p id="current" class="current"></p></section>
 <section class="panel"><div class="section-head"><h2>Publicações encontradas</h2><a href="/api/history" download="historico.csv">Baixar histórico CSV</a></div><div id="results" class="results"><p class="muted">Os resultados aparecerão aqui após a coleta.</p></div></section>
