@@ -10,7 +10,8 @@
     "dev": "node --watch src/server.js",
     "desktop": "electron .",
     "dist:mac": "electron-builder --mac dmg --publish never",
-    "test": "node --test"
+    "test": "node --test",
+    "dist:win": "electron-builder --win nsis --x64 --publish never"
   },
   "dependencies": {
     "express": "^5.1.0",
