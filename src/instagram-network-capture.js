@@ -156,11 +156,33 @@ export function createInstagramNetworkCapture(page) {
         hasTextBody: false
       });
       return {
+        capturedAt: new Date().toISOString(),
         capturedResponses: responses.length,
         parsedResponses: parsed.length,
         unparsedResponses: responses.filter(item => item.parseError).length,
         operations: [...operations].slice(0, 30),
         operationDetails: [...byOperation.values()].slice(0, 30),
+        responseDetails: responses.map(item => ({
+          endpoint: item.endpoint,
+          operation: item.operation,
+          status: item.status,
+          contentType: item.contentType,
+          parseError: item.parseError,
+          ...(item.payload ? { payload: {
+            objectsVisited: item.payload.objectsVisited,
+            messageLikeObjects: item.payload.messageLikeObjects,
+            distinctMessageIds: item.payload.distinctMessageIds,
+            sharedMediaObjects: item.payload.sharedMediaObjects,
+            hasMessageId: item.payload.hasMessageId,
+            hasTextBody: item.payload.hasTextBody,
+            hasTimestampMs: item.payload.hasTimestampMs,
+            hasSender: item.payload.hasSender,
+            hasReactionFields: item.payload.hasReactionFields,
+            reactionFieldNames: item.payload.reactionFieldNames,
+            hasShareFields: item.payload.hasShareFields,
+            hasPermalinkOrUrl: item.payload.hasPermalinkOrUrl
+          } } : {})
+        })),
         ...aggregate
       };
     }
