@@ -8,7 +8,8 @@ Aplicação local, leve e em português para coletar publicações compartilhada
 - Playwright abre um navegador Chromium com perfil persistente e isolado do Chrome/Edge. Na primeira utilização, use **Conectar Instagram / fazer login** e entre manualmente; cookies e sessão ficam salvos nos dados locais do aplicativo para as próximas execuções. O navegador permanece aberto entre coletas.
 - Histórico CSV local em `data/historico.csv`, atualizado a cada publicação.
 - Verificação de URLs já registradas para evitar repetir uma publicação.
-- Deduplicação, leitura de legenda, sugestão de comentário local e revisão dos resultados na interface. Não publica curtidas/comentários nem salva coleções automaticamente.
+- Deduplicação, leitura de legenda, sugestão de comentário local e revisão dos resultados na interface.
+- Checklist individual por publicação para registrar, após conferência no Instagram, salvamento, coleção/pasta correta, curtida, comentário e check na mensagem exata do grupo. Cada confirmação exige ação explícita e fica registrada no histórico CSV; a aplicação não clica nem publica essas interações automaticamente.
 - Botão para interromper a fila.
 
 ## Aplicativo para Mac Neo
@@ -48,7 +49,7 @@ Os comentários são gerados localmente por composição, não pela escolha de u
 
 ## Limitações importantes
 
-Esta é uma primeira implementação e ainda precisa ser validada com a conta e a versão atual do Instagram. O Instagram altera frequentemente a interface; seletores podem precisar de ajustes. Publicações privadas, removidas ou indisponíveis não serão processadas.
+Esta é uma primeira implementação e ainda precisa ser validada com a conta e a versão atual do Instagram. O Instagram altera frequentemente a interface; seletores podem precisar de ajustes. Publicações privadas, removidas ou indisponíveis não serão processadas. A análise de Stories ainda não está implementada. O checklist registra confirmações manuais e não comprova ações por leitura automática da conta.
 
 O aplicativo não contorna CAPTCHA, checkpoint, MFA, limites ou bloqueios. Se surgir uma verificação ou sinal de restrição, interrompa o uso e conclua qualquer confirmação diretamente no Instagram. A coleta e preparação de comentários não devem se transformar em disparos automáticos em lote: curtir, comentar ou salvar deve depender de uma ação explícita da pessoa na interface do Instagram. Não use para spam ou interação em massa.
 
