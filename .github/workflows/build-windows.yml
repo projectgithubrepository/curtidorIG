@@ -1,4 +1,5 @@
 name: Build Windows app
+# Rebuild includes latest Direct capture diagnostics
 
 concurrency:
   group: windows-build-${{ github.ref }}
