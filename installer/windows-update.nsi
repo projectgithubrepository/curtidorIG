@@ -19,18 +19,18 @@ Section "Atualizar curtidorIG" SEC01
 
   IfFileExists "$INSTDIR/resources/app.asar" 0 not_installed
 
-  IfFileExists "$%GITHUB_WORKSPACE%\\release\\win-unpacked\\resources\\app.asar" 0 build_missing
+  IfFileExists "$%GITHUB_WORKSPACE%\release\win-unpacked\resources\app.asar" 0 build_missing
   DetailPrint "Atualizando os arquivos do aplicativo..."
 
   SetOutPath "$INSTDIR/resources"
-  File /oname=app.asar "$%GITHUB_WORKSPACE%\\release\\win-unpacked\\resources\\app.asar"
+  File /oname=app.asar "$%GITHUB_WORKSPACE%\release\win-unpacked\resources\app.asar"
 
   RMDir /r "$INSTDIR/resources/app.asar.unpacked"
   SetOutPath "$INSTDIR/resources/app.asar.unpacked"
-  File /r "$%GITHUB_WORKSPACE%\\release\\win-unpacked\\resources\\app.asar.unpacked\\*"
+  File /r "$%GITHUB_WORKSPACE%\release\win-unpacked\resources\app.asar.unpacked\*"
 
   DetailPrint "Atualização concluída. Os dados do usuário e o Chromium foram preservados."
-  MessageBox MB_ICONINFORMATION|MB_OK "curtidorIG atualizado com sucesso!$\\r$\\n$\\r$\\nSeu login do Instagram, histórico e Chromium foram preservados."
+  MessageBox MB_ICONINFORMATION|MB_OK "curtidorIG atualizado com sucesso!$\r$\n$\r$\nSeu login do Instagram, histórico e Chromium foram preservados."
   Goto done
 
 not_installed:
