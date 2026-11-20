@@ -137,7 +137,11 @@ async function readConversationScrollState(page, move = false) {
     };
 
     if (shouldMove) {
-      element.scrollTop = olderScrollPosition(beforeTop, distance, style.flexDirection);
+      const currentTop = Number(beforeTop) || 0;
+      const olderTop = style.flexDirection === "column-reverse" || currentTop < 0
+        ? currentTop - distance
+        : Math.max(0, currentTop - distance);
+      element.scrollTop = olderTop;
       state.requestedScrollTop = Math.round(element.scrollTop);
     }
     return state;
