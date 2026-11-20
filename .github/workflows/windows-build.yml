@@ -1,0 +1,37 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\\.playwright-browsers
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium for the app
+        run: npx playwright install chromium
+      - name: Run tests
+        run: npm test
+      - name: Build Windows installer
+        run: npx electron-builder --win nsis --x64 --publish never
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: curtidorIG-Windows-Setup
+          path: release/*Windows-Setup.exe
+          if-no-files-found: error
+          retention-days: 14
