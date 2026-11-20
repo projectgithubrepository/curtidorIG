@@ -1,73 +1,185 @@
-const MAX_RESPONSES = 120;
-const MAX_DEPTH = 18;
+const MAX_RESPONSES = 160;
+const MAX_DEPTH = 20;
+const MAX_URLS_PER_MESSAGE = 12;
+const URL_PATTERN = /https?:\\?\/?\\?\/?(?:www\\?\.)?instagram\\?\.com\\?\/(?:p|reel|tv|stories)\\?\/[A-Za-z0-9._-]+(?:\\?\/[^\\s"'<>]*)?/gi;
 
 function operationNameFromRequest(request) {
+  const candidates = [];
   try {
     const body = request.postDataJSON();
-    if (body && typeof body.operationName === "string") return body.operationName;
-    if (Array.isArray(body)) {
-      return body.map(item => item?.operationName).filter(Boolean).join(", ");
-    }
+    const visit = value => {
+      if (!value || typeof value !== "object") return;
+      if (typeof value.operationName === "string") candidates.push(value.operationName);
+      if (typeof value.fb_api_req_friendly_name === "string") candidates.push(value.fb_api_req_friendly_name);
+      if (Array.isArray(value)) value.forEach(visit);
+      else if (value.variables && typeof value.variables === "object") visit(value.variables);
+    };
+    visit(body);
   } catch {}
   try {
     const url = new URL(request.url());
-    return url.searchParams.get("query_hash") || url.searchParams.get("doc_id") || "";
-  } catch {
-    return "";
-  }
+    for (const key of ["operationName", "fb_api_req_friendly_name", "query_hash", "doc_id"]) {
+      const value = url.searchParams.get(key);
+      if (value) candidates.push(value);
+    }
+  } catch {}
+  return [...new Set(candidates)].join(", ");
 }
 
-function inspectPayload(payload) {
+function requestContext(request) {
+  const result = { threadId: "", operation: operationNameFromRequest(request) };
+  const inspect = value => {
+    if (!value || typeof value !== "object") return;
+    if (!result.threadId) {
+      for (const key of ["thread_id", "threadId", "conversation_id"]) {
+        if (value[key] != null && /^\\d{6,}$/.test(String(value[key]))) {
+          result.threadId = String(value[key]);
+          break;
+        }
+      }
+    }
+    if (Array.isArray(value)) value.forEach(inspect);
+    else for (const child of Object.values(value)) if (child && typeof child === "object") inspect(child);
+  };
+  try { inspect(request.postDataJSON()); } catch {}
+  try {
+    const url = new URL(request.url());
+    for (const key of ["thread_id", "threadId", "conversation_id"]) {
+      const value = url.searchParams.get(key);
+      if (value && /^\\d{6,}$/.test(value)) result.threadId = value;
+    }
+  } catch {}
+  return result;
+}
+
+function normalizeTimestamp(value) {
+  if (value == null || value === "") return "";
+  const numeric = Number(value);
+  let date;
+  if (Number.isFinite(numeric)) {
+    date = new Date(numeric < 1e12 ? numeric * 1000 : numeric);
+  } else {
+    date = new Date(value);
+  }
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
+function collectUrls(value, output, seen = new WeakSet(), depth = 0) {
+  if (depth > MAX_DEPTH || value == null) return;
+  if (typeof value === "string") {
+    const matches = value.match(URL_PATTERN) || [];
+    for (const raw of matches) {
+      const normalized = raw.replace(/\\\\\//g, "/").replace(/[),.;]+$/, "");
+      try {
+        const parsed = new URL(normalized);
+        if (!/^(?:www\\.)?instagram\\.com$/i.test(parsed.hostname)) continue;
+        const match = parsed.pathname.match(/^\\/(p|reel|tv|stories)\\/([A-Za-z0-9._-]+)/i);
+        if (!match) continue;
+        const url = "https://www.instagram.com/" + match[1].toLowerCase() + "/" + match[2];
+        if (!output.includes(url) && output.length < MAX_URLS_PER_MESSAGE) output.push(url);
+      } catch {}
+    }
+    return;
+  }
+  if (typeof value !== "object" || seen.has(value)) return;
+  seen.add(value);
+  if (Array.isArray(value)) value.forEach(item => collectUrls(item, output, seen, depth + 1));
+  else for (const child of Object.values(value)) collectUrls(child, output, seen, depth + 1);
+}
+
+function isMessageObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const id = value.message_id ?? value.mid ?? value.item_id;
+  if (id == null) return false;
+  return Boolean(value.sender || value.timestamp_ms != null || value.timestamp != null ||
+    value.created_at != null || value.text_body != null || value.content || value.message);
+}
+
+function messageText(value) {
+  const candidates = [value.text_body, value.text, value.message_text, value.caption, value.title];
+  for (const item of candidates) {
+    if (typeof item === "string" && item.trim()) return item.slice(0, 1600);
+  }
+  const content = value.content;
+  if (content && typeof content === "object") {
+    for (const key of ["text", "text_body", "caption"]) {
+      if (typeof content[key] === "string" && content[key].trim()) return content[key].slice(0, 1600);
+    }
+  }
+  return "";
+}
+
+function senderName(value) {
+  const sender = value.sender ?? value.user ?? value.from;
+  if (typeof sender === "string") return sender.slice(0, 120);
+  if (sender && typeof sender === "object") {
+    return String(sender.username ?? sender.name ?? sender.full_name ?? sender.igid ?? sender.id ?? "").slice(0, 120);
+  }
+  return "";
+}
+
+function extractPayload(payload, context = {}) {
   const keys = new Set();
   const messageIds = new Set();
-  const reactionKeys = new Set();
-  let objectsVisited = 0;
-  let messageLikeObjects = 0;
-  let sharedMediaObjects = 0;
+  const records = [];
+  const structures = [];
   const seen = new WeakSet();
+  let objectsVisited = 0;
+  let sharedMediaObjects = 0;
+  let hasReactionFields = false;
 
-  function visit(value, depth = 0) {
+  function visit(value, path = "$", depth = 0) {
     if (!value || typeof value !== "object" || depth > MAX_DEPTH || seen.has(value)) return;
     seen.add(value);
     if (Array.isArray(value)) {
-      for (const item of value) visit(item, depth + 1);
+      value.forEach((item, index) => visit(item, path + "[" + index + "]", depth + 1));
       return;
     }
     objectsVisited++;
     const ownKeys = Object.keys(value);
-    for (const key of ownKeys) keys.add(key);
-    const id = value.message_id ?? value.mid ?? value.item_id;
-    if (id !== undefined && id !== null && (value.sender || value.timestamp_ms || value.text_body !== undefined || value.content)) {
-      messageLikeObjects++;
-      messageIds.add(String(id).slice(0, 100));
-    }
-    for (const key of ownKeys) {
-      if (/reaction|emoji|reactor/i.test(key)) reactionKeys.add(key);
-    }
+    ownKeys.forEach(key => keys.add(key));
+    if (ownKeys.some(key => /reaction|emoji|reactor/i.test(key))) hasReactionFields = true;
     if (value.share || value.media || value.media_share || value.xma || value.slide_messages) sharedMediaObjects++;
-    for (const child of Object.values(value)) visit(child, depth + 1);
-  }
 
+    if (isMessageObject(value)) {
+      const id = String(value.message_id ?? value.mid ?? value.item_id);
+      messageIds.add(id);
+      const urls = [];
+      collectUrls(value, urls);
+      const timestamp = normalizeTimestamp(value.timestamp_ms ?? value.timestamp ?? value.created_at ?? value.sent_at);
+      const text = messageText(value);
+      const localThreadId = String(value.thread_id ?? value.threadId ?? value.conversation_id ?? context.threadId ?? "");
+      records.push({
+        messageId: id,
+        threadId: localThreadId,
+        timestamp,
+        sender: senderName(value),
+        text,
+        urls,
+        hasReactionData: ownKeys.some(key => /reaction|emoji|reactor/i.test(key)) ||
+          Boolean(value.reactions || value.reaction_summary || value.reaction_count),
+        structurePath: path,
+        objectKeys: ownKeys.slice(0, 45)
+      });
+      if (structures.length < 8) structures.push({ path, keys: ownKeys.slice(0, 45), contentType: value.content?.__typename || value.content?.type || "" });
+    }
+    for (const [key, child] of Object.entries(value)) visit(child, path + "." + key, depth + 1);
+  }
   visit(payload);
-  const allKeys = [...keys];
   return {
-    objectsVisited,
-    messageLikeObjects,
-    distinctMessageIds: messageIds.size,
-    sharedMediaObjects,
-    hasMessageId: allKeys.some(key => /^(message_id|mid|item_id)$/.test(key)),
-    hasTextBody: keys.has("text_body"),
-    hasTimestampMs: keys.has("timestamp_ms"),
-    hasSender: keys.has("sender"),
-    hasReactionFields: reactionKeys.size > 0,
-    reactionFieldNames: [...reactionKeys].slice(0, 20),
-    hasShareFields: allKeys.some(key => /^(share|media_share|xma|slide_messages)$/.test(key)),
-    hasPermalinkOrUrl: allKeys.some(key => /^(permalink|url|href)$/.test(key))
+    records, structures, objectsVisited, messageLikeObjects: records.length,
+    distinctMessageIds: messageIds.size, sharedMediaObjects, hasReactionFields,
+    hasShareFields: [...keys].some(key => /^(share|media_share|xma|slide_messages)$/i.test(key)),
+    hasPermalinkOrUrl: [...keys].some(key => /^(permalink|url|href)$/i.test(key)),
+    hasMessageId: [...keys].some(key => /^(message_id|mid|item_id)$/i.test(key)),
+    hasTextBody: keys.has("text_body"), hasTimestampMs: keys.has("timestamp_ms"),
+    hasSender: keys.has("sender")
   };
 }
 
 export function createInstagramNetworkCapture(page) {
   const responses = [];
+  const recordsByKey = new Map();
   const operations = new Set();
   let stopped = false;
   const pending = new Set();
@@ -75,37 +187,42 @@ export function createInstagramNetworkCapture(page) {
   const onResponse = response => {
     if (stopped || responses.length >= MAX_RESPONSES) return;
     let url;
-    try {
-      url = new URL(response.url());
-    } catch {
-      return;
-    }
+    try { url = new URL(response.url()); } catch { return; }
     if (!["www.instagram.com", "instagram.com"].includes(url.hostname.toLowerCase())) return;
     if (!url.pathname.includes("/graphql") && !url.pathname.includes("/api/v1/direct")) return;
-
     const contentLength = Number(response.headers()["content-length"] || 0);
     if (contentLength > 10 * 1024 * 1024) return;
 
     const request = response.request();
-    const operation = operationNameFromRequest(request);
-    if (operation) operations.add(operation);
-
+    const context = requestContext(request);
+    if (context.operation) operations.add(context.operation);
     const entry = {
       endpoint: url.pathname.includes("/graphql") ? "graphql" : "direct-api",
-      operation: operation || "unknown",
+      operation: context.operation || "unknown",
+      threadId: context.threadId,
       status: response.status(),
       contentType: (response.headers()["content-type"] || "").split(";")[0].slice(0, 80),
       payload: null,
       parseError: false
     };
-
     const task = (async () => {
       try {
         const payload = await response.json();
-        entry.payload = inspectPayload(payload);
-      } catch {
-        entry.parseError = true;
-      }
+        entry.payload = extractPayload(payload, context);
+        for (const record of entry.payload.records) {
+          const key = record.messageId + "|" + record.threadId;
+          const previous = recordsByKey.get(key);
+          if (!previous || previous.urls.length < record.urls.length || (!previous.timestamp && record.timestamp)) {
+            recordsByKey.set(key, { ...record, responseThreadId: context.threadId });
+          } else {
+            previous.urls = [...new Set([...previous.urls, ...record.urls])].slice(0, MAX_URLS_PER_MESSAGE);
+            if (!previous.timestamp) previous.timestamp = record.timestamp;
+            if (!previous.text) previous.text = record.text;
+            if (!previous.sender) previous.sender = record.sender;
+            previous.hasReactionData ||= record.hasReactionData;
+          }
+        }
+      } catch { entry.parseError = true; }
       if (responses.length < MAX_RESPONSES) responses.push(entry);
     })();
     pending.add(task);
@@ -123,44 +240,24 @@ export function createInstagramNetworkCapture(page) {
 
   return {
     stop,
+    records() { return [...recordsByKey.values()].map(record => ({ ...record, urls: [...record.urls] })); },
     summary() {
       const parsed = responses.filter(item => item.payload);
       const byOperation = new Map();
       const aggregate = parsed.reduce((result, item) => {
         result.messageLikeObjects += item.payload.messageLikeObjects;
         result.sharedMediaObjects += item.payload.sharedMediaObjects;
-        result.distinctMessageIds += item.payload.distinctMessageIds;
-        result.hasSender ||= item.payload.hasSender;
-        result.hasPermalinkOrUrl ||= item.payload.hasPermalinkOrUrl;
         result.hasReactionFields ||= item.payload.hasReactionFields;
         result.hasShareFields ||= item.payload.hasShareFields;
-        result.hasMessageId ||= item.payload.hasMessageId;
-        result.hasTimestampMs ||= item.payload.hasTimestampMs;
-        result.hasTextBody ||= item.payload.hasTextBody;
         const key = item.operation || "unknown";
-        const current = byOperation.get(key) || {
-          operation: key, responses: 0, messageLikeObjects: 0, sharedMediaObjects: 0,
-          hasReactionFields: false, hasShareFields: false
-        };
+        const current = byOperation.get(key) || { operation: key, responses: 0, messageLikeObjects: 0, sharedMediaObjects: 0 };
         current.responses++;
         current.messageLikeObjects += item.payload.messageLikeObjects;
         current.sharedMediaObjects += item.payload.sharedMediaObjects;
-        current.hasReactionFields ||= item.payload.hasReactionFields;
-        current.hasShareFields ||= item.payload.hasShareFields;
         byOperation.set(key, current);
         return result;
-      }, {
-        messageLikeObjects: 0,
-        sharedMediaObjects: 0,
-        distinctMessageIds: 0,
-        hasSender: false,
-        hasPermalinkOrUrl: false,
-        hasReactionFields: false,
-        hasShareFields: false,
-        hasMessageId: false,
-        hasTimestampMs: false,
-        hasTextBody: false
-      });
+      }, { messageLikeObjects: 0, sharedMediaObjects: 0, hasReactionFields: false, hasShareFields: false });
+      const allStructures = parsed.flatMap(item => item.payload.structures).slice(0, 12);
       return {
         capturedAt: new Date().toISOString(),
         capturedResponses: responses.length,
@@ -168,12 +265,16 @@ export function createInstagramNetworkCapture(page) {
         unparsedResponses: responses.filter(item => item.parseError).length,
         operations: [...operations].slice(0, 30),
         operationDetails: [...byOperation.values()].slice(0, 30),
+        distinctMessageIds: recordsByKey.size,
+        extractedShareUrls: [...recordsByKey.values()].reduce((sum, item) => sum + item.urls.length, 0),
+        messageLikeObjects: aggregate.messageLikeObjects,
+        sharedMediaObjects: aggregate.sharedMediaObjects,
+        hasReactionFields: aggregate.hasReactionFields,
+        hasShareFields: aggregate.hasShareFields,
+        structures: allStructures,
         responseDetails: responses.map(item => ({
-          endpoint: item.endpoint,
-          operation: item.operation,
-          status: item.status,
-          contentType: item.contentType,
-          parseError: item.parseError,
+          endpoint: item.endpoint, operation: item.operation, threadIdPresent: Boolean(item.threadId),
+          status: item.status, contentType: item.contentType, parseError: item.parseError,
           ...(item.payload ? { payload: {
             objectsVisited: item.payload.objectsVisited,
             messageLikeObjects: item.payload.messageLikeObjects,
@@ -184,12 +285,10 @@ export function createInstagramNetworkCapture(page) {
             hasTimestampMs: item.payload.hasTimestampMs,
             hasSender: item.payload.hasSender,
             hasReactionFields: item.payload.hasReactionFields,
-            reactionFieldNames: item.payload.reactionFieldNames,
             hasShareFields: item.payload.hasShareFields,
             hasPermalinkOrUrl: item.payload.hasPermalinkOrUrl
           } } : {})
-        })),
-        ...aggregate
+        }))
       };
     }
   };
@@ -198,5 +297,3 @@ export function createInstagramNetworkCapture(page) {
 export function summarizeInstagramNetworkCapture(capture) {
   return capture.summary();
 }
-
-// Build trigger: rebuild the corrected main branch.
