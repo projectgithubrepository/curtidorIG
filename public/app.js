@@ -11,6 +11,20 @@ const bar = document.querySelector("#bar");
 const results = document.querySelector("#results");
 
 const connect = document.querySelector("#connect");
+const copyDiagnostic = document.querySelector("#copyDiagnostic");
+const diagnosticCopyStatus = document.querySelector("#diagnosticCopyStatus");
+const downloadDiagnostic = document.querySelector("#downloadDiagnostic");
+
+copyDiagnostic.addEventListener("click", async () => {
+  try {
+    const response = await fetch("/api/diagnostic-log");
+    if (!response.ok) throw new Error("Faça uma coleta antes de copiar o diagnóstico.");
+    await navigator.clipboard.writeText(await response.text());
+    diagnosticCopyStatus.textContent = "Diagnóstico copiado. Cole o texto aqui na conversa.";
+  } catch (error) {
+    diagnosticCopyStatus.textContent = error.message;
+  }
+});
 
 connect.addEventListener("click", async () => {
   connect.disabled = true;
@@ -69,6 +83,9 @@ async function refresh() {
     counter.textContent=`${p.done} de ${p.total} publicações processadas`;
     current.textContent=p.current||""; bar.style.width=p.total?`${Math.min(100,p.done/p.total*100)}%`:"0%";
     start.disabled=data.running; stop.disabled=!data.running; render(r.results||[]);
+    copyDiagnostic.disabled = data.running || !data.progress?.message || data.progress?.message === "Pronto.";
+    downloadDiagnostic.style.pointerEvents = copyDiagnostic.disabled ? "none" : "auto";
+    downloadDiagnostic.style.opacity = copyDiagnostic.disabled ? "0.5" : "1";
   } catch {}
 }
 setInterval(refresh,1500); refresh();
