@@ -92,3 +92,33 @@ test("extracts nested shared-media shortcodes and relative permalinks", async ()
     "https://www.instagram.com/reel/SHORTCODE9"
   ]);
 });
+
+
+test("captures JSON WebSocket frames and inherits the enclosing thread id", async () => {
+  const page = new EventEmitter();
+  const socket = new EventEmitter();
+  socket.url = () => "wss://www.instagram.com/ws";
+  const capture = createInstagramNetworkCapture(page);
+  page.emit("websocket", socket);
+  socket.emit("framereceived", JSON.stringify({
+    data: {
+      thread: {
+        thread_id: "1783131735658148",
+        items: [{
+          message_id: "ws-message-1",
+          timestamp_ms: 1795021200000,
+          sender: { username: "member" },
+          share: { url: "https://www.instagram.com/p/WSPOST123/" }
+        }]
+      }
+    }
+  }));
+  await capture.stop();
+  const [record] = capture.records();
+  assert.equal(record.messageId, "ws-message-1");
+  assert.equal(record.threadId, "1783131735658148");
+  assert.deepEqual(record.urls, ["https://www.instagram.com/p/WSPOST123"]);
+  assert.equal(capture.summary().websocketFrames, 1);
+  assert.equal(capture.summary().parsedWebSocketFrames, 1);
+  assert.equal(capture.summary().webSocketMessageLikeObjects, 1);
+});
