@@ -23,13 +23,13 @@ function dateInRange(sharedAt, startDate, endDate) {
 
 async function readVisiblePostLinks(page) {
   return page.evaluate(() => {
-    const urlPattern = /https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv|stories)\/[A-Za-z0-9._-]+(?:\/[^\s]*)?/gi;
+    const urlPattern = /https?:\\/\\/(?:www\\.)?instagram\\.com\\/(?:p|reel|tv|stories)\\/[A-Za-z0-9._-]+(?:\\/[^\\s]*)?/gi;
     const normalizeUrl = value => {
       try {
         const parsed = new URL(value, location.origin);
-        if (!/^(?:www\.)?instagram\.com$/i.test(parsed.hostname)) return "";
-        if (!/^\/(?:p|reel|tv|stories)\//.test(parsed.pathname)) return "";
-        return parsed.origin + parsed.pathname.replace(/\/$/, "");
+        if (!/^(?:www\\.)?instagram\\.com$/i.test(parsed.hostname)) return "";
+        if (!/^\\/(?:p|reel|tv|stories)\\//.test(parsed.pathname)) return "";
+        return parsed.origin + parsed.pathname.replace(/\\/$/, "");
       } catch { return ""; }
     };
     const candidates = new Map();
@@ -62,9 +62,9 @@ async function readVisiblePostLinks(page) {
     }
     return [...candidates.values()].map(item => ({
       ...item,
-      contentType: /\/stories\//.test(item.url) ? "story" : "feed",
+      contentType: /\\/stories\\//.test(item.url) ? "story" : "feed",
       sharedAt: item.sharedAt || "",
-      groupCheck: /(?:✅|☑️|✔️|✓)/u.test(item.messageText)
+      groupCheck: false
     }));
   }).then(items => items.filter(item => !isAdministrativeMessage(item.messageText)));
 }
@@ -108,19 +108,55 @@ async function scrollToOlderMessages(page) {
   await page.waitForTimeout(900);
 }
 
+function addNetworkMessages(records, { groupThreadId, startDate, endDate, found, fallback, milestones }) {
+  let accepted = 0;
+  let rejectedThread = 0;
+  for (const record of records) {
+    if (record.threadId && groupThreadId && record.threadId !== groupThreadId) {
+      rejectedThread++;
+      continue;
+    }
+    const text = record.text || "";
+    if (text && isAdministrativeMessage(text)) {
+      const marker = parseAdministrativeMilestone(text);
+      if (marker) milestones.set(record.messageId, { ...marker, messageId: record.messageId, sharedAt: record.timestamp });
+      continue;
+    }
+    for (const url of record.urls || []) {
+      const date = dateInRange(record.timestamp, startDate, endDate);
+      if (date.known && !date.inRange) continue;
+      const item = {
+        url,
+        messageId: record.messageId,
+        sender: record.sender || "",
+        messageText: text,
+        sharedAt: date.iso,
+        dateUnknown: !date.known,
+        contentType: /\\/stories\\//i.test(url) ? "story" : "feed",
+        collectionMode: date.known ? "network-date" : "network-date-unknown",
+        groupCheck: false,
+        networkReactionDataPresent: Boolean(record.hasReactionData)
+      };
+      if (date.known) {
+        if (!found.has(url)) { found.set(url, item); accepted++; }
+      } else if (!fallback.has(url)) {
+        fallback.set(url, item);
+        accepted++;
+      }
+    }
+  }
+  return { accepted, rejectedThread };
+}
+
 export async function collectGroupPosts(page, { groupName, startDate, endDate, shouldStop = () => false }) {
-  // Observa somente respostas que a própria interface autenticada do Instagram recebe.
-  // Nenhuma requisição privada é criada e nenhum conteúdo de mensagem é persistido no diagnóstico.
-  const networkCapture = createInstagramNetworkCapture(page);
+  let networkCapture = null;
   try {
     await page.goto("https://www.instagram.com/direct/inbox/", { waitUntil: "domcontentloaded", timeout: 60000 });
   } catch (error) {
-    await networkCapture.stop();
     throw error;
   }
   await page.waitForTimeout(2500);
   if (page.url().includes("/accounts/login")) {
-    await networkCapture.stop();
     throw new Error("Faça login manualmente no Instagram e inicie a coleta novamente.");
   }
 
@@ -131,18 +167,22 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   }
   const exact = page.getByText(groupName, { exact: true }).first();
   if (!(await exact.count())) {
-    await networkCapture.stop();
     throw new Error(`Não encontrei o grupo "${groupName}". Confira o nome ou abra a conversa manualmente no Instagram e tente novamente.`);
   }
+
+  // Inicia a captura imediatamente antes de abrir o grupo para não misturar
+  // mensagens recebidas de outras conversas durante a carga da caixa de entrada.
+  networkCapture = createInstagramNetworkCapture(page);
   await exact.click();
   await page.waitForTimeout(1800);
+  const activeThreadId = page.url().match(/\\/direct\\/t\\/(\\d+)/)?.[1] || "";
 
   const found = new Map();
+  const fallback = new Map();
   const milestones = new Map();
   let previousCount = -1;
   let stableRounds = 0;
 
-  // Estratégia principal: só aceita mensagens cuja data possa ser lida e esteja no período.
   for (let round = 0; round < 35 && !shouldStop(); round++) {
     for (const marker of await readVisibleAdministrativeMilestones(page)) milestones.set(marker.text, marker);
     const batch = await readVisiblePostLinks(page);
@@ -156,61 +196,49 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     await scrollToOlderMessages(page);
   }
 
-  // Plano B: se a interface não expuser datas legíveis, varre o histórico recente
-  // até percorrer cerca de 300 mensagens recentes (limite de 30 rolagens). Links com
-  // data conhecida fora do período continuam excluídos; datas ausentes são marcadas.
-  if (!found.size && !shouldStop()) {
-    const fallback = new Map();
-    let stableFallbackRounds = 0;
-    let previousFallbackSize = -1;
-    for (let round = 0; round < 30 && !shouldStop(); round++) {
-      for (const marker of await readVisibleAdministrativeMilestones(page)) milestones.set(marker.text, marker);
-      const batch = await readVisiblePostLinks(page);
-      for (const item of batch) {
-        if (fallback.has(item.url)) continue;
-        const date = dateInRange(item.sharedAt, startDate, endDate);
-        if (date.known && !date.inRange) continue;
-        fallback.set(item.url, {
-          ...item,
-          sharedAt: date.known ? date.iso : "",
-          dateUnknown: !date.known,
-          collectionMode: "last-300-fallback"
-        });
-      }
+  await networkCapture.stop();
+  const networkRecords = networkCapture.records();
+  const networkDiagnostics = networkCapture.summary();
+  const networkMerge = addNetworkMessages(networkRecords, {
+    groupThreadId: activeThreadId, startDate, endDate, found, fallback, milestones
+  });
 
-      if (fallback.size === previousFallbackSize) stableFallbackRounds++; else stableFallbackRounds = 0;
-      previousFallbackSize = fallback.size;
-      if (stableFallbackRounds >= 5 && round >= 20) break;
-      await scrollToOlderMessages(page);
-    }
+  // Sem data confirmada, preserva os links como candidatos separados; eles não
+  // entram no período automaticamente e ficam identificados como data desconhecida.
+  if (!found.size) {
     for (const [url, item] of fallback) found.set(url, item);
   }
-
-  await networkCapture.stop();
-  const networkDiagnostics = networkCapture.summary();
 
   if (!found.size) {
     const diagnostics = await page.evaluate(() => {
       const anchors = [...document.querySelectorAll("a[href]")];
-      const instagramLinks = anchors.filter(a => /instagram\.com\/(?:p|reel|tv|stories)\//i.test(a.href)).length;
+      const instagramLinks = anchors.filter(a => /instagram\\.com\\/(?:p|reel|tv|stories)\\//i.test(a.href)).length;
       const messageNodes = document.querySelectorAll('[role="row"],[role="listitem"],[data-testid*="message"],[data-testid*="Message"]').length;
       return { url: location.href, anchors: anchors.length, instagramLinks, messageNodes };
     });
     const error = new Error("Nenhuma publicação foi extraída. Diagnóstico: " + diagnostics.instagramLinks +
       " links do Instagram em " + diagnostics.anchors + " links da página; " +
       diagnostics.messageNodes + " elementos de mensagem. Página: " + diagnostics.url +
-      ". Diagnóstico de rede: " + networkDiagnostics.capturedResponses + " respostas capturadas; operações: " +
-      (networkDiagnostics.operations.join(", ") || "nenhuma identificada") + "; objetos de mensagem: " +
-      networkDiagnostics.messageLikeObjects + "; campos de reação: " + (networkDiagnostics.hasReactionFields ? "sim" : "não") +
-      "; campos de compartilhamento: " + (networkDiagnostics.hasShareFields ? "sim" : "não") +
-      ". Verifique se a conversa correta está aberta e se as mensagens foram carregadas. Nenhuma interação foi feita.");
+      ". Rede: " + networkDiagnostics.capturedResponses + " respostas; " +
+      networkDiagnostics.distinctMessageIds + " mensagens deduplicadas; " +
+      networkDiagnostics.extractedShareUrls + " URLs extraídas; " +
+      networkMerge.rejectedThread + " mensagens descartadas por divergência de conversa. Nenhuma interação foi feita.");
     error.networkDiagnostics = networkDiagnostics;
     error.pageDiagnostics = diagnostics;
     throw error;
   }
 
   const milestoneList = [...milestones.values()];
-  return [...found.values()].map(item => ({ ...item, administrativeMilestones: milestoneList, networkDiagnostics })).sort((a, b) => {
+  return [...found.values()].map(item => ({
+    ...item,
+    administrativeMilestones: milestoneList,
+    networkDiagnostics: {
+      ...networkDiagnostics,
+      normalizedNetworkMessages: networkRecords.length,
+      acceptedNetworkPosts: networkMerge.accepted,
+      rejectedOtherThreads: networkMerge.rejectedThread
+    }
+  })).sort((a, b) => {
     if (!a.sharedAt) return 1;
     if (!b.sharedAt) return -1;
     return a.sharedAt.localeCompare(b.sharedAt);
@@ -231,7 +259,7 @@ export async function inspectPost(page, url) {
     const profileLink = [...document.querySelectorAll("nav a[href]")].find(node =>
       /perfil|profile/i.test([node.getAttribute("aria-label"), node.innerText].filter(Boolean).join(" "))
     );
-    const username = (profileLink?.getAttribute("href") || "").match(/^\/([^/]+)\/?$/)?.[1] || "";
+    const username = (profileLink?.getAttribute("href") || "").match(/^\\/([^/]+)\\/?$/)?.[1] || "";
     let commented = false;
     if (username) commented = [...element.querySelectorAll("li")].some(item =>
       [...item.querySelectorAll("a[href]")].some(link => link.getAttribute("href") === "/" + username + "/") &&
