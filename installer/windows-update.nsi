@@ -30,9 +30,7 @@ Section "Atualizar curtidorIG" SEC01
   File /r "$%GITHUB_WORKSPACE%\\release\\win-unpacked\\resources\\app.asar.unpacked\\*"
 
   DetailPrint "Atualização concluída. Os dados do usuário e o Chromium foram preservados."
-  MessageBox MB_ICONINFORMATION|MB_OK "curtidorIG atualizado com sucesso!$$
-$$
-Seu login do Instagram, histórico e Chromium foram preservados."
+  MessageBox MB_ICONINFORMATION|MB_OK "curtidorIG atualizado com sucesso!$\\r$\\n$\\r$\\nSeu login do Instagram, histórico e Chromium foram preservados."
   Goto done
 
 not_installed:
