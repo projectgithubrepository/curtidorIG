@@ -16,6 +16,62 @@ let stopRequested = false;
 let browserContext = null;
 let results = [];
 let progress = { total: 0, done: 0, current: "", message: "Pronto." };
+let diagnosticReport = null;
+let diagnosticLog = [];
+
+function logDiagnostic(level, message, details = {}) {
+  diagnosticLog.push({
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+    ...(Object.keys(details).length ? { details } : {})
+  });
+  if (diagnosticLog.length > 1000) diagnosticLog.shift();
+}
+
+function reportItem(item) {
+  return {
+    url: item.url || "",
+    contentType: item.contentType || "",
+    sharedAt: item.sharedAt || "",
+    dateUnknown: Boolean(item.dateUnknown),
+    collectionMode: item.collectionMode || "",
+    status: item.status || "",
+    taskState: item.taskState || null
+  };
+}
+
+app.get("/api/diagnostic-report", (_req, res) => {
+  if (!diagnosticReport) return res.status(404).json({ error: "Ainda não há relatório. Execute uma coleta primeiro." });
+  res.setHeader("Content-Disposition", 'attachment; filename="curtidorig-relatorio-diagnostico.json"');
+  res.json(diagnosticReport);
+});
+
+app.get("/api/diagnostic-log", (_req, res) => {
+  if (!diagnosticReport) return res.status(404).type("text/plain; charset=utf-8").send("Ainda não há log. Execute uma coleta primeiro.");
+  const lines = [
+    "curtidorIG - LOG DE DIAGNÓSTICO",
+    `Gerado: ${new Date().toISOString()}`,
+    `Grupo: ${diagnosticReport.request?.groupName || "não informado"}`,
+    `Período: ${diagnosticReport.request?.startDate || "?"} até ${diagnosticReport.request?.endDate || "?"}`,
+    `Resultado: ${diagnosticReport.outcome || "indisponível"}`,
+    "",
+    ...diagnosticLog.map(entry => {
+      const detail = entry.details ? " | " + JSON.stringify(entry.details) : "";
+      return `[${entry.timestamp}] [${entry.level}] ${entry.message}${detail}`;
+    }),
+    "",
+    "Resumo técnico:",
+    JSON.stringify(diagnosticReport.networkDiagnostics || {}, null, 2),
+    "",
+    "Diagnóstico da página:",
+    JSON.stringify(diagnosticReport.pageDiagnostics || {}, null, 2),
+    "",
+    "Observação: este log não inclui texto privado de mensagens, cookies, tokens ou senhas."
+  ];
+  res.setHeader("Content-Disposition", 'attachment; filename="curtidorig-diagnostico.log"');
+  res.type("text/plain; charset=utf-8").send(lines.join("\\n"));
+}
 
 async function getInstagramContext() {
   if (browserContext) {
@@ -69,6 +125,10 @@ app.post("/api/start", async (req, res) => {
   running = true;
   stopRequested = false;
   results = [];
+  diagnosticLog = [];
+  diagnosticReport = null;
+  const startedAt = new Date().toISOString();
+  logDiagnostic("INFO", "Coleta iniciada", { groupName, startDate, endDate });
   progress = { total: 0, done: 0, current: groupName, message: "Abrindo o Instagram..." };
   res.json({ ok: true, message: "Coleta iniciada." });
 
@@ -77,7 +137,13 @@ app.post("/api/start", async (req, res) => {
       const context = await getInstagramContext();
       const page = context.pages()[0] || await context.newPage();
       progress.message = "Localizando a conversa. O nome precisa corresponder exatamente.";
+      logDiagnostic("INFO", "Abrindo a caixa de entrada e localizando o grupo");
       const collected = await collectGroupPosts(page, { groupName, startDate, endDate, shouldStop: () => stopRequested });
+      logDiagnostic("INFO", "Varredura da conversa concluída", {
+        publicationsFound: collected.length,
+        administrativeMilestones: new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size,
+        networkResponses: collected[0]?.networkDiagnostics?.capturedResponses ?? 0
+      });
       if (stopRequested) return;
       progress.total = collected.length;
       const withoutDate = collected.filter(item => item.dateUnknown).length;
@@ -89,6 +155,7 @@ app.post("/api/start", async (req, res) => {
         : "Diagnóstico de rede indisponível.";
       progress.message = `${collected.length} links encontrados${usedFallback ? " pela varredura de recuperação" : ""}; ${withoutDate} sem data identificável; ${milestoneCount} marcos administrativos identificados. ${networkStatus} Verificando histórico...`;
       const previous = getRecentComments(200);
+      logDiagnostic("INFO", "Iniciando inspeção das publicações encontradas", { total: collected.length });
       for (const item of collected) {
         if (stopRequested) break;
         const previousState = mergeTaskState(getTaskState(item.url), { groupCheck: item.groupCheck });
@@ -129,13 +196,58 @@ app.post("/api/start", async (req, res) => {
         ? ` Captura de rede: ${network.capturedResponses} respostas, ${network.messageLikeObjects} objetos de mensagem; reações ${network.hasReactionFields ? "detectadas" : "não detectadas"}.`
         : "";
       progress.message = `Coleta concluída: ${results.length} itens listados.${networkStatus} Nenhuma ação de curtir, comentar, salvar ou reagir foi executada.`;
+      logDiagnostic("INFO", "Coleta concluída", { listed: results.length, networkResponses: network?.capturedResponses ?? 0 });
+      diagnosticReport = {
+        schemaVersion: 1,
+        application: "curtidorIG",
+        generatedAt: new Date().toISOString(),
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        outcome: stopRequested ? "interrompida" : "concluída",
+        request: { groupName, startDate, endDate },
+        summary: {
+          publicationsFound: collected.length,
+          publicationsInspected: results.length,
+          administrativeMilestones: new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size,
+          stories: collected.filter(item => item.contentType === "story").length,
+          feedsAndReels: collected.filter(item => item.contentType !== "story").length,
+          itemsWithoutDate: collected.filter(item => item.dateUnknown).length
+        },
+        networkDiagnostics: collected[0]?.networkDiagnostics || null,
+        pageDiagnostics: null,
+        publications: results.map(reportItem),
+        administrativeMilestones: collected[0]?.administrativeMilestones || [],
+        log: diagnosticLog
+      };
     } catch (error) {
       progress.message = error.message;
+      logDiagnostic("ERROR", error.message, {
+        name: error.name || "Error",
+        networkResponses: error.networkDiagnostics?.capturedResponses ?? null,
+        pageDiagnostics: error.pageDiagnostics || null
+      });
+      diagnosticReport = {
+        schemaVersion: 1,
+        application: "curtidorIG",
+        generatedAt: new Date().toISOString(),
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        outcome: "erro",
+        request: { groupName, startDate, endDate },
+        summary: { publicationsFound: results.length, publicationsInspected: results.length },
+        networkDiagnostics: error.networkDiagnostics || results[0]?.networkDiagnostics || null,
+        pageDiagnostics: error.pageDiagnostics || null,
+        publications: results.map(reportItem),
+        log: diagnosticLog,
+        error: { name: error.name || "Error", message: error.message }
+      };
     } finally {
       // Mantém o contexto persistente aberto para preservar a sessão autenticada.
       running = false;
       progress.current = "";
       if (stopRequested) progress.message = "Coleta interrompida.";
+      logDiagnostic("INFO", "Execução finalizada", { stopped: stopRequested, progressMessage: progress.message });
+      if (diagnosticReport) diagnosticReport.log = diagnosticLog;
     }
   })();
 });
