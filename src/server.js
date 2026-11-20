@@ -39,7 +39,8 @@ function reportItem(item) {
     collectionMode: item.collectionMode || "",
     status: item.status || "",
     taskState: item.taskState || null,
-    identityVerified: Boolean(item.identityVerified)
+    identityVerified: Boolean(item.identityVerified),
+    inspectionDiagnostics: item.inspectionDiagnostics || null
   };
 }
 
@@ -207,12 +208,12 @@ app.post("/api/start", async (req, res) => {
             continue;
           }
           const comment = taskState.commented ? "" : createComment(inspection.caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
-          const result = { ...item, caption: inspection.caption, comment, taskState, status: item.dateUnknown ? "data do compartilhamento não identificada" : taskStateLabel(taskState) };
+          const result = { ...item, caption: inspection.caption, comment, taskState, inspectionDiagnostics: inspection.inspectionDiagnostics || null, status: item.dateUnknown ? "data do compartilhamento não identificada" : taskStateLabel(taskState) };
           results.push(result);
           appendHistory({ url: item.url, groupThreadId: item.threadId, messageId: item.messageId, caption: inspection.caption, comment, status: result.status, groupName, sharedAt: item.sharedAt, saved: taskState.saved, savedFolderVerified: taskState.savedFolderVerified, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: taskState.complete, milestone: item.administrativeMilestones, detail: `Grupo: ${groupName}; mensagem: ${item.sharedAt}; ${result.status}` });
         } catch (error) {
-          logDiagnostic("ERROR", "Falha ao inspecionar publicação", { url: item.url, error: error.message });
-          const result = { ...item, caption: "", comment: "", status: "não foi possível analisar", detail: error.message };
+          logDiagnostic("ERROR", "Falha ao inspecionar publicação", { url: item.url, error: error.message, inspectionDiagnostics: error.inspectionDiagnostics || null });
+          const result = { ...item, caption: "", comment: "", status: "não foi possível analisar", detail: error.message, inspectionDiagnostics: error.inspectionDiagnostics || null };
           results.push(result);
           appendHistory({ url: item.url, groupThreadId: item.threadId, messageId: item.messageId, status: "erro na análise", groupName, sharedAt: item.sharedAt, detail: error.message });
         }
