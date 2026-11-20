@@ -48,7 +48,7 @@ function requestContext(request) {
   const inspect = value => {
     if (!value || typeof value !== "object") return;
     if (!result.threadId) {
-      for (const key of ["thread_id", "threadId", "conversation_id"]) {
+      for (const key of ["thread_id", "threadId", "conversation_id", "thread_v2_id"]) {
         if (value[key] != null && /^\d{6,}$/.test(String(value[key]))) {
           result.threadId = String(value[key]);
           break;
@@ -165,11 +165,11 @@ function extractPayload(payload, context = {}) {
   let sharedMediaObjects = 0;
   let hasReactionFields = false;
 
-  function visit(value, path = "$", depth = 0) {
+  function visit(value, path = "$", depth = 0, inheritedThreadId = "") {
     if (!value || typeof value !== "object" || depth > MAX_DEPTH || seen.has(value)) return;
     seen.add(value);
     if (Array.isArray(value)) {
-      value.forEach((item, index) => visit(item, path + "[" + index + "]", depth + 1));
+      value.forEach((item, index) => visit(item, path + "[" + index + "]", depth + 1, inheritedThreadId));
       return;
     }
     objectsVisited++;
@@ -186,7 +186,7 @@ function extractPayload(payload, context = {}) {
       collectMediaCodes(value, urls);
       const timestamp = normalizeTimestamp(value.timestamp_ms ?? value.timestamp ?? value.created_at ?? value.sent_at);
       const text = messageText(value);
-      const localThreadId = String(value.thread_id ?? value.threadId ?? value.conversation_id ?? context.threadId ?? "");
+      const localThreadId = currentThreadId;
       records.push({
         messageId: id,
         threadId: localThreadId,
@@ -201,7 +201,7 @@ function extractPayload(payload, context = {}) {
       });
       if (structures.length < 8) structures.push({ path, keys: ownKeys.slice(0, 45), contentType: value.content?.__typename || value.content?.type || "" });
     }
-    for (const [key, child] of Object.entries(value)) visit(child, path + "." + key, depth + 1);
+    for (const [key, child] of Object.entries(value)) visit(child, path + "." + key, depth + 1, currentThreadId);
   }
   visit(payload);
   return {
@@ -221,7 +221,7 @@ export function createInstagramNetworkCapture(page) {
   const operations = new Set();
   let stopped = false;
   const pending = new Set();
-  const websocketStats = { connections: 0, frames: 0, parsedFrames: 0, unparsedFrames: 0 };
+  const websocketStats = { connections: 0, frames: 0, parsedFrames: 0, unparsedFrames: 0, messageLikeObjects: 0, sharedMediaObjects: 0 };
   const websocketOperations = new Set();
 
   const mergeRecords = (items, context = {}) => {
@@ -339,7 +339,7 @@ export function createInstagramNetworkCapture(page) {
         websocketConnections: websocketStats.connections,
         websocketFrames: websocketStats.frames,
         parsedWebSocketFrames: websocketStats.parsedFrames,
-        unparsedWebSocketFrames: websocketStats.unparsedFrames,
+        unparsedWebSocketFrames: websocketStats.unparsedFrames,\n        webSocketMessageLikeObjects: websocketStats.messageLikeObjects,\n        webSocketSharedMediaObjects: websocketStats.sharedMediaObjects,
         operationDetails: [...byOperation.values()].slice(0, 30),
         distinctMessageIds: recordsByKey.size,
         extractedShareUrls: [...recordsByKey.values()].reduce((sum, item) => sum + item.urls.length, 0),
