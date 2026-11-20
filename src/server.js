@@ -129,6 +129,55 @@ app.get("/api/status", (_req, res) => res.json({
 app.get("/api/results", (_req, res) => res.json({ results }));
 app.get("/api/history", (_req, res) => res.type("text/csv; charset=utf-8").send(readHistory()));
 
+app.post("/api/confirm-action", (req, res) => {
+  const url = String(req.body.url ?? "");
+  const action = String(req.body.action ?? "");
+  const allowed = new Set(["saved", "savedFolderVerified", "liked", "commented", "groupCheck"]);
+  if (!url || !allowed.has(action)) return res.status(400).json({ error: "Publicação ou ação inválida." });
+
+  const item = results.find(entry => entry.url === url);
+  if (!item) return res.status(404).json({ error: "Publicação não encontrada nesta execução. Faça uma nova coleta." });
+  if (!item.identityVerified || !item.threadId || !item.messageId) {
+    return res.status(409).json({ error: "Não há vínculo comprovado com a mensagem original. A confirmação foi bloqueada." });
+  }
+  const current = mergeTaskState({}, item.taskState || {});
+  if (action === "savedFolderVerified" && !current.saved) {
+    return res.status(409).json({ error: "Confirme primeiro que a publicação foi salva." });
+  }
+  if (current[action]) return res.json({ ok: true, taskState: current, status: item.status, unchanged: true });
+
+  const taskState = mergeTaskState(current, { [action]: true });
+  const labels = {
+    saved: "salva",
+    savedFolderVerified: "pasta de destino conferida",
+    liked: "curtida",
+    commented: "comentário publicado",
+    groupCheck: "check confirmado na mensagem do grupo"
+  };
+  item.taskState = taskState;
+  item.status = taskStateLabel(taskState);
+  appendHistory({
+    url: item.url,
+    groupThreadId: item.threadId,
+    messageId: item.messageId,
+    caption: item.caption || "",
+    comment: item.comment || "",
+    status: item.status,
+    groupName: item.groupName || "",
+    sharedAt: item.sharedAt || "",
+    saved: taskState.saved,
+    savedFolderVerified: taskState.savedFolderVerified,
+    liked: taskState.liked,
+    commented: taskState.commented,
+    groupCheck: taskState.groupCheck,
+    milestone: item.administrativeMilestones,
+    detail: "Confirmação manual: " + labels[action]
+  });
+  logDiagnostic("INFO", "Ação confirmada manualmente", { action, url, messageId: item.messageId });
+  res.json({ ok: true, taskState, status: item.status });
+});
+
+
 app.post("/api/connect", async (_req, res) => {
   try {
     const context = await getInstagramContext();
