@@ -48,30 +48,38 @@ app.get("/api/diagnostic-report", (_req, res) => {
 });
 
 app.get("/api/diagnostic-log", (_req, res) => {
-  if (!diagnosticReport) return res.status(404).type("text/plain; charset=utf-8").send("Ainda não há log. Execute uma coleta primeiro.");
+  if (!diagnosticReport) return res.status(404).type("text/plain; charset=utf-8").send("Ainda não há diagnóstico. Execute uma coleta primeiro.");
+
+  const report = diagnosticReport;
+  const network = report.networkDiagnostics || {};
+  const summary = report.summary || {};
+  const operationLines = (network.operationDetails || []).slice(0, 8).map(item =>
+    `- ${item.operation}: ${item.responses} resposta(s), ${item.messageLikeObjects} mensagem(ns), ${item.sharedMediaObjects} compartilhamento(s), reação: ${item.hasReactionFields ? "sim" : "não"}`
+  );
+  const errorLines = (report.log || []).filter(item => item.level === "ERROR" || item.level === "WARN").slice(-5)
+    .map(item => `- [${item.level}] ${item.message}`);
+  const page = report.pageDiagnostics || {};
   const lines = [
-    "curtidorIG - LOG DE DIAGNÓSTICO",
-    `Gerado: ${new Date().toISOString()}`,
-    `Grupo: ${diagnosticReport.request?.groupName || "não informado"}`,
-    `Período: ${diagnosticReport.request?.startDate || "?"} até ${diagnosticReport.request?.endDate || "?"}`,
-    `Resultado: ${diagnosticReport.outcome || "indisponível"}`,
+    "CURTIDORIG | DIAGNÓSTICO",
+    `Resultado: ${report.outcome || "indisponível"}`,
+    `Grupo: ${report.request?.groupName || "não informado"} | Período: ${report.request?.startDate || "?"} a ${report.request?.endDate || "?"}`,
+    `Publicações: ${summary.publicationsFound ?? report.publications?.length ?? 0} | Feed/Reels: ${summary.feedsAndReels ?? "?"} | Stories: ${summary.stories ?? "?"} | Marcos administrativos: ${summary.administrativeMilestones ?? "?"} | Sem data: ${summary.itemsWithoutDate ?? "?"}`,
     "",
-    ...diagnosticLog.map(entry => {
-      const detail = entry.details ? " | " + JSON.stringify(entry.details) : "";
-      return `[${entry.timestamp}] [${entry.level}] ${entry.message}${detail}`;
-    }),
+    "CAPTURA DE REDE",
+    `Respostas: ${network.capturedResponses ?? 0} | Lidas: ${network.parsedResponses ?? 0} | Não interpretadas: ${network.unparsedResponses ?? 0}`,
+    `Mensagens identificadas: ${network.messageLikeObjects ?? 0} | Compartilhamentos identificados: ${network.sharedMediaObjects ?? 0}`,
+    `Campos: ID ${network.hasMessageId ? "sim" : "não"}; texto ${network.hasTextBody ? "sim" : "não"}; data/hora ${network.hasTimestampMs ? "sim" : "não"}; remetente ${network.hasSender ? "sim" : "não"}; reações ${network.hasReactionFields ? "sim" : "não"}; compartilhamentos ${network.hasShareFields ? "sim" : "não"}; URL ${network.hasPermalinkOrUrl ? "sim" : "não"}`,
+    "Operações:",
+    ...(operationLines.length ? operationLines : ["- Nenhuma operação identificada"]),
+    ...(page.instagramLinks !== undefined ? ["", `PÁGINA: ${page.instagramLinks} links Instagram / ${page.anchors ?? "?"} links totais / ${page.messageNodes ?? "?"} nós de mensagem`] : []),
+    ...(errorLines.length ? ["", "ERROS/AVISOS:", ...errorLines] : []),
     "",
-    "Resumo técnico:",
-    JSON.stringify(diagnosticReport.networkDiagnostics || {}, null, 2),
-    "",
-    "Diagnóstico da página:",
-    JSON.stringify(diagnosticReport.pageDiagnostics || {}, null, 2),
-    "",
-    "Observação: este log não inclui texto privado de mensagens, cookies, tokens ou senhas."
+    `Gerado: ${report.generatedAt || new Date().toISOString()}`,
+    "Sem texto privado de mensagens, cookies, tokens ou senhas."
   ];
-  res.setHeader("Content-Disposition", 'attachment; filename="curtidorig-diagnostico.log"');
-  res.type("text/plain; charset=utf-8").send(lines.join("\\n"));
-}
+  res.setHeader("Content-Disposition", 'attachment; filename="curtidorig-diagnostico.txt"');
+  res.type("text/plain; charset=utf-8").send(lines.join("\n"));
+});
 
 async function getInstagramContext() {
   if (browserContext) {
