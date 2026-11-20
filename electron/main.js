@@ -3,7 +3,6 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let mainWindow;
@@ -22,6 +21,7 @@ async function waitForServer(url, attempts = 40) {
 async function ensureChromium() {
   const browsersPath = path.join(app.getPath("userData"), "playwright-browsers");
   process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath;
+  const { chromium } = await import("playwright");
   try {
     await fs.access(chromium.executablePath());
     return;
