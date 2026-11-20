@@ -279,8 +279,8 @@ export function createInstagramNetworkCapture(page) {
     if (stopped || responses.length >= MAX_RESPONSES) return;
     let url;
     try { url = new URL(response.url()); } catch { return; }
-    if (!["www.instagram.com", "instagram.com"].includes(url.hostname.toLowerCase())) return;
-    if (!url.pathname.includes("/graphql") && !url.pathname.includes("/api/v1/direct")) return;
+    if (!/(^|\.)instagram\.com$/i.test(url.hostname)) return;
+    if (!/graphql|direct|thread|inbox|message/i.test(url.pathname)) return;
     const contentLength = Number(response.headers()["content-length"] || 0);
     if (contentLength > 10 * 1024 * 1024) return;
 
@@ -288,7 +288,9 @@ export function createInstagramNetworkCapture(page) {
     const context = requestContext(request);
     if (context.operation) operations.add(context.operation);
     const entry = {
-      endpoint: url.pathname.includes("/graphql") ? "graphql" : "direct-api",
+      endpoint: url.pathname.includes("/graphql") ? "graphql" : "instagram-api",
+      path: url.pathname.slice(0, 180),
+      method: request.method(),
       operation: context.operation || "unknown",
       threadId: context.threadId,
       status: response.status(),
@@ -346,6 +348,7 @@ export function createInstagramNetworkCapture(page) {
         parsedResponses: parsed.length,
         unparsedResponses: responses.filter(item => item.parseError).length,
         operations: [...new Set([...operations, ...websocketOperations])].slice(0, 30),
+        websocketEndpoints: [...websocketOperations].slice(0, 20),
         websocketConnections: websocketStats.connections,
         websocketFrames: websocketStats.frames,
         parsedWebSocketFrames: websocketStats.parsedFrames,
@@ -366,7 +369,7 @@ export function createInstagramNetworkCapture(page) {
         hasPermalinkOrUrl: parsed.some(item => item.payload.hasPermalinkOrUrl) || websocketStats.hasPermalinkOrUrl,
         structures: allStructures,
         responseDetails: responses.map(item => ({
-          endpoint: item.endpoint, operation: item.operation, threadIdPresent: Boolean(item.threadId),
+          endpoint: item.endpoint, path: item.path, method: item.method, operation: item.operation, threadIdPresent: Boolean(item.threadId),
           status: item.status, contentType: item.contentType, parseError: item.parseError,
           ...(item.payload ? { payload: {
             objectsVisited: item.payload.objectsVisited,
