@@ -96,7 +96,7 @@ app.post("/api/start", async (req, res) => {
         if (item.contentType === "story") {
           const result = { ...item, taskState: previousState, caption: "", comment: "", status: "Story identificada — análise e ações específicas ainda não disponíveis" };
           results.push(result);
-          appendHistory({ url: item.url, status: result.status, groupName, sharedAt: item.sharedAt, saved: previousState.saved, liked: previousState.liked, commented: previousState.commented, groupCheck: previousState.groupCheck, milestone: item.administrativeMilestones, detail: result.status });
+          appendHistory({ url: item.url, status: result.status, groupName, sharedAt: item.sharedAt, saved: previousState.saved, savedFolderVerified: previousState.savedFolderVerified, liked: previousState.liked, commented: previousState.commented, groupCheck: previousState.groupCheck, milestone: item.administrativeMilestones, detail: result.status });
           progress.done++;
           continue;
         }
@@ -105,7 +105,7 @@ app.post("/api/start", async (req, res) => {
           const taskState = mergeTaskState(previousState, inspection.observedState);
           if (taskState.complete) {
             results.push({ ...item, caption: inspection.caption, taskState, status: "fluxo completo — ignorar", comment: "" });
-            appendHistory({ url: item.url, caption: inspection.caption, status: "fluxo completo — ignorar", groupName, sharedAt: item.sharedAt, saved: taskState.saved, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: true, milestone: item.administrativeMilestones });
+            appendHistory({ url: item.url, caption: inspection.caption, status: "fluxo completo — ignorar", groupName, sharedAt: item.sharedAt, saved: taskState.saved, savedFolderVerified: taskState.savedFolderVerified, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: true, milestone: item.administrativeMilestones });
             progress.done++;
             continue;
           }
