@@ -369,7 +369,7 @@ export function interpretPostSnapshot(snapshot) {
   const dialogText = String(snapshot.dialogText || "").trim();
   const ogDescription = String(snapshot.ogDescription || "").trim();
   const selectors = snapshot.selectors || {};
-  const combined = [title, bodyText].join("\\n").toLowerCase();
+  const combined = [title, bodyText].join("\n").toLowerCase();
   const diagnostics = {
     requestedUrl: String(snapshot.requestedUrl || ""),
     finalUrl,
@@ -383,10 +383,10 @@ export function interpretPostSnapshot(snapshot) {
     hasDialog: Boolean(selectors.dialog)
   };
 
-  if (/\\/accounts\\/(login|signup)/i.test(finalUrl) || /login|entrar na sua conta|log in to instagram/i.test(combined)) {
+  const finalPath = (() => { try { return new URL(finalUrl).pathname; } catch { return finalUrl; } })();\n  if (/^\\/accounts\\/(login|signup)/i.test(finalPath) || /entrar na sua conta|log in to instagram|log in to continue/i.test(combined)) {
     throw Object.assign(new Error("Instagram redirecionou para login; a sessão precisa ser autenticada."), { inspectionDiagnostics: { ...diagnostics, reason: "login" } });
   }
-  if (/challenge|checkpoint|\\/accounts/suspended/i.test(finalUrl) || /confirme que é você|confirm it’s you|security code|atividade suspeita|suspicious activity/i.test(combined)) {
+  if (/challenge|checkpoint|suspended/i.test(finalPath) || /confirme que é você|confirm it’s you|security code|atividade suspeita|suspicious activity/i.test(combined)) {
     throw Object.assign(new Error("Instagram apresentou uma etapa de segurança ou confirmação; a publicação não foi analisada."), { inspectionDiagnostics: { ...diagnostics, reason: "security-check" } });
   }
   if (snapshot.httpStatus && snapshot.httpStatus >= 400) {
