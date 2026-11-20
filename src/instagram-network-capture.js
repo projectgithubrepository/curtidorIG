@@ -125,6 +125,7 @@ export function createInstagramNetworkCapture(page) {
     stop,
     summary() {
       const parsed = responses.filter(item => item.payload);
+      const byOperation = new Map();
       const aggregate = parsed.reduce((result, item) => {
         result.messageLikeObjects += item.payload.messageLikeObjects;
         result.sharedMediaObjects += item.payload.sharedMediaObjects;
@@ -133,6 +134,17 @@ export function createInstagramNetworkCapture(page) {
         result.hasMessageId ||= item.payload.hasMessageId;
         result.hasTimestampMs ||= item.payload.hasTimestampMs;
         result.hasTextBody ||= item.payload.hasTextBody;
+        const key = item.operation || "unknown";
+        const current = byOperation.get(key) || {
+          operation: key, responses: 0, messageLikeObjects: 0, sharedMediaObjects: 0,
+          hasReactionFields: false, hasShareFields: false
+        };
+        current.responses++;
+        current.messageLikeObjects += item.payload.messageLikeObjects;
+        current.sharedMediaObjects += item.payload.sharedMediaObjects;
+        current.hasReactionFields ||= item.payload.hasReactionFields;
+        current.hasShareFields ||= item.payload.hasShareFields;
+        byOperation.set(key, current);
         return result;
       }, {
         messageLikeObjects: 0,
@@ -148,10 +160,8 @@ export function createInstagramNetworkCapture(page) {
         parsedResponses: parsed.length,
         unparsedResponses: responses.filter(item => item.parseError).length,
         operations: [...operations].slice(0, 30),
-        ...aggregate,
-        responseDetails: responses.map(({ endpoint, operation, status, contentType, payload, parseError }) => ({
-          endpoint, operation, status, contentType, parseError, payload
-        }))
+        operationDetails: [...byOperation.values()].slice(0, 30),
+        ...aggregate
       };
     }
   };
