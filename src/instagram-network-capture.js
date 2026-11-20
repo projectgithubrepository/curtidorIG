@@ -3,10 +3,27 @@ const MAX_DEPTH = 20;
 const MAX_URLS_PER_MESSAGE = 12;
 const URL_PATTERN = /(?:https?:\/\/(?:www\.)?instagram\.com)?\/(?:p|reel|tv|stories)\/[A-Za-z0-9._-]+(?:\/[^\s"'<>]*)?/gi;
 
+function requestBody(request) {
+  try { return request.postDataJSON(); } catch {}
+  try {
+    const raw = request.postData();
+    if (!raw) return null;
+    const params = new URLSearchParams(raw);
+    const result = {};
+    for (const key of ["operationName", "fb_api_req_friendly_name", "doc_id", "query_hash"]) {
+      const value = params.get(key);
+      if (value) result[key] = value;
+    }
+    const variables = params.get("variables");
+    if (variables) { try { result.variables = JSON.parse(variables); } catch {} }
+    return result;
+  } catch { return null; }
+}
+
 function operationNameFromRequest(request) {
   const candidates = [];
   try {
-    const body = request.postDataJSON();
+    const body = requestBody(request);
     const visit = value => {
       if (!value || typeof value !== "object") return;
       if (typeof value.operationName === "string") candidates.push(value.operationName);
@@ -41,7 +58,7 @@ function requestContext(request) {
     if (Array.isArray(value)) value.forEach(inspect);
     else for (const child of Object.values(value)) if (child && typeof child === "object") inspect(child);
   };
-  try { inspect(request.postDataJSON()); } catch {}
+  try { inspect(requestBody(request)); } catch {}
   try {
     const url = new URL(request.url());
     for (const key of ["thread_id", "threadId", "conversation_id"]) {
