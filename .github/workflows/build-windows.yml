@@ -11,6 +11,7 @@ on:
       - "package-lock.json"
       - "electron-builder.yml"
       - ".github/workflows/build-windows.yml"
+      - "installer/**"
 
 jobs:
   build:
@@ -32,10 +33,19 @@ jobs:
         run: |
           $env:PLAYWRIGHT_BROWSERS_PATH = "$env:GITHUB_WORKSPACE\.playwright-browsers"
           npm run dist:win
-      - name: Upload installer
+      - name: Install NSIS
+        run: choco install nsis --no-progress -y
+      - name: Build lightweight update executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          makensis /V3 installer/windows-update.nsi
+      - name: Upload installer and update patch
         uses: actions/upload-artifact@v4
         with:
           name: curtidorIG-Windows-x64
-          path: release/*.exe
+          path: |
+            release/curtidorIG-*-Windows-Setup.exe
+            release/curtidorIG-Atualizacao-Windows.exe
           if-no-files-found: error
           retention-days: 30
