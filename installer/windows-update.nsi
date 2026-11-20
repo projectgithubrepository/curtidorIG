@@ -1,8 +1,12 @@
 Unicode true
 !include "MUI2.nsh"
 
+!ifndef OUTPUT_DIR
+  !define OUTPUT_DIR "..\release"
+!endif
+
 Name "Atualização do curtidorIG"
-OutFile "release/curtidorIG-Atualizacao-Windows.exe"
+OutFile "\${OUTPUT_DIR}\curtidorIG-Atualizacao-Windows.exe"
 InstallDir "$LOCALAPPDATA/Programs/curtidorIG"
 RequestExecutionLevel user
 ShowInstDetails show
