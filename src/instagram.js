@@ -469,7 +469,7 @@ export async function inspectPost(page, url) {
     const profileLink = [...document.querySelectorAll("nav a[href]")].find(node =>
       /perfil|profile/i.test([node.getAttribute("aria-label"), node.innerText].filter(Boolean).join(" "))
     );
-    const username = (profileLink?.getAttribute("href") || "").match(/^\\/([^/]+)\\/?$/)?.[1] || "";
+    const username = (profileLink?.getAttribute("href") || "").split("/").filter(Boolean)[0] || "";
     let commented = false;
     if (username) commented = [...element.querySelectorAll("li")].some(item =>
       [...item.querySelectorAll("a[href]")].some(link => link.getAttribute("href") === "/" + username + "/") &&
