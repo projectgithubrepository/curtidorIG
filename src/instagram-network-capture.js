@@ -285,6 +285,7 @@ export function createInstagramNetworkCapture(page) {
       const aggregate = parsed.reduce((result, item) => {
         result.messageLikeObjects += item.payload.messageLikeObjects;
         result.sharedMediaObjects += item.payload.sharedMediaObjects;
+        result.hasMessageId ||= item.payload.hasMessageId;
         result.hasReactionFields ||= item.payload.hasReactionFields;
         result.hasShareFields ||= item.payload.hasShareFields;
         const key = item.operation || "unknown";
@@ -294,7 +295,7 @@ export function createInstagramNetworkCapture(page) {
         current.sharedMediaObjects += item.payload.sharedMediaObjects;
         byOperation.set(key, current);
         return result;
-      }, { messageLikeObjects: 0, sharedMediaObjects: 0, hasReactionFields: false, hasShareFields: false });
+      }, { messageLikeObjects: 0, sharedMediaObjects: 0, hasMessageId: false, hasReactionFields: false, hasShareFields: false });
       const allStructures = parsed.flatMap(item => item.payload.structures).slice(0, 12);
       return {
         capturedAt: new Date().toISOString(),
@@ -307,6 +308,7 @@ export function createInstagramNetworkCapture(page) {
         extractedShareUrls: [...recordsByKey.values()].reduce((sum, item) => sum + item.urls.length, 0),
         messageLikeObjects: aggregate.messageLikeObjects,
         sharedMediaObjects: aggregate.sharedMediaObjects,
+        hasMessageId: aggregate.hasMessageId,
         hasReactionFields: aggregate.hasReactionFields,
         hasShareFields: aggregate.hasShareFields,
         structures: allStructures,
