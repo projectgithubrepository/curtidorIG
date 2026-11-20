@@ -1,4 +1,5 @@
 const groupName = document.querySelector("#groupName");
+const collectionName = document.querySelector("#collectionName");
 const startDate = document.querySelector("#startDate");
 const endDate = document.querySelector("#endDate");
 const start = document.querySelector("#start");
@@ -46,7 +47,7 @@ connect.addEventListener("click", async () => {
 start.addEventListener("click", async () => {
   start.disabled = true;
   try {
-    const response = await fetch("/api/start", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ groupName:groupName.value, startDate:startDate.value, endDate:endDate.value }) });
+    const response = await fetch("/api/start", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ groupName:groupName.value, collectionName:collectionName.value, startDate:startDate.value, endDate:endDate.value }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Não foi possível iniciar.");
     message.textContent = data.message;
@@ -72,6 +73,11 @@ function render(items) {
     markers.textContent=milestoneCount ? "Marcos visíveis: " + (item.administrativeMilestones || []).map(marker => `${marker.date || "data não identificada"} · ${marker.feedCount ?? "?"} Feed · ${marker.storiesCount ?? "?"} Stories`).join(" | ") : "";
     const caption=document.createElement("p"); caption.textContent=item.caption || item.detail || "";
     const comment=document.createElement("p"); comment.className="comment"; comment.textContent=item.comment ? "Comentário sugerido: "+item.comment : "";
+    if (item.comment) {
+      const copyComment=document.createElement("button"); copyComment.type="button"; copyComment.className="secondary small-action";
+      copyComment.textContent="Copiar comentário"; copyComment.dataset.copyComment=item.comment;
+      card.append(copyComment);
+    }
     const controls=document.createElement("div"); controls.className="result-actions";
     const actions=[
       ["saved","Confirmar que salvou"],
@@ -94,6 +100,16 @@ function render(items) {
   }
 }
 results.addEventListener("click", async event => {
+  const copyButton=event.target.closest("button[data-copy-comment]");
+  if (copyButton) {
+    try {
+      await navigator.clipboard.writeText(copyButton.dataset.copyComment);
+      copyButton.textContent="Comentário copiado";
+    } catch {
+      window.alert("Não foi possível acessar a área de transferência.");
+    }
+    return;
+  }
   const button=event.target.closest("button[data-action]");
   if (!button) return;
   const labels={
