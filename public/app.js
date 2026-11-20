@@ -51,7 +51,7 @@ function render(items) {
     const type=document.createElement("small"); type.textContent=item.contentType === "story" ? "Story" : "Feed / Reel";
     const stateLine=document.createElement("small");
     const task=item.taskState || { saved:false, liked:false, commented:false, groupCheck:Boolean(item.groupCheck) };
-    stateLine.textContent = [`Salva: ${task.saved ? "sim" : "pendente"}`, `Curtida: ${task.liked ? "sim" : "pendente"}`, `Comentada: ${task.commented ? "sim" : "pendente"}`, `Check no grupo: ${task.groupCheck ? "sim" : "pendente"}`].join(" · ");
+    stateLine.textContent = [`Salva: ${task.saved ? "sim" : "pendente"}`, `Pasta correta: ${task.savedFolderVerified ? "sim" : "não verificada"}`, `Curtida: ${task.liked ? "sim" : "pendente"}`, `Comentada: ${task.commented ? "sim" : "pendente"}`, `Check no grupo: ${task.groupCheck ? "sim" : "pendente"}`].join(" · ");
     const date=document.createElement("small"); date.textContent=item.sharedAt ? new Date(item.sharedAt).toLocaleString("pt-BR") : "Data não identificada";
     const markers=document.createElement("small");
     const milestoneCount=(item.administrativeMilestones || []).length;
