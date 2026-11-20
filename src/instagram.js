@@ -37,20 +37,32 @@ async function readVisiblePostLinks(page) {
       if (!url) continue;
       const container = anchor.closest('[role="row"],[role="listitem"],[data-testid*="message"],[data-testid*="Message"]') || anchor.parentElement;
       const messageText = (container?.innerText || anchor.innerText || "").slice(0, 1200);
-      if (!candidates.has(url)) candidates.set(url, { url, messageText });
+      let sharedAt = "";
+      for (let node = anchor, depth = 0; node && depth < 10; node = node.parentElement, depth++) {
+        const time = node.querySelector?.("time[datetime],time[title],time[aria-label]");
+        if (time) {
+          sharedAt = time.getAttribute("datetime") || time.getAttribute("title") || time.getAttribute("aria-label") || time.textContent || "";
+          break;
+        }
+      }
+      if (!candidates.has(url)) candidates.set(url, { url, messageText, sharedAt });
     }
     const messageNodes = [...document.querySelectorAll('[role="row"],[role="listitem"],[data-testid*="message"],[data-testid*="Message"]')];
     for (const node of messageNodes) {
       const messageText = (node.innerText || "").slice(0, 1600);
       for (const match of messageText.matchAll(urlPattern)) {
         const url = normalizeUrl(match[0]);
-        if (url && !candidates.has(url)) candidates.set(url, { url, messageText });
+        if (url && !candidates.has(url)) {
+          const time = node.querySelector("time[datetime],time[title],time[aria-label]");
+          const sharedAt = time ? (time.getAttribute("datetime") || time.getAttribute("title") || time.getAttribute("aria-label") || time.textContent || "") : "";
+          candidates.set(url, { url, messageText, sharedAt });
+        }
       }
     }
     return [...candidates.values()].map(item => ({
       ...item,
       contentType: /\/stories\//.test(item.url) ? "story" : "feed",
-      sharedAt: "",
+      sharedAt: item.sharedAt || "",
       groupCheck: /(?:✅|☑️|✔️|✓)/u.test(item.messageText)
     }));
   }).then(items => items.filter(item => !isAdministrativeMessage(item.messageText)));
