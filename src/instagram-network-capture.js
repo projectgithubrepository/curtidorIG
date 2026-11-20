@@ -294,7 +294,7 @@ export function createInstagramNetworkCapture(page) {
     // Como a captura começa ao abrir uma conversa específica, associe essa
     // resposta ao thread ativo somente para a operação de listagem de mensagens.
     if (!context.threadId && /IGDMessageListOffMsysQuery/i.test(context.operation)) {
-      const activeThreadId = String(page.url?.() || "").match(/\\/direct\\/t\\/(\\d+)/)?.[1] || "";
+      const activeThreadId = String(page.url?.() || "").match(/\/direct\/t\/(\d+)/)?.[1] || "";
       if (activeThreadId) context.threadId = activeThreadId;
     }
     if (context.operation) operations.add(context.operation);
