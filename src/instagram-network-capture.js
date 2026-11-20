@@ -262,6 +262,8 @@ export function createInstagramNetworkCapture(page) {
       }
       websocketStats.parsedFrames++;
       const extracted = extractPayload(payload, { threadId: "", operation: "websocket" });
+      websocketStats.messageLikeObjects += extracted.messageLikeObjects;
+      websocketStats.sharedMediaObjects += extracted.sharedMediaObjects;
       mergeRecords(extracted.records);
     });
   };
