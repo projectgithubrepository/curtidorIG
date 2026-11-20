@@ -22,27 +22,37 @@ function dateInRange(sharedAt, startDate, endDate) {
 
 async function readVisiblePostLinks(page) {
   return page.evaluate(() => {
-    const anchors = [...document.querySelectorAll('a[href*="/p/"],a[href*="/reel/"],a[href*="/tv/"],a[href*="/stories/"]')];
-    return anchors.map(anchor => {
-      let node = anchor;
-      let messageText = "";
-      let sharedAt = "";
-      for (let depth = 0; node && depth < 12; depth++, node = node.parentElement) {
-        const time = node.querySelector?.("time[datetime],time[title],time[aria-label]");
-        if (time) {
-          sharedAt = time.getAttribute("datetime") || time.getAttribute("title") || time.getAttribute("aria-label") || time.textContent || "";
-          messageText = (node.innerText || "").slice(0, 1000);
-          break;
-        }
+    const urlPattern = /https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv|stories)\/[A-Za-z0-9._-]+(?:\/[^\s]*)?/gi;
+    const normalizeUrl = value => {
+      try {
+        const parsed = new URL(value, location.origin);
+        if (!/^(?:www\.)?instagram\.com$/i.test(parsed.hostname)) return "";
+        if (!/^\/(?:p|reel|tv|stories)\//.test(parsed.pathname)) return "";
+        return parsed.origin + parsed.pathname.replace(/\/$/, "");
+      } catch { return ""; }
+    };
+    const candidates = new Map();
+    for (const anchor of document.querySelectorAll("a[href]")) {
+      const url = normalizeUrl(anchor.getAttribute("href") || anchor.href);
+      if (!url) continue;
+      const container = anchor.closest('[role="row"],[role="listitem"],[data-testid*="message"],[data-testid*="Message"]') || anchor.parentElement;
+      const messageText = (container?.innerText || anchor.innerText || "").slice(0, 1200);
+      if (!candidates.has(url)) candidates.set(url, { url, messageText });
+    }
+    const messageNodes = [...document.querySelectorAll('[role="row"],[role="listitem"],[data-testid*="message"],[data-testid*="Message"]')];
+    for (const node of messageNodes) {
+      const messageText = (node.innerText || "").slice(0, 1600);
+      for (const match of messageText.matchAll(urlPattern)) {
+        const url = normalizeUrl(match[0]);
+        if (url && !candidates.has(url)) candidates.set(url, { url, messageText });
       }
-      if (!messageText) {
-        const container = anchor.closest('[role="row"],[role="listitem"],[data-testid*="message"]') || anchor.parentElement;
-        messageText = (container?.innerText || anchor.innerText || "").slice(0, 1000);
-      }
-      const url = anchor.href.split("?")[0];
-      const reactionLabels = [...(node?.querySelectorAll?.("[aria-label],img[alt]") || [])].map(element => element.getAttribute("aria-label") || element.getAttribute("alt") || "").join(" ");
-      return { url, contentType: /\/stories\//.test(url) ? "story" : "feed", sharedAt, messageText, groupCheck: /(?:✅|☑️|✔️|✓)/u.test(messageText + " " + reactionLabels) };
-    });
+    }
+    return [...candidates.values()].map(item => ({
+      ...item,
+      contentType: /\/stories\//.test(item.url) ? "story" : "feed",
+      sharedAt: "",
+      groupCheck: /(?:✅|☑️|✔️|✓)/u.test(item.messageText)
+    }));
   }).then(items => items.filter(item => !isAdministrativeMessage(item.messageText)));
 }
 
@@ -52,8 +62,37 @@ async function readVisibleAdministrativeMilestones(page) {
 }
 
 async function scrollToOlderMessages(page) {
-  await page.mouse.wheel(0, -750);
-  await page.waitForTimeout(650);
+  const target = await page.evaluate(() => {
+    const candidates = [...document.querySelectorAll("body *")].filter(element => {
+      const style = getComputedStyle(element);
+      return /(auto|scroll)/.test(style.overflowY) &&
+        element.scrollHeight > element.clientHeight + 80 &&
+        element.clientHeight > 120;
+    });
+    candidates.sort((a, b) => {
+      const ar = a.getBoundingClientRect();
+      const br = b.getBoundingClientRect();
+      const aRight = ar.left > innerWidth * 0.35 ? 1 : 0;
+      const bRight = br.left > innerWidth * 0.35 ? 1 : 0;
+      return (bRight - aRight) || ((br.height * br.width) - (ar.height * ar.width));
+    });
+    const element = candidates[0];
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    element.scrollTop = Math.max(0, element.scrollTop - Math.max(500, element.clientHeight * 0.8));
+    return {
+      x: Math.max(5, Math.min(innerWidth - 5, rect.left + rect.width / 2)),
+      y: Math.max(5, Math.min(innerHeight - 5, rect.top + rect.height / 2))
+    };
+  });
+  if (target) {
+    await page.mouse.move(target.x, target.y);
+    await page.mouse.wheel(0, -850);
+  } else {
+    await page.mouse.move(1100, 700);
+    await page.mouse.wheel(0, -850);
+  }
+  await page.waitForTimeout(900);
 }
 
 export async function collectGroupPosts(page, { groupName, startDate, endDate, shouldStop = () => false }) {
@@ -125,8 +164,18 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   }
 
   if (!found.size) {
-    throw new Error("Não encontrei links de publicações no grupo, mesmo após tentar a leitura por data e a varredura de até 300 mensagens recentes. Confira se a conversa carregou e se há links compartilhados nesse trecho; nenhuma interação foi feita.");
+    const diagnostics = await page.evaluate(() => {
+      const anchors = [...document.querySelectorAll("a[href]")];
+      const instagramLinks = anchors.filter(a => /instagram\.com\/(?:p|reel|tv|stories)\//i.test(a.href)).length;
+      const messageNodes = document.querySelectorAll('[role="row"],[role="listitem"],[data-testid*="message"],[data-testid*="Message"]').length;
+      return { url: location.href, anchors: anchors.length, instagramLinks, messageNodes };
+    });
+    throw new Error("Nenhuma publicação foi extraída. Diagnóstico: " + diagnostics.instagramLinks +
+      " links do Instagram em " + diagnostics.anchors + " links da página; " +
+      diagnostics.messageNodes + " elementos de mensagem. Página: " + diagnostics.url +
+      ". Verifique se a conversa correta está aberta e se as mensagens foram carregadas. Nenhuma interação foi feita.");
   }
+
   const milestoneList = [...milestones.values()];
   return [...found.values()].map(item => ({ ...item, administrativeMilestones: milestoneList })).sort((a, b) => {
     if (!a.sharedAt) return 1;
