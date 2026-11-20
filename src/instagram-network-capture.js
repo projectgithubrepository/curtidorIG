@@ -289,6 +289,7 @@ export function createInstagramNetworkCapture(page) {
 
     const request = response.request();
     const context = requestContext(request);
+    // Regressão coberta em tests/instagram-network-capture.test.js.
     // IGDMessageListOffMsysQuery nem sempre repete thread_id nas variables.
     // Como a captura começa ao abrir uma conversa específica, associe essa
     // resposta ao thread ativo somente para a operação de listagem de mensagens.
