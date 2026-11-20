@@ -13,9 +13,9 @@ test("recognizes administrative group notices and extracts date and counts", () 
 });
 
 test("completion state is monotonic and never clears a completed action", () => {
-  const previous = { saved: true, liked: true, commented: false, groupCheck: true };
+  const previous = { saved: true, savedFolderVerified: true, liked: true, commented: false, groupCheck: true };
   const next = mergeTaskState(previous, { commented: true, liked: false });
-  assert.deepEqual(next, { saved: true, liked: true, commented: true, groupCheck: true, complete: true });
+  assert.deepEqual(next, { saved: true, savedFolderVerified: true, liked: true, commented: true, groupCheck: true, complete: true });
   assert.match(taskStateLabel(next), /fluxo completo/);
 });
 
