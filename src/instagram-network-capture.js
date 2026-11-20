@@ -104,24 +104,27 @@ function collectUrls(value, output, seen = new WeakSet(), depth = 0) {
   else for (const child of Object.values(value)) collectUrls(child, output, seen, depth + 1);
 }
 
-function collectMediaCodes(value, output, seen = new WeakSet(), depth = 0) {
+function collectMediaCodes(value, output, seen = new WeakSet(), depth = 0, insideShare = false) {
   if (!value || typeof value !== "object" || depth > MAX_DEPTH || seen.has(value)) return;
   seen.add(value);
   if (Array.isArray(value)) {
-    value.forEach(item => collectMediaCodes(item, output, seen, depth + 1));
+    value.forEach(item => collectMediaCodes(item, output, seen, depth + 1, insideShare));
     return;
   }
   const code = value.code ?? value.shortcode ?? value.short_code;
-  const isMediaContext = Boolean(value.media || value.media_share || value.xma ||
+  const ownMediaContext = Boolean(value.media || value.media_share || value.xma ||
     value.product_type || value.media_type != null || value.image_versions2 ||
-    value.video_versions || value.carousel_media);
-  if (code && isMediaContext && /^[A-Za-z0-9_-]{5,}$/.test(String(code))) {
+    value.video_versions || value.carousel_media || value.__typename === "XDTMedia");
+  if (code && (ownMediaContext || insideShare) && /^[A-Za-z0-9_-]{5,}$/.test(String(code))) {
     const productType = String(value.product_type || "").toLowerCase();
     const path = productType === "clips" ? "reel" : "p";
     const url = "https://www.instagram.com/" + path + "/" + String(code);
     if (!output.includes(url) && output.length < MAX_URLS_PER_MESSAGE) output.push(url);
   }
-  for (const child of Object.values(value)) collectMediaCodes(child, output, seen, depth + 1);
+  for (const [key, child] of Object.entries(value)) {
+    const childIsShare = insideShare || /^(share|media_share|xma|shared_media|media)$/i.test(key);
+    collectMediaCodes(child, output, seen, depth + 1, childIsShare);
+  }
 }
 
 function isMessageObject(value) {
@@ -286,6 +289,13 @@ export function createInstagramNetworkCapture(page) {
 
     const request = response.request();
     const context = requestContext(request);
+    // IGDMessageListOffMsysQuery nem sempre repete thread_id nas variables.
+    // Como a captura começa ao abrir uma conversa específica, associe essa
+    // resposta ao thread ativo somente para a operação de listagem de mensagens.
+    if (!context.threadId && /IGDMessageListOffMsysQuery/i.test(context.operation)) {
+      const activeThreadId = String(page.url?.() || "").match(/\\/direct\\/t\\/(\\d+)/)?.[1] || "";
+      if (activeThreadId) context.threadId = activeThreadId;
+    }
     if (context.operation) operations.add(context.operation);
     const entry = {
       endpoint: url.pathname.includes("/graphql") ? "graphql" : "instagram-api",
