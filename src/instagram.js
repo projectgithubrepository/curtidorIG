@@ -383,7 +383,8 @@ export function interpretPostSnapshot(snapshot) {
     hasDialog: Boolean(selectors.dialog)
   };
 
-  const finalPath = (() => { try { return new URL(finalUrl).pathname; } catch { return finalUrl; } })();\n  if (/^\\/accounts\\/(login|signup)/i.test(finalPath) || /entrar na sua conta|log in to instagram|log in to continue/i.test(combined)) {
+  const finalPath = (() => { try { return new URL(finalUrl).pathname; } catch { return finalUrl; } })();
+  if (finalPath.startsWith("/accounts/login") || finalPath.startsWith("/accounts/signup") || /entrar na sua conta|log in to instagram|log in to continue/i.test(combined)) {
     throw Object.assign(new Error("Instagram redirecionou para login; a sessão precisa ser autenticada."), { inspectionDiagnostics: { ...diagnostics, reason: "login" } });
   }
   if (/challenge|checkpoint|suspended/i.test(finalPath) || /confirme que é você|confirm it’s you|security code|atividade suspeita|suspicious activity/i.test(combined)) {
