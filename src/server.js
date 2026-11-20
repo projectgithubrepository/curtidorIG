@@ -80,7 +80,9 @@ app.post("/api/start", async (req, res) => {
       if (stopRequested) return;
       const processed = getProcessedUrls();
       progress.total = collected.length;
-      const withoutDate = collected.filter(item => item.dateUnknown).length;\n      const usedFallback = collected.some(item => item.collectionMode === "last-300-fallback");\n      progress.message = `${collected.length} links encontrados${usedFallback ? " pela varredura de recuperação" : ""}; ${withoutDate} sem data identificável. Preparando comentários...`;
+      const withoutDate = collected.filter(item => item.dateUnknown).length;
+      const usedFallback = collected.some(item => item.collectionMode === "last-300-fallback");
+      progress.message = `${collected.length} links encontrados${usedFallback ? " pela varredura de recuperação" : ""}; ${withoutDate} sem data identificável. Preparando comentários...`;
       const previous = getRecentComments(200);
       for (const item of collected) {
         if (stopRequested) break;
