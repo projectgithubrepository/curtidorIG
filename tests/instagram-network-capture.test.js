@@ -127,3 +127,56 @@ test("captures JSON WebSocket frames and inherits the enclosing thread id", asyn
   assert.equal(capture.summary().hasShareFields, true);
   assert.equal(capture.summary().hasPermalinkOrUrl, true);
 });
+
+
+test("associates message-list response with the active Direct thread when request omits thread id", async () => {
+  const page = new EventEmitter();
+  page.url = () => "https://www.instagram.com/direct/t/1783131735658148";
+  const capture = createInstagramNetworkCapture(page);
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql",
+    status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({
+      postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: {} }),
+      url: () => "https://www.instagram.com/api/graphql"
+    }),
+    json: async () => ({
+      data: { thread: { items: [{
+        message_id: "mid.active-thread",
+        timestamp_ms: 1795021200000,
+        sender: { username: "member" },
+        share: { url: "https://www.instagram.com/p/ACTIVEPOST/" }
+      }] } }
+    })
+  });
+  await capture.stop();
+  const [record] = capture.records();
+  assert.equal(record.threadId, "1783131735658148");
+  assert.deepEqual(record.urls, ["https://www.instagram.com/p/ACTIVEPOST"]);
+});
+
+test("extracts shortcodes nested in media-share payloads without explicit media_type", async () => {
+  const page = new EventEmitter();
+  const capture = createInstagramNetworkCapture(page);
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql",
+    status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({
+      postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: { thread_id: "1783131735658148" } }),
+      url: () => "https://www.instagram.com/api/graphql"
+    }),
+    json: async () => ({
+      data: { thread: { items: [{
+        message_id: "mid.nested-share",
+        timestamp_ms: 1795021200000,
+        sender: { username: "member" },
+        content: { media_share: { media: { code: "NESTEDCODE123" } } }
+      }] } }
+    })
+  });
+  await capture.stop();
+  const [record] = capture.records();
+  assert.deepEqual(record.urls, ["https://www.instagram.com/p/NESTEDCODE123"]);
+});
