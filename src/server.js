@@ -83,6 +83,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     "CURTIDORIG | DIAGNÓSTICO",
     `Resultado: ${report.outcome || "indisponível"}`,
     `Grupo: ${report.request?.groupName || "não informado"} | Período: ${report.request?.startDate || "?"} a ${report.request?.endDate || "?"}`,
+    `Coleção de destino: ${report.request?.collectionName || "não informada"}`,
     `Publicações: ${summary.publicationsFound ?? report.publications?.length ?? 0} | Feed/Reels: ${summary.feedsAndReels ?? "?"} | Stories: ${summary.stories ?? "?"} | Marcos administrativos: ${summary.administrativeMilestones ?? "?"} | Sem data: ${summary.itemsWithoutDate ?? "?"}`,
     "",
     "CAPTURA DE REDE",
