@@ -26,6 +26,9 @@ win:
       arch:
         - x64
   artifactName: curtidorIG-${version}-Windows-Setup.${ext}
+  extraResources:
+    - from: .playwright-browsers
+      to: playwright-browsers
 nsis:
   oneClick: false
   perMachine: false
