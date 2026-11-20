@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import path from "node:path";
 import { isAdministrativeMessage, parseAdministrativeMilestone } from "./group-state.js";
+import { createInstagramNetworkCapture } from "./instagram-network-capture.js";
 
 const PROFILE_DIR = path.resolve("data", "instagram-profile");
 
@@ -108,6 +109,9 @@ async function scrollToOlderMessages(page) {
 }
 
 export async function collectGroupPosts(page, { groupName, startDate, endDate, shouldStop = () => false }) {
+  // Observa somente respostas que a própria interface autenticada do Instagram recebe.
+  // Nenhuma requisição privada é criada e nenhum conteúdo de mensagem é persistido no diagnóstico.
+  const networkCapture = createInstagramNetworkCapture(page);
   await page.goto("https://www.instagram.com/direct/inbox/", { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(2500);
   if (page.url().includes("/accounts/login")) {
@@ -175,6 +179,9 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     for (const [url, item] of fallback) found.set(url, item);
   }
 
+  networkCapture.stop();
+  const networkDiagnostics = networkCapture.summary();
+
   if (!found.size) {
     const diagnostics = await page.evaluate(() => {
       const anchors = [...document.querySelectorAll("a[href]")];
@@ -185,11 +192,15 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     throw new Error("Nenhuma publicação foi extraída. Diagnóstico: " + diagnostics.instagramLinks +
       " links do Instagram em " + diagnostics.anchors + " links da página; " +
       diagnostics.messageNodes + " elementos de mensagem. Página: " + diagnostics.url +
+      ". Diagnóstico de rede: " + networkDiagnostics.capturedResponses + " respostas capturadas; operações: " +
+      (networkDiagnostics.operations.join(", ") || "nenhuma identificada") + "; objetos de mensagem: " +
+      networkDiagnostics.messageLikeObjects + "; campos de reação: " + (networkDiagnostics.hasReactionFields ? "sim" : "não") +
+      "; campos de compartilhamento: " + (networkDiagnostics.hasShareFields ? "sim" : "não") +
       ". Verifique se a conversa correta está aberta e se as mensagens foram carregadas. Nenhuma interação foi feita.");
   }
 
   const milestoneList = [...milestones.values()];
-  return [...found.values()].map(item => ({ ...item, administrativeMilestones: milestoneList })).sort((a, b) => {
+  return [...found.values()].map(item => ({ ...item, administrativeMilestones: milestoneList, networkDiagnostics })).sort((a, b) => {
     if (!a.sharedAt) return 1;
     if (!b.sharedAt) return -1;
     return a.sharedAt.localeCompare(b.sharedAt);
