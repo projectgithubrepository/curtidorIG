@@ -83,7 +83,7 @@ async function refresh() {
     counter.textContent=`${p.done} de ${p.total} publicações processadas`;
     current.textContent=p.current||""; bar.style.width=p.total?`${Math.min(100,p.done/p.total*100)}%`:"0%";
     start.disabled=data.running; stop.disabled=!data.running; render(r.results||[]);
-    copyDiagnostic.disabled = data.running || !data.progress?.message || data.progress?.message === "Pronto.";
+    copyDiagnostic.disabled = data.running || !data.hasDiagnostic;
     downloadDiagnostic.style.pointerEvents = copyDiagnostic.disabled ? "none" : "auto";
     downloadDiagnostic.style.opacity = copyDiagnostic.disabled ? "0.5" : "1";
   } catch {}
