@@ -22,8 +22,16 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
-      - name: Build Windows installer
-        run: npm run dist:win
+      - name: Download Chromium for packaging
+        shell: pwsh
+        run: |
+          $env:PLAYWRIGHT_BROWSERS_PATH = "$env:GITHUB_WORKSPACE\.playwright-browsers"
+          npx playwright install chromium
+      - name: Build Windows installer with bundled Chromium
+        shell: pwsh
+        run: |
+          $env:PLAYWRIGHT_BROWSERS_PATH = "$env:GITHUB_WORKSPACE\.playwright-browsers"
+          npm run dist:win
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
