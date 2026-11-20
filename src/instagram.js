@@ -422,8 +422,12 @@ export async function inspectPost(page, url) {
   // Não depende de um atraso fixo nem de networkidle (o Instagram mantém conexões abertas).
   await page.waitForFunction(() => {
     const text = (document.body?.innerText || "").toLowerCase();
-    return Boolean(document.querySelector("article, main, [role='dialog']") ||
-      /content unavailable|this page isn't available|página não está disponível|conteúdo indisponível|login|entrar na sua conta|challenge|checkpoint|confirme que é você/.test(text));
+    const articleText = document.querySelector("article")?.innerText?.trim() || "";
+    const mainText = document.querySelector("main")?.innerText?.trim() || "";
+    const dialogText = document.querySelector("[role='dialog']")?.innerText?.trim() || "";
+    const hasMedia = Boolean(document.querySelector("video, article img, main img, [role='dialog'] img"));
+    const knownState = /content unavailable|this page isn't available|página não está disponível|conteúdo indisponível|entrar na sua conta|log in to instagram|challenge|checkpoint|confirme que é você/.test(text);
+    return articleText.length > 20 || dialogText.length > 20 || mainText.length > 100 || hasMedia || knownState;
   }, { timeout: 18000 }).catch(() => {});
 
   const snapshot = await page.evaluate(() => {
