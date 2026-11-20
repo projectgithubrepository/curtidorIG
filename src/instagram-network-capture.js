@@ -222,7 +222,7 @@ export function createInstagramNetworkCapture(page) {
   const operations = new Set();
   let stopped = false;
   const pending = new Set();
-  const websocketStats = { connections: 0, frames: 0, parsedFrames: 0, unparsedFrames: 0, messageLikeObjects: 0, sharedMediaObjects: 0 };
+  const websocketStats = { connections: 0, frames: 0, parsedFrames: 0, unparsedFrames: 0, messageLikeObjects: 0, sharedMediaObjects: 0, hasMessageId: false, hasTextBody: false, hasTimestampMs: false, hasSender: false, hasReactionFields: false, hasShareFields: false, hasPermalinkOrUrl: false };
   const websocketOperations = new Set();
 
   const mergeRecords = (items, context = {}) => {
@@ -264,6 +264,13 @@ export function createInstagramNetworkCapture(page) {
       const extracted = extractPayload(payload, { threadId: "", operation: "websocket" });
       websocketStats.messageLikeObjects += extracted.messageLikeObjects;
       websocketStats.sharedMediaObjects += extracted.sharedMediaObjects;
+      websocketStats.hasMessageId ||= extracted.hasMessageId;
+      websocketStats.hasTextBody ||= extracted.hasTextBody;
+      websocketStats.hasTimestampMs ||= extracted.hasTimestampMs;
+      websocketStats.hasSender ||= extracted.hasSender;
+      websocketStats.hasReactionFields ||= extracted.hasReactionFields;
+      websocketStats.hasShareFields ||= extracted.hasShareFields;
+      websocketStats.hasPermalinkOrUrl ||= extracted.hasPermalinkOrUrl;
       mergeRecords(extracted.records);
     });
   };
@@ -348,11 +355,15 @@ export function createInstagramNetworkCapture(page) {
         operationDetails: [...byOperation.values()].slice(0, 30),
         distinctMessageIds: recordsByKey.size,
         extractedShareUrls: [...recordsByKey.values()].reduce((sum, item) => sum + item.urls.length, 0),
-        messageLikeObjects: aggregate.messageLikeObjects,
-        sharedMediaObjects: aggregate.sharedMediaObjects,
-        hasMessageId: aggregate.hasMessageId,
-        hasReactionFields: aggregate.hasReactionFields,
-        hasShareFields: aggregate.hasShareFields,
+        messageLikeObjects: aggregate.messageLikeObjects + websocketStats.messageLikeObjects,
+        sharedMediaObjects: aggregate.sharedMediaObjects + websocketStats.sharedMediaObjects,
+        hasMessageId: aggregate.hasMessageId || websocketStats.hasMessageId,
+        hasTextBody: parsed.some(item => item.payload.hasTextBody) || websocketStats.hasTextBody,
+        hasTimestampMs: parsed.some(item => item.payload.hasTimestampMs) || websocketStats.hasTimestampMs,
+        hasSender: parsed.some(item => item.payload.hasSender) || websocketStats.hasSender,
+        hasReactionFields: aggregate.hasReactionFields || websocketStats.hasReactionFields,
+        hasShareFields: aggregate.hasShareFields || websocketStats.hasShareFields,
+        hasPermalinkOrUrl: parsed.some(item => item.payload.hasPermalinkOrUrl) || websocketStats.hasPermalinkOrUrl,
         structures: allStructures,
         responseDetails: responses.map(item => ({
           endpoint: item.endpoint, operation: item.operation, threadIdPresent: Boolean(item.threadId),
