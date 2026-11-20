@@ -33,6 +33,23 @@ jobs:
         run: |
           $env:PLAYWRIGHT_BROWSERS_PATH = "$env:GITHUB_WORKSPACE\.playwright-browsers"
           npm run dist:win
+      - name: Inspect packaged application files
+        shell: pwsh
+        run: |
+          Write-Host "Conteúdo de release:"
+          Get-ChildItem release -Force | Select-Object FullName, Mode
+          Write-Host "Conteúdo de release/win-unpacked:"
+          if (Test-Path release/win-unpacked) {
+            Get-ChildItem release/win-unpacked -Force | Select-Object FullName, Mode
+          } else {
+            throw "A pasta release/win-unpacked não foi criada pelo electron-builder."
+          }
+          Write-Host "Conteúdo de resources:"
+          if (Test-Path release/win-unpacked/resources) {
+            Get-ChildItem release/win-unpacked/resources -Force | Select-Object FullName, Mode
+          } else {
+            throw "A pasta resources não foi criada."
+          }
       - name: Install NSIS
         run: choco install nsis --no-progress -y
       - name: Build lightweight update executable
