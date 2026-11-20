@@ -17,7 +17,7 @@ test("a publication is complete only after all five states are confirmed", () =>
 test("folder confirmation cannot substitute for saving", () => {
   const state = mergeTaskState({}, { savedFolderVerified: true });
   assert.equal(state.saved, false);
-  assert.equal(state.savedFolderVerified, true);
+  assert.equal(state.savedFolderVerified, false);
   assert.equal(state.complete, false);
 });
 
