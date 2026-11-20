@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import path from "node:path";
+import { isAdministrativeMessage } from "./group-state.js";
 
 const PROFILE_DIR = path.resolve("data", "instagram-profile");
 
@@ -38,9 +39,9 @@ async function readVisiblePostLinks(page) {
         const container = anchor.closest('[role="row"],[role="listitem"],[data-testid*="message"]') || anchor.parentElement;
         messageText = (container?.innerText || anchor.innerText || "").slice(0, 1000);
       }
-      return { url: anchor.href.split("?")[0], sharedAt, messageText };
+      return { url: anchor.href.split("?")[0], sharedAt, messageText, groupCheck: /(?:✅|☑️|✔️|✓)/u.test(messageText) };
     });
-  });
+  }).then(items => items.filter(item => !isAdministrativeMessage(item.messageText)));
 }
 
 async function scrollToOlderMessages(page) {
