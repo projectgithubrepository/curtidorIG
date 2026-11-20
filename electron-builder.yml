@@ -20,3 +20,16 @@ mac:
     - dmg
 dmg:
   artifactName: curtidorIG-${version}-macOS.${ext}
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: curtidorIG-${version}-Windows-Setup.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: curtidorIG
