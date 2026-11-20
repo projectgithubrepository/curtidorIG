@@ -290,7 +290,7 @@ export function createInstagramNetworkCapture(page) {
     const entry = {
       endpoint: url.pathname.includes("/graphql") ? "graphql" : "instagram-api",
       path: url.pathname.slice(0, 180),
-      method: request.method(),
+      method: request.method?.() || "unknown",
       operation: context.operation || "unknown",
       threadId: context.threadId,
       status: response.status(),
