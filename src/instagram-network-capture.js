@@ -129,6 +129,9 @@ export function createInstagramNetworkCapture(page) {
       const aggregate = parsed.reduce((result, item) => {
         result.messageLikeObjects += item.payload.messageLikeObjects;
         result.sharedMediaObjects += item.payload.sharedMediaObjects;
+        result.distinctMessageIds += item.payload.distinctMessageIds;
+        result.hasSender ||= item.payload.hasSender;
+        result.hasPermalinkOrUrl ||= item.payload.hasPermalinkOrUrl;
         result.hasReactionFields ||= item.payload.hasReactionFields;
         result.hasShareFields ||= item.payload.hasShareFields;
         result.hasMessageId ||= item.payload.hasMessageId;
@@ -149,6 +152,9 @@ export function createInstagramNetworkCapture(page) {
       }, {
         messageLikeObjects: 0,
         sharedMediaObjects: 0,
+        distinctMessageIds: 0,
+        hasSender: false,
+        hasPermalinkOrUrl: false,
         hasReactionFields: false,
         hasShareFields: false,
         hasMessageId: false,
