@@ -200,11 +200,11 @@ app.post("/api/start", async (req, res) => {
         }
         progress.done++;
       }
-      const network = results[0]?.networkDiagnostics;
-      const networkStatus = network
-        ? ` Captura de rede: ${network.capturedResponses} respostas, ${network.messageLikeObjects} objetos de mensagem; reações ${network.hasReactionFields ? "detectadas" : "não detectadas"}.`
+      const finalNetwork = results[0]?.networkDiagnostics || network;
+      const finalNetworkStatus = finalNetwork
+        ? ` Captura de rede: ${finalNetwork.capturedResponses} respostas, ${finalNetwork.messageLikeObjects} objetos de mensagem; reações ${finalNetwork.hasReactionFields ? "detectadas" : "não detectadas"}.`
         : "";
-      progress.message = `Coleta concluída: ${results.length} itens listados.${networkStatus} Nenhuma ação de curtir, comentar, salvar ou reagir foi executada.`;
+      progress.message = `Coleta concluída: ${results.length} itens listados.${finalNetworkStatus} Nenhuma ação de curtir, comentar, salvar ou reagir foi executada.`;
       logDiagnostic("INFO", "Coleta concluída", { listed: results.length, networkResponses: network?.capturedResponses ?? 0 });
       diagnosticReport = {
         schemaVersion: 1,
