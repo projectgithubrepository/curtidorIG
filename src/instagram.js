@@ -40,7 +40,8 @@ async function readVisiblePostLinks(page) {
         messageText = (container?.innerText || anchor.innerText || "").slice(0, 1000);
       }
       const url = anchor.href.split("?")[0];
-      return { url, contentType: /\/stories\//.test(url) ? "story" : "feed", sharedAt, messageText, groupCheck: /(?:✅|☑️|✔️|✓)/u.test(messageText) };
+      const reactionLabels = [...(node?.querySelectorAll?.("[aria-label],img[alt]") || [])].map(element => element.getAttribute("aria-label") || element.getAttribute("alt") || "").join(" ");
+      return { url, contentType: /\/stories\//.test(url) ? "story" : "feed", sharedAt, messageText, groupCheck: /(?:✅|☑️|✔️|✓)/u.test(messageText + " " + reactionLabels) };
     });
   }).then(items => items.filter(item => !isAdministrativeMessage(item.messageText)));
 }
