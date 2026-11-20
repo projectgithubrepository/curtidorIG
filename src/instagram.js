@@ -179,7 +179,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     for (const [url, item] of fallback) found.set(url, item);
   }
 
-  networkCapture.stop();
+  await networkCapture.stop();
   const networkDiagnostics = networkCapture.summary();
 
   if (!found.size) {
