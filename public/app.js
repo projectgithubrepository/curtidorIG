@@ -60,21 +60,63 @@ function render(items) {
   if (!items.length) { const p=document.createElement("p"); p.className="muted"; p.textContent="Nenhuma publicação listada ainda."; results.append(p); return; }
   for (const item of items) {
     const card=document.createElement("article"); card.className="result";
-    const link=document.createElement("a"); link.href=item.url; link.target="_blank"; link.rel="noreferrer"; link.textContent=item.url;
-    const status=document.createElement("strong"); status.textContent=item.status;
-    const type=document.createElement("small"); type.textContent=item.contentType === "story" ? "Story" : "Feed / Reel";
+    const link=document.createElement("a"); link.href=item.url; link.target="_blank"; link.rel="noreferrer"; link.textContent="Abrir publicação no Instagram";
+    const status=document.createElement("strong"); status.textContent=item.status || "Pendente";
+    const type=document.createElement("small"); type.textContent=item.contentType === "story" ? "Story · fluxo específico ainda não automatizado" : "Feed / Reel";
     const stateLine=document.createElement("small");
-    const task=item.taskState || { saved:false, liked:false, commented:false, groupCheck:Boolean(item.groupCheck) };
-    stateLine.textContent = [`Salva: ${task.saved ? "sim" : "pendente"}`, `Pasta correta: ${task.savedFolderVerified ? "sim" : "não verificada"}`, `Curtida: ${task.liked ? "sim" : "pendente"}`, `Comentada: ${task.commented ? "sim" : "pendente"}`, `Check no grupo: ${task.groupCheck ? "sim" : "pendente"}`].join(" · ");
+    const task=item.taskState || { saved:false, savedFolderVerified:false, liked:false, commented:false, groupCheck:false };
+    stateLine.textContent = [`Salva: ${task.saved ? "confirmada" : "pendente"}`, `Pasta: ${task.savedFolderVerified ? "confirmada" : "pendente"}`, `Curtida: ${task.liked ? "confirmada" : "pendente"}`, `Comentário: ${task.commented ? "confirmado" : "pendente"}`, `Check no grupo: ${task.groupCheck ? "confirmado" : "pendente"}`].join(" · ");
     const date=document.createElement("small"); date.textContent=item.sharedAt ? new Date(item.sharedAt).toLocaleString("pt-BR") : "Data não identificada";
     const markers=document.createElement("small");
     const milestoneCount=(item.administrativeMilestones || []).length;
     markers.textContent=milestoneCount ? "Marcos visíveis: " + (item.administrativeMilestones || []).map(marker => `${marker.date || "data não identificada"} · ${marker.feedCount ?? "?"} Feed · ${marker.storiesCount ?? "?"} Stories`).join(" | ") : "";
     const caption=document.createElement("p"); caption.textContent=item.caption || item.detail || "";
     const comment=document.createElement("p"); comment.className="comment"; comment.textContent=item.comment ? "Comentário sugerido: "+item.comment : "";
-    card.append(status,type,stateLine,date,markers,link,caption,comment); results.append(card);
+    const controls=document.createElement("div"); controls.className="result-actions";
+    const actions=[
+      ["saved","Confirmar que salvou"],
+      ["savedFolderVerified","Confirmar pasta correta"],
+      ["liked","Confirmar curtida"],
+      ["commented","Confirmar comentário"],
+      ["groupCheck","Confirmar check no grupo"]
+    ];
+    for (const [key,label] of actions) {
+      if (task[key] || (key==="savedFolderVerified" && !task.saved)) continue;
+      const button=document.createElement("button"); button.type="button"; button.className="secondary small-action";
+      button.textContent=label; button.dataset.action=key; button.dataset.url=item.url;
+      button.disabled=!item.identityVerified;
+      controls.append(button);
+    }
+    if (!item.identityVerified) {
+      const warning=document.createElement("small"); warning.textContent="Sem vínculo seguro com a mensagem original: confirmações bloqueadas."; controls.append(warning);
+    }
+    card.append(status,type,stateLine,date,markers,link,caption,comment,controls); results.append(card);
   }
 }
+results.addEventListener("click", async event => {
+  const button=event.target.closest("button[data-action]");
+  if (!button) return;
+  const labels={
+    saved:"Você já salvou esta publicação no Instagram?",
+    savedFolderVerified:"Você conferiu que ela está na coleção/pasta correta?",
+    liked:"Você já curtiu esta publicação?",
+    commented:"Você já publicou o comentário no Instagram?",
+    groupCheck:"Você confirmou o check na mensagem exata do grupo?"
+  };
+  const action=button.dataset.action;
+  if (!window.confirm(labels[action] + "\\n\\nA aplicação apenas registrará sua confirmação; não executará a ação no Instagram.")) return;
+  button.disabled=true;
+  try {
+    const response=await fetch("/api/confirm-action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:button.dataset.url,action})});
+    const data=await response.json();
+    if (!response.ok) throw new Error(data.error || "Não foi possível registrar a confirmação.");
+    await refresh();
+  } catch(error) {
+    window.alert(error.message);
+    button.disabled=false;
+  }
+});
+
 async function refresh() {
   try {
     const [sr,rr]=await Promise.all([fetch("/api/status"),fetch("/api/results")]);
