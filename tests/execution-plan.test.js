@@ -5,7 +5,7 @@ import { buildExecutionPlan, interpretGroupInstructions, summarizeExecutionPlan 
 const verifiedInspection = {
   liked: true, savedStateKnown: true, saved: false,
   collectionInventoryAvailable: true, collectionMembership: false,
-  commented: true, destinationGroupVerified: true
+  commented: true, destinationGroupVerified: true, messageIdentityVerified: true
 };
 
 test("like and collection are mandatory; optional comment is still prepared and posted", () => {
@@ -124,4 +124,16 @@ test("unverified actions are not candidates or mapped executable actions", () =>
   assert.equal(plan[0].testMode.candidate, false);
   assert.equal(plan[3].testMode.mapped, false);
   assert.equal(plan[3].testMode.candidate, false);
+});
+
+test("does not mark otherwise verified actions apt without the source message identity", () => {
+  const plan = buildExecutionPlan({
+    mode:"test", collectionName:"Curtido", comment:"Comentário válido 🌸",
+    stateKnown:{...verifiedInspection,messageIdentityVerified:false,reasons:{messageIdentityVerified:"ID da mensagem original ausente."}}
+  });
+  for (const action of plan.slice(0,4)) {
+    assert.match(action.status,/^não verificada/);
+    assert.match(action.reason,/ID da mensagem original ausente/);
+    assert.equal(action.testMode.mapped,false);
+  }
 });
