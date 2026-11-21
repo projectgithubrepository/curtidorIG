@@ -66,6 +66,43 @@ app.get("/api/diagnostic-report", (_req, res) => {
   res.json(diagnosticReport);
 });
 
+app.get("/api/diagnostic-summary", (_req, res) => {
+  if (!diagnosticReport) return res.status(404).type("text/plain; charset=utf-8").send("Ainda não há diagnóstico. Execute uma coleta primeiro.");
+
+  const report = diagnosticReport;
+  const summary = report.summary || {};
+  const network = report.networkDiagnostics || {};
+  const coverage = summary.collectionCoverage || {};
+  const scan = report.collectionDiagnostics || {};
+  const operations = (network.operationDetails || []).slice(0, 5).map(item =>
+    `- ${item.operation}: ${item.responses || 0} respostas / ${item.messageLikeObjects || 0} mensagens / ${item.sharedMediaObjects || 0} compartilhamentos`
+  );
+  const warnings = (report.log || []).filter(item => item.level === "ERROR" || item.level === "WARN").slice(-4)
+    .map(item => `- ${item.level}: ${item.message}`);
+  const lines = [
+    "CURTIDORIG | RESUMO TÉCNICO FILTRADO",
+    `Resultado: ${report.outcome || "indisponível"} | Modo: ${report.request?.mode || "?"}`,
+    `Grupo: ${report.request?.groupName || "?"} | Período: ${report.request?.startDate || "?"} a ${report.request?.endDate || "?"}`,
+    `Itens: ${summary.publicationsFound ?? report.publications?.length ?? 0} encontrados | ${summary.publicationsInspected ?? 0} inspecionados | Feed/Reels: ${summary.feedsAndReels ?? "?"} | Stories: ${summary.stories ?? "?"}`,
+    ...(coverage.available ? [`Referência administrativa: Feed ${coverage.actualFeed}/${coverage.expectedFeed} | Stories ${coverage.actualStories}/${coverage.expectedStories} | ${coverage.matches ? "CONFERE" : "DIVERGÊNCIA"}`] : ["Referência administrativa: indisponível"]),
+    `Varredura: ${scan.historyRounds ?? "?"} rodadas | avanço: ${scan.scrollProgressRounds ?? "?"} | topo: ${scan.stableBoundaryReached ? "sim" : "não"} | marco temporal: ${scan.dateBoundaryReached ? "sim" : "não"} | travada: ${scan.historyStalled ? "sim" : "não"}`,
+    `Rede: ${network.capturedResponses ?? 0} respostas / ${network.parsedResponses ?? 0} interpretadas / ${network.unparsedResponses ?? 0} não interpretadas`,
+    `Direct: ${network.websocketConnections ?? 0} WebSockets / ${network.websocketFrames ?? 0} quadros | IDs de mensagens: ${network.distinctMessageIds ?? 0}`,
+    `Stories extraídas da rede: ${network.storyUrlsExtracted ?? 0} (WebSocket: ${network.webSocketStoryUrls ?? 0}) | objetos compartilhados: ${network.sharedMediaObjects ?? 0}`,
+    "Operações de rede:",
+    ...(operations.length ? operations : ["- Nenhuma identificada"]),
+    `Coleção de destino "${report.request?.collectionName || "?"}": ${summary.savedCollectionInventoryAvailable ? "inventariada" : "NÃO localizada/inventariada"}`,
+    ...(summary.savedCollectionInventoryError ? [`Falha da coleção: ${String(summary.savedCollectionInventoryError).replace(/\\s+/g, " ").slice(0, 350)}`] : []),
+    `Grupo coletivo: ${summary.destinationGroupVerification?.verified ? "confirmado" : "não confirmado"}`,
+    `Plano: ${summary.plannedActions ?? 0} etapas | aptas: ${summary.mappedActions ?? 0} | bloqueadas: ${summary.blockedActions ?? 0} | não verificadas: ${summary.unverifiedActions ?? 0} | inspeções interrompidas: ${summary.inspectionFailures ?? 0}`,
+    ...(warnings.length ? ["Avisos relevantes:", ...warnings] : ["Avisos relevantes: nenhum"]),
+    `Gerado: ${report.generatedAt || "?"}`,
+    "Resumo filtrado: sem URLs individuais, legendas, textos de mensagens, payloads, cookies, tokens ou senhas."
+  ];
+  res.setHeader("Content-Disposition", 'attachment; filename="curtidorig-resumo-filtrado.txt"');
+  res.type("text/plain; charset=utf-8").send(lines.join("\n"));
+});
+
 app.get("/api/diagnostic-log", (_req, res) => {
   if (!diagnosticReport) return res.status(404).type("text/plain; charset=utf-8").send("Ainda não há diagnóstico. Execute uma coleta primeiro.");
 
@@ -670,7 +707,8 @@ app.post("/api/start", async (req, res) => {
           simulatedActions,
           blockedActions,
           unverifiedActions,
-          savedCollectionInventoryAvailable
+          savedCollectionInventoryAvailable,
+          savedCollectionInventoryError: savedCollectionInventoryError || null
         },
         networkDiagnostics: collected[0]?.networkDiagnostics || null,
         collectionDiagnostics,
