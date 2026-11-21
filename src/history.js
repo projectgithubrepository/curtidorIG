@@ -3,7 +3,7 @@ import path from "node:path";
 
 const DATA_DIR = path.resolve("data");
 const HISTORY_FILE = path.join(DATA_DIR, "historico.csv");
-const HEADER = ["data_hora","url","id_conversa","id_mensagem","legenda","curtida","comentario","status","detalhe","grupo_origem","data_compartilhamento","salva","comentada","check_grupo","fluxo_completo","marco_administrativo","pasta_correta","colecao_destino"];
+const HEADER = ["data_hora","url","id_conversa","id_mensagem","legenda","curtida","comentario","status","detalhe","grupo_origem","data_compartilhamento","salva","comentada","check_grupo","fluxo_completo","marco_administrativo","pasta_correta","colecao_destino","enviado_grupo","comentario_proibido"];
 
 function csvCell(value) {
   const text = String(value ?? "");
@@ -50,7 +50,7 @@ export function ensureHistory() {
       entry.detalhe ?? "", entry.grupo_origem ?? "", entry.data_compartilhamento ?? "",
       entry.salva ?? "não", entry.comentada ?? "não", entry.check_grupo ?? "não",
       entry.fluxo_completo ?? "não", entry.marco_administrativo ?? "",
-      entry.pasta_correta ?? "não", entry.colecao_destino ?? ""
+      entry.pasta_correta ?? "não", entry.colecao_destino ?? "", entry.enviado_grupo ?? "não", entry.comentario_proibido ?? "não"
     ]);
   }
   fs.writeFileSync(HISTORY_FILE, migrated.map(row => row.map(csvCell).join(",")).join("\n") + "\n", "utf8");
@@ -80,12 +80,14 @@ export function getTaskState(url, groupThreadId = "", messageId = "") {
   const liked = truthy(latest.curtida);
   const commented = truthy(latest.comentada);
   const groupCheck = truthy(latest.check_grupo);
-  return { saved, savedFolderVerified, liked, commented, groupCheck, complete: saved && savedFolderVerified && liked && commented && groupCheck };
+  const sharedToGroup = truthy(latest.enviado_grupo);
+  const commentForbidden = truthy(latest.comentario_proibido);
+  return { saved, savedFolderVerified, liked, commented, sharedToGroup, commentForbidden, groupCheck, complete: saved && savedFolderVerified && liked && (commented || commentForbidden) && sharedToGroup && groupCheck };
 }
 
 export function getCompletedUrls() {
   return new Set(historyEntries().filter(entry =>
-    truthy(entry.salva) && truthy(entry.pasta_correta) && truthy(entry.curtida) && truthy(entry.comentada) && truthy(entry.check_grupo)
+    truthy(entry.salva) && truthy(entry.pasta_correta) && truthy(entry.curtida) && (truthy(entry.comentada) || truthy(entry.comentario_proibido)) && truthy(entry.enviado_grupo) && truthy(entry.check_grupo)
   ).map(entry => entry.url));
 }
 
@@ -103,16 +105,18 @@ export function appendHistory(entry) {
     savedFolderVerified: Boolean(previous.savedFolderVerified || entry.savedFolderVerified),
     liked: Boolean(previous.liked || entry.liked),
     commented: Boolean(previous.commented || entry.commented),
-    groupCheck: Boolean(previous.groupCheck || entry.groupCheck)
+    groupCheck: Boolean(previous.groupCheck || entry.groupCheck),
+    sharedToGroup: Boolean(previous.sharedToGroup || entry.sharedToGroup),
+    commentForbidden: Boolean(previous.commentForbidden || entry.commentForbidden)
   };
-  const complete = identityVerified && state.saved && state.savedFolderVerified && state.liked && state.commented && state.groupCheck;
+  const complete = identityVerified && state.saved && state.savedFolderVerified && state.liked && (state.commented || state.commentForbidden) && state.sharedToGroup && state.groupCheck;
   const row = [
     entry.date ?? new Date().toISOString(), entry.url, groupThreadId, messageId, entry.caption ?? "",
     state.liked ? "sim" : "não", entry.comment ?? "", entry.status ?? "pendente",
     entry.detail ?? "", entry.groupName ?? "", entry.sharedAt ?? "",
     state.saved ? "sim" : "não", state.commented ? "sim" : "não",
     state.groupCheck ? "sim" : "não", complete ? "sim" : "não",
-    entry.milestone ? JSON.stringify(entry.milestone) : "", state.savedFolderVerified ? "sim" : "não", entry.collectionName ?? ""
+    entry.milestone ? JSON.stringify(entry.milestone) : "", state.savedFolderVerified ? "sim" : "não", entry.collectionName ?? "", state.sharedToGroup ? "sim" : "não", state.commentForbidden ? "sim" : "não"
   ];
   fs.appendFileSync(HISTORY_FILE, row.map(csvCell).join(",") + "\n", "utf8");
 }
