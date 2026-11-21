@@ -187,6 +187,7 @@ app.post("/api/confirm-action", (req, res) => {
     sharedToGroup: taskState.sharedToGroup,
     commentForbidden: taskState.commentForbidden,
     groupCheck: taskState.groupCheck,
+    completionEmoji: diagnosticReport?.request?.completionEmoji || "🌸",
     milestone: item.administrativeMilestones,
     detail: "Confirmação manual: " + labels[action]
   });
@@ -317,13 +318,13 @@ app.post("/api/start", async (req, res) => {
       logDiagnostic("INFO", "Iniciando inspeção e planejamento das publicações", { total: collected.length, mode });
       for (const item of collected) {
         if (stopRequested) break;
-        const previousState = mergeTaskState(getTaskState(item.url, item.threadId, item.messageId), {});
+        const previousState = mergeTaskState(getTaskState(item.url, item.threadId, item.messageId, completionEmoji), {});
         const instructions = interpretGroupInstructions(item.messageText || "");
         if (item.contentType === "story") {
           const plan = buildExecutionPlan({ mode, collectionName, completionEmoji, taskState: previousState, instructions });
           const result = { ...item, taskState: previousState, caption: "", comment: "", plan: plan.map(action => ({...action,status:"bloqueada",reason:"Publicações do tipo Story ainda exigem fluxo específico; nenhuma ação foi executada."})), status: "Story identificada — ações automáticas indisponíveis nesta versão" };
           results.push(result);
-          appendHistory({ url:item.url, groupThreadId:item.threadId, messageId:item.messageId, status:result.status, groupName, collectionName, sharedAt:item.sharedAt, saved:previousState.saved, savedFolderVerified:previousState.savedFolderVerified, liked:previousState.liked, commented:previousState.commented, sharedToGroup:previousState.sharedToGroup, groupCheck:previousState.groupCheck, commentForbidden:instructions.comment==="forbidden", detail:result.status });
+          appendHistory({ url:item.url, groupThreadId:item.threadId, messageId:item.messageId, status:result.status, groupName, collectionName, sharedAt:item.sharedAt, saved:previousState.saved, savedFolderVerified:previousState.savedFolderVerified, liked:previousState.liked, commented:previousState.commented, sharedToGroup:previousState.sharedToGroup, groupCheck:previousState.groupCheck, completionEmoji, commentForbidden:instructions.comment==="forbidden", detail:result.status });
           progress.done++;
           continue;
         }
@@ -350,7 +351,7 @@ app.post("/api/start", async (req, res) => {
                 const outcome = await run();
                 taskState = mergeTaskState(taskState, { [key]: true, ...(action==="saveToCollection"?{savedFolderVerified:true}:{}) });
                 actionLog.push({action,status:outcome.status});
-                appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,commentForbidden:instructions.comment==="forbidden",status:taskStateLabel(taskState),detail:"Ação automática verificada: "+action});
+                appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,completionEmoji,commentForbidden:instructions.comment==="forbidden",status:taskStateLabel(taskState),detail:"Ação automática verificada: "+action});
               } catch (error) {
                 actionLog.push({action,status:"bloqueada",reason:error.message});
                 logDiagnostic("WARN","Ação automática interrompida",{action,url:item.url,error:error.message});
@@ -363,7 +364,7 @@ app.post("/api/start", async (req, res) => {
                 const outcome = await executeCompletionReaction(page,item,completionEmoji);
                 taskState = mergeTaskState(taskState,{groupCheck:true});
                 actionLog.push({action:"completionReaction",status:outcome.status});
-                appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:true,commentForbidden:instructions.comment==="forbidden",status:taskStateLabel(taskState),detail:"Reação de conclusão verificada"});
+                appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:true,completionEmoji,commentForbidden:instructions.comment==="forbidden",status:taskStateLabel(taskState),detail:"Reação de conclusão verificada"});
               } catch(error) {
                 actionLog.push({action:"completionReaction",status:"bloqueada",reason:error.message});
                 logDiagnostic("WARN","Reação à mensagem original bloqueada",{url:item.url,error:error.message});
@@ -384,7 +385,7 @@ app.post("/api/start", async (req, res) => {
           }
           const result = { ...item, caption:inspection.caption, comment, taskState, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
           results.push(result);
-          appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,commentForbidden:instructions.comment==="forbidden",complete:taskState.complete,milestone:item.administrativeMilestones,detail:mode==="test"?"Simulação sem ações":"Planejamento e execução da publicação"});
+          appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,completionEmoji,commentForbidden:instructions.comment==="forbidden",complete:taskState.complete,milestone:item.administrativeMilestones,detail:mode==="test"?"Simulação sem ações":"Planejamento e execução da publicação"});
         } catch (error) {
           logDiagnostic("ERROR", "Falha ao inspecionar publicação", { url:item.url,error:error.message,inspectionDiagnostics:error.inspectionDiagnostics||null });
           const result={...item,caption:"",comment:"",taskState:previousState,status:"não foi possível analisar",detail:error.message};
