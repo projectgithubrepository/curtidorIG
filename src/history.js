@@ -3,7 +3,7 @@ import path from "node:path";
 
 const DATA_DIR = path.resolve("data");
 const HISTORY_FILE = path.join(DATA_DIR, "historico.csv");
-const HEADER = ["data_hora","url","id_conversa","id_mensagem","legenda","curtida","comentario","status","detalhe","grupo_origem","data_compartilhamento","salva","comentada","check_grupo","fluxo_completo","marco_administrativo","pasta_correta","colecao_destino","enviado_grupo","comentario_proibido"];
+const HEADER = ["data_hora","url","id_conversa","id_mensagem","legenda","curtida","comentario","status","detalhe","grupo_origem","data_compartilhamento","salva","comentada","check_grupo","fluxo_completo","marco_administrativo","pasta_correta","colecao_destino","enviado_grupo","comentario_proibido","emoji_reacao"];
 
 function csvCell(value) {
   const text = String(value ?? "");
@@ -50,7 +50,7 @@ export function ensureHistory() {
       entry.detalhe ?? "", entry.grupo_origem ?? "", entry.data_compartilhamento ?? "",
       entry.salva ?? "não", entry.comentada ?? "não", entry.check_grupo ?? "não",
       entry.fluxo_completo ?? "não", entry.marco_administrativo ?? "",
-      entry.pasta_correta ?? "não", entry.colecao_destino ?? "", entry.enviado_grupo ?? "não", entry.comentario_proibido ?? "não"
+      entry.pasta_correta ?? "não", entry.colecao_destino ?? "", entry.enviado_grupo ?? "não", entry.comentario_proibido ?? "não", entry.emoji_reacao ?? ""
     ]);
   }
   fs.writeFileSync(HISTORY_FILE, migrated.map(row => row.map(csvCell).join(",")).join("\n") + "\n", "utf8");
@@ -70,24 +70,25 @@ function historyEntries() {
   );
 }
 
-export function getTaskState(url, groupThreadId = "", messageId = "") {
+export function getTaskState(url, groupThreadId = "", messageId = "", completionEmoji = "🌸") {
   // A publicação só tem identidade suficiente quando está vinculada à conversa e à mensagem exatas.
-  if (!url || !groupThreadId || !messageId) return { saved: false, savedFolderVerified: false, liked: false, commented: false, groupCheck: false, complete: false };
+  if (!url || !groupThreadId || !messageId) return { saved: false, savedFolderVerified: false, liked: false, commented: false, sharedToGroup:false, commentForbidden:false, groupCheck: false, reactionEmoji:"", complete: false };
   const entries = historyEntries().filter(entry => entry.url === url && entry.id_conversa === String(groupThreadId) && entry.id_mensagem === String(messageId));
   const latest = entries.at(-1) ?? {};
   const saved = truthy(latest.salva);
   const savedFolderVerified = truthy(latest.pasta_correta);
   const liked = truthy(latest.curtida);
   const commented = truthy(latest.comentada);
-  const groupCheck = truthy(latest.check_grupo);
+  const reactionEmoji = String(latest.emoji_reacao ?? "");
+  const groupCheck = truthy(latest.check_grupo) && reactionEmoji === completionEmoji;
   const sharedToGroup = truthy(latest.enviado_grupo);
   const commentForbidden = truthy(latest.comentario_proibido);
-  return { saved, savedFolderVerified, liked, commented, sharedToGroup, commentForbidden, groupCheck, complete: saved && savedFolderVerified && liked && (commented || commentForbidden) && sharedToGroup && groupCheck };
+  return { saved, savedFolderVerified, liked, commented, sharedToGroup, commentForbidden, groupCheck, reactionEmoji, complete: saved && savedFolderVerified && liked && (commented || commentForbidden) && sharedToGroup && groupCheck };
 }
 
 export function getCompletedUrls() {
   return new Set(historyEntries().filter(entry =>
-    truthy(entry.salva) && truthy(entry.pasta_correta) && truthy(entry.curtida) && (truthy(entry.comentada) || truthy(entry.comentario_proibido)) && truthy(entry.enviado_grupo) && truthy(entry.check_grupo)
+    truthy(entry.salva) && truthy(entry.pasta_correta) && truthy(entry.curtida) && (truthy(entry.comentada) || truthy(entry.comentario_proibido)) && truthy(entry.enviado_grupo) && truthy(entry.check_grupo) && Boolean(entry.emoji_reacao)
   ).map(entry => entry.url));
 }
 
@@ -99,15 +100,16 @@ export function appendHistory(entry) {
   const groupThreadId = String(entry.groupThreadId ?? "");
   const messageId = String(entry.messageId ?? "");
   const identityVerified = Boolean(entry.url && groupThreadId && messageId);
-  const previous = identityVerified ? getTaskState(entry.url, groupThreadId, messageId) : {};
+  const previous = identityVerified ? getTaskState(entry.url, groupThreadId, messageId, entry.completionEmoji || "🌸") : {};
   const state = {
     saved: Boolean(previous.saved || entry.saved),
     savedFolderVerified: Boolean(previous.savedFolderVerified || entry.savedFolderVerified),
     liked: Boolean(previous.liked || entry.liked),
     commented: Boolean(previous.commented || entry.commented),
-    groupCheck: Boolean(previous.groupCheck || entry.groupCheck),
+    groupCheck: Boolean(previous.groupCheck || (entry.groupCheck && entry.completionEmoji)),
     sharedToGroup: Boolean(previous.sharedToGroup || entry.sharedToGroup),
-    commentForbidden: Boolean(previous.commentForbidden || entry.commentForbidden)
+    commentForbidden: Boolean(previous.commentForbidden || entry.commentForbidden),
+    reactionEmoji: entry.groupCheck && entry.completionEmoji ? entry.completionEmoji : (previous.reactionEmoji || "")
   };
   const complete = identityVerified && state.saved && state.savedFolderVerified && state.liked && (state.commented || state.commentForbidden) && state.sharedToGroup && state.groupCheck;
   const row = [
@@ -116,7 +118,7 @@ export function appendHistory(entry) {
     entry.detail ?? "", entry.groupName ?? "", entry.sharedAt ?? "",
     state.saved ? "sim" : "não", state.commented ? "sim" : "não",
     state.groupCheck ? "sim" : "não", complete ? "sim" : "não",
-    entry.milestone ? JSON.stringify(entry.milestone) : "", state.savedFolderVerified ? "sim" : "não", entry.collectionName ?? "", state.sharedToGroup ? "sim" : "não", state.commentForbidden ? "sim" : "não"
+    entry.milestone ? JSON.stringify(entry.milestone) : "", state.savedFolderVerified ? "sim" : "não", entry.collectionName ?? "", state.sharedToGroup ? "sim" : "não", state.commentForbidden ? "sim" : "não", state.reactionEmoji
   ];
   fs.appendFileSync(HISTORY_FILE, row.map(csvCell).join(",") + "\n", "utf8");
 }
