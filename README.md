@@ -74,6 +74,8 @@ Esta seção consolida as regras funcionais que a aplicação deve seguir. As re
 ### 2.1 Stories e coleção de destino
 
 - A extração de Stories deve reconhecer permalinks e formatos de compartilhamento aninhados do Direct, sem teto de URLs por mensagem. Cada Story exige identidade verificável do autor e do ID.
+- Ao abrir um permalink de Story, mapear a tela intermediária de confirmação: localizar o botão **“Ver story”**, clicar uma única vez, aguardar a abertura e confirmar que a tela intermediária desapareceu antes de ler comentários ou planejar qualquer ação. Se o botão estiver ambíguo ou a tela não avançar, bloquear o Story e registrar o motivo; aplicar a mesma abertura antes de compartilhar o Story ao grupo.
+- A varredura da conversa de origem deve encerrar assim que encontrar timestamp anterior à data inicial, usando tanto os horários visíveis quanto os timestamps capturados da rede **somente para o ID exato da conversa selecionada**. Não percorrer dias anteriores sem necessidade. O diagnóstico registra a data mais antiga encontrada e a fonte que comprovou o limite.
 - Ao receber versões incrementais da mesma mensagem em respostas de rede diferentes, unir todos os links/IDs extraídos; uma resposta parcial nunca pode substituir uma versão anterior mais completa.
 - Reconhecer marcadores de Story em nomes de campos versionados e em metadados como `media_product_type`, `item_type`, `share_type` e `attachment_type`, inclusive em estruturas XMA profundas.
 - Preservar IDs longos (64 bits) como texto ao interpretar JSON de respostas HTTP e WebSocket; não converter IDs de mídia do Instagram para `Number`, pois a precisão numérica pode colapsar Stories diferentes.
@@ -156,6 +158,9 @@ A mensagem administrativa com os totais de Feed/Reels e Stories é publicada dep
 
 - “Não verificada” nunca pode aparecer sem uma causa específica por publicação e por ação. O detalhe deve informar o controle/elemento procurado, o que foi encontrado, a limitação observada e a evidência que faltou.
 - Curtida: separar “controle localizado” de “já curtida/não curtida”. Ausência do controle é estado desconhecido, não prova de que a publicação está pendente.
+- Antes de qualquer ação em Feed/Reels, conferir o estado atual na página do Instagram: curtida existente = já concluída; salvamento exige botão + presença na coleção exata; comentário exige identificação do perfil e verificação dos comentários; envio exige conferência da URL no histórico do grupo coletivo. Ação já existente deve ser marcada como **“já concluída — não repetir”**.
+- Se o estado atual não puder ser confirmado, bloquear a ação automática. Nunca interpretar ausência de dados como prova de que a ação não foi feita.
+- O CSV/histórico local não é prova de conclusão: serve como contexto e proteção de tentativas não confirmadas. A decisão de pular ou executar deve vir do estado atual do Instagram. Reações na mensagem original também são conferidas na própria mensagem antes de selecionar o emoji; se o emoji já estiver presente, não repetir.
 - Salvamento: separar três fatos: estado do botão Salvar, disponibilidade do inventário da coleção e presença da URL na coleção exata. Uma publicação salva fora da coleção escolhida não conta como concluída.
 - Comentário anterior: informar se o perfil foi identificado, quantos comentários carregados foram examinados e se houve correspondência. “Não encontrado nos comentários visíveis” não equivale a provar que não existe em comentários ainda não carregados.
 - Grupo coletivo: o nome digitado não comprova que o destino existe. Enquanto o grupo não for localizado e confirmado, o envio não pode ser classificado como apto no TESTE.
