@@ -62,12 +62,31 @@ export function analyzeCaption(caption) {
 }
 
 export function createComment(caption, previousComments = []) {
-  const source=String(caption ?? "").slice(0,5000);
+  const source=String(caption ?? "").slice(0,5000).trim();
+  const used=new Set(previousComments.map(item=>normalize(item)));
+  if (!source) {
+    // Sem legenda legível: usar uma mensagem neutra, sem inventar detalhes sobre a mídia.
+    const fallbackCandidates = [
+      "Passando para valorizar esse compartilhamento! 👏",
+      "Obrigado por compartilhar esse conteúdo com o grupo! ✨",
+      "Prestigiando também essa publicação por aqui! 🙌",
+      "Mais uma contribuição para acompanhar e prestigiar! 💛",
+      "Presente para valorizar esse compartilhamento! 🌸",
+      "Muito bom participar e prestigiar esse espaço! 🤝",
+      "Acompanhando e valorizando as publicações do grupo! 💫",
+      "Obrigado por trazer esse conteúdo para o grupo! ❤️"
+    ];
+    const seed=hash(String(previousComments.length));
+    for (let i=0;i<fallbackCandidates.length;i++) {
+      const candidate=fallbackCandidates[(seed+i)%fallbackCandidates.length];
+      if (countWords(candidate)>=2 && /\\p{Extended_Pictographic}/u.test(candidate) && !used.has(normalize(candidate))) return candidate;
+    }
+    return "Obrigado por compartilhar e contribuir com o grupo! 👏";
+  }
   const analysis=analyzeCaption(source);
   const topic=TOPICS.find(item=>item.id===analysis.topic);
   const vocabulary=topic ?? GENERIC;
   const seed=hash(normalize(source));
-  const used=new Set(previousComments.map(item=>normalize(item)));
   const intent=INTENTS.find(item=>item.id===analysis.intent);
   const candidates=[];
   if(intent) for(let i=0;i<intent.prefixes.length;i++) candidates.push(pick(intent.prefixes,seed,i)+" "+pick(vocabulary.emojis ?? GENERIC.emojis,seed,i+1));
