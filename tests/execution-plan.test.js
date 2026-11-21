@@ -2,8 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildExecutionPlan, interpretGroupInstructions, summarizeExecutionPlan } from "../src/execution-plan.js";
 
+const verifiedInspection = {
+  liked: true, savedStateKnown: true, saved: false,
+  collectionInventoryAvailable: true, collectionMembership: false,
+  commented: true, destinationGroupVerified: true
+};
+
 test("like and collection are mandatory; optional comment is still prepared and posted", () => {
-  const plan = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Comentário bem estruturado aqui 🌸" });
+  const plan = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Comentário bem estruturado aqui 🌸", stateKnown: verifiedInspection });
   assert.match(plan[0].status, /^simulada/);
   assert.match(plan[1].status, /^simulada/);
   assert.match(plan[2].status, /^simulada/);
@@ -15,7 +21,7 @@ test("like and collection are mandatory; optional comment is still prepared and 
 test("explicit no-comment instruction always suppresses commenting", () => {
   const instructions = interpretGroupInstructions("Curtir e salvar. NÃO COMENTAR.");
   assert.equal(instructions.comment, "forbidden");
-  const plan = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Comentário válido 🌸", instructions });
+  const plan = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Comentário válido 🌸", instructions, stateKnown: verifiedInspection });
   assert.match(plan[2].status, /^dispensada/);
 });
 
@@ -23,7 +29,7 @@ test("requested comment and group send are included", () => {
   const instructions = interpretGroupInstructions("Comentar e enviar para o grupo de destino.");
   assert.equal(instructions.comment, "required");
   assert.equal(instructions.shareToGroup, "required");
-  const plan = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Comentário contextual 🌸", instructions });
+  const plan = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Comentário contextual 🌸", instructions, stateKnown: verifiedInspection });
   assert.match(plan[2].status, /^simulada/);
   assert.match(plan[3].status, /^simulada/);
 });
@@ -61,7 +67,7 @@ test("missing destination collection blocks mandatory save and completion reacti
 });
 
 test("comment generation must have two words and an emoji", () => {
-  const invalid = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Legal" });
+  const invalid = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Legal", stateKnown: verifiedInspection });
   assert.equal(invalid[2].status, "bloqueada");
   const valid = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Conteúdo muito interessante 🌸" });
   assert.match(valid[2].status, /^simulada/);
@@ -96,6 +102,7 @@ test("already-saved post outside the selected collection is blocked", () => {
     mode: "test",
     collectionName: "Laranja Girls",
     taskState: { saved: true, savedFolderVerified: false },
+    stateKnown: { ...verifiedInspection, saved: true, collectionInventoryAvailable: true },
     comment: "Comentário contextual 🌸"
   });
   assert.equal(plan[1].status, "bloqueada");
@@ -114,6 +121,6 @@ test("unverified actions are not candidates or mapped executable actions", () =>
   assert.equal(plan[1].testMode.mapped, false);
   assert.equal(plan[2].testMode.mapped, false);
   assert.equal(plan[0].testMode.candidate, false);
-  assert.equal(plan[3].testMode.mapped, true);
+  assert.equal(plan[3].testMode.mapped, false);
   assert.equal(plan[3].testMode.candidate, false);
 });
