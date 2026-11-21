@@ -105,7 +105,8 @@ test("already-saved post outside the selected collection is blocked", () => {
     stateKnown: { ...verifiedInspection, saved: true, collectionInventoryAvailable: true },
     comment: "Comentário contextual 🌸"
   });
-  assert.equal(plan[1].status, "bloqueada");
+  assert.match(plan[1].status, /^bloqueada/);
+  assert.match(plan[1].status, /publicação salva fora da coleção confirmada/);
   assert.match(plan[1].reason, /presença na coleção escolhida não foi comprovada/);
 });
 
