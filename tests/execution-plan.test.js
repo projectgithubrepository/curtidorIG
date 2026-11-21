@@ -37,7 +37,7 @@ test("requested comment and group send are included", () => {
 test("sending to the collective destination group is always mandatory", () => {
   const instructions = interpretGroupInstructions("Curtir e salvar. NÃO ENVIAR.");
   assert.equal(instructions.shareToGroup, "required");
-  const plan = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Comentário válido 🌸", instructions });
+  const plan = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Comentário válido 🌸", instructions, stateKnown: verifiedInspection });
   assert.match(plan[3].status, /^simulada/);
 });
 
@@ -69,7 +69,7 @@ test("missing destination collection blocks mandatory save and completion reacti
 test("comment generation must have two words and an emoji", () => {
   const invalid = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Legal", stateKnown: verifiedInspection });
   assert.equal(invalid[2].status, "bloqueada");
-  const valid = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Conteúdo muito interessante 🌸" });
+  const valid = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Conteúdo muito interessante 🌸", stateKnown: verifiedInspection });
   assert.match(valid[2].status, /^simulada/);
 });
 
@@ -94,7 +94,7 @@ test("test mode keeps unverifiable states out of executable candidates", () => {
   assert.match(plan[0].status, /^não verificada/);
   assert.match(plan[1].status, /^não verificada/);
   assert.match(plan[2].status, /^não verificada/);
-  assert.match(plan[3].status, /^simulada/);
+  assert.match(plan[3].status, /^não verificada/);
 });
 
 test("already-saved post outside the selected collection is blocked", () => {
@@ -106,7 +106,7 @@ test("already-saved post outside the selected collection is blocked", () => {
     comment: "Comentário contextual 🌸"
   });
   assert.equal(plan[1].status, "bloqueada");
-  assert.match(plan[1].reason, /fora da coleção/);
+  assert.match(plan[1].reason, /presença na coleção escolhida não foi comprovada/);
 });
 
 
