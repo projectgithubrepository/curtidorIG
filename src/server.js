@@ -611,6 +611,7 @@ app.post("/api/start", async (req, res) => {
           savedCollectionInventoryAvailable
         },
         networkDiagnostics: collected[0]?.networkDiagnostics || null,
+        collectionDiagnostics,
         pageDiagnostics: null,
         publications: results.map(reportItem),
         administrativeMilestones: collected[0]?.administrativeMilestones || [],
