@@ -658,7 +658,7 @@ app.post("/api/start", async (req, res) => {
                   taskState = mergeTaskState(taskState,{shareAttempted:true});
                   appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedToGroup:false,shareAttempted:true,liked:taskState.liked,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,commented:taskState.commented,commentForbidden:instructions.comment==="forbidden",completionEmoji,groupCheck:taskState.groupCheck,status:"envio iniciado — aguardando confirmação",detail:"Tentativa de envio registrada antes do clique final"});
                 },
-                { sharedUrls:destinationGroupVerification.sharedUrls || [], inventoryComplete:destinationGroupVerification.sharedInventoryComplete }
+                destinationGroupVerification
               ), "sharedToGroup"]
             ];
             let blocked = false;
