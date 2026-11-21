@@ -122,6 +122,16 @@ A proibição explícita de comentar prevalece sobre a regra padrão de comentá
 - Ao terminar o TESTE, exibir imediatamente um **relatório preliminar na própria interface** com totais separados por tipo de ação (curtidas, salvamentos na coleção, comentários em publicações, envios ao grupo coletivo, reações na mensagem original, comentários públicos em Stories e envios de Stories). Para cada tipo, separar ocorrências analisadas, aptas no plano, aguardando pré-requisitos, já concluídas, bloqueadas e não verificadas. Esses números nunca podem ser apresentados como ações executadas.
 - Em cada publicação, mostrar também o texto original do pedido capturado no grupo, o link, o tipo, a data do compartilhamento, o comentário preparado e a decisão individual de cada etapa.
 
+#### Diagnóstico obrigatório no relatório preliminar
+
+- “Não verificada” nunca pode aparecer sem uma causa específica por publicação e por ação. O detalhe deve informar o controle/elemento procurado, o que foi encontrado, a limitação observada e a evidência que faltou.
+- Curtida: separar “controle localizado” de “já curtida/não curtida”. Ausência do controle é estado desconhecido, não prova de que a publicação está pendente.
+- Salvamento: separar três fatos: estado do botão Salvar, disponibilidade do inventário da coleção e presença da URL na coleção exata. Uma publicação salva fora da coleção escolhida não conta como concluída.
+- Comentário anterior: informar se o perfil foi identificado, quantos comentários carregados foram examinados e se houve correspondência. “Não encontrado nos comentários visíveis” não equivale a provar que não existe em comentários ainda não carregados.
+- Grupo coletivo: o nome digitado não comprova que o destino existe. Enquanto o grupo não for localizado e confirmado, o envio não pode ser classificado como apto no TESTE.
+- Cada etapa deve terminar em uma categoria contabilizada: apta/simulada, candidata, aguardando pré-requisito, já concluída, bloqueada, não verificada ou sem classificação. Os totais devem fechar com a quantidade prevista.
+- Erros de leitura dos controles precisam preservar a mensagem técnica e os dados de diagnóstico úteis, sem cookies, tokens ou credenciais.
+
 #### AUTOMÁTICO
 
 - Exige confirmação explícita da pessoa.
