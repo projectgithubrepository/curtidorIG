@@ -351,3 +351,21 @@ test("extracts Story identity from story_pk and user_info variants", async () =>
   assert.deepEqual(capture.records()[0].urls, ["https://www.instagram.com/stories/story.variant/390000000000000034"]);
   assert.equal(capture.summary().storyUrlsExtracted, 1);
 });
+
+test("does not misclassify a Story shortcode as a Feed permalink", async () => {
+  const page = new EventEmitter();
+  const capture = createInstagramNetworkCapture(page);
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql", status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({ postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: { thread_id: "1783131735658148" } }), url: () => "https://www.instagram.com/api/graphql" }),
+    json: async () => ({ data: { thread: { items: [{
+      message_id: "story-no-feed-fallback",
+      timestamp_ms: 1795021200000,
+      sender: { username: "member" },
+      content: { story_share: { media: { pk: "390000000000000034", code: "STORYCODE34", user: { username: "story.creator" } } } }
+    }] } } })
+  });
+  await capture.stop();
+  assert.deepEqual(capture.records()[0].urls, ["https://www.instagram.com/stories/story.creator/390000000000000034"]);
+});
