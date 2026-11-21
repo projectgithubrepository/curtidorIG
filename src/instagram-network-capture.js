@@ -1,5 +1,5 @@
 const MAX_DIAGNOSTIC_RESPONSES = 500;
-const MAX_DEPTH = 20;
+const MAX_DEPTH = 40;
 const URL_PATTERN = /(?:https?:\/\/(?:www\.)?instagram\.com)?\/(?:p|reel|tv|stories)\/[A-Za-z0-9._-]+(?:\/[^\s"'<>]*)?/gi;
 
 function requestBody(request) {
@@ -113,7 +113,7 @@ function collectUrls(value, output, seen = new WeakSet(), depth = 0) {
 }
 
 function storyIdentity(value, depth = 0, seen = new WeakSet()) {
-  if (!value || typeof value !== "object" || depth > 8 || seen.has(value)) return { username: "", storyId: "" };
+  if (!value || typeof value !== "object" || depth > 20 || seen.has(value)) return { username: "", storyId: "" };
   seen.add(value);
   const username = String(value.username ?? value.user?.username ?? value.user_info?.username ?? value.owner?.username ?? value.author?.username ?? "");
   const candidates = [value.story_id, value.story_pk, value.story_media_id, value.pk, value.media_id, value.mediaId, value.id];
@@ -139,7 +139,7 @@ function collectStoryUrls(value, output, seen = new WeakSet(), depth = 0, storyC
   const entries = Object.entries(value);
   const typename = String(value.__typename || value.type || "").toLowerCase();
   const productType = String(value.product_type || value.productType || "").toLowerCase();
-  const ownStoryMarker = /story|stories/.test(typename) || /^(story|stories)$/.test(productType) || value.is_story === true || String(value.media_type || "").toLowerCase() === "story" || entries.some(([key]) => /^(story_id|story_pk|story_media_id)$/i.test(key));
+  const ownStoryMarker = /story|stories/.test(typename) || /story|stories/.test(productType) || /story|stories/.test(String(value.media_product_type || value.item_type || value.share_type || value.attachment_type || value.xma_type || value.story_type || "").toLowerCase()) || value.is_story === true || String(value.media_type || "").toLowerCase() === "story" || entries.some(([key]) => /^(story_id|story_pk|story_media_id)$/i.test(key));
   const identity = storyIdentity(value);
   if ((storyContext || ownStoryMarker) && identity.username && identity.storyId) {
     const url = "https://www.instagram.com/stories/" + identity.username + "/" + identity.storyId;
