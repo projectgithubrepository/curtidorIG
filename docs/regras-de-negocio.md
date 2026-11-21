@@ -27,17 +27,17 @@ Não haverá campo para colar links manualmente como fluxo principal.
 
 **Definição do período:** o filtro considera a data em que a publicação foi compartilhada na conversa, não a data original em que o autor publicou o conteúdo no Instagram.
 
-## Tratamento das publicações
+## Regras de ações por pedido
 
-Para cada item coletado, a aplicação poderá:
+Cada link deve ser associado ao texto do pedido da mensagem do grupo. As ações são decididas por publicação:
 
-- Ler a legenda e identificar assunto, palavras-chave e intenção textual.
-- Preparar um comentário contextual, sem IA ou serviços externos.
-- Validar que o comentário tenha pelo menos duas palavras e pelo menos um emoji.
-- Consultar o histórico CSV para reduzir repetições.
-- Registrar URL, grupo de origem, data da mensagem, legenda, comentário sugerido e resultado no histórico local.
+- **Curtir:** obrigatório em todas as publicações.
+- **Salvar:** obrigatório em todas as publicações, sempre na coleção/pasta semanal informada (por exemplo, “Curtido”). A confirmação deve validar a coleção correta, não apenas o estado genérico de salvo.
+- **Comentar:** somente quando o pedido solicitar. Se estiver marcado como opcional, não comentar por padrão. Se houver instrução para não comentar, essa proibição prevalece e o comentário não pode ser publicado.
+- **Enviar para outro grupo/conversa:** somente quando solicitado. Se houver instrução para não enviar, não enviar. Não confundir esse envio com o salvamento obrigatório na coleção.
+- **Reação de conclusão:** reagir com o emoji configurado à mensagem exata que compartilhou o link, uma reação por mensagem, depois de concluídas as ações obrigatórias e as ações explicitamente solicitadas. Se a reação já existir, não repetir.
 
-Ações de curtir, comentar e salvar em coleção não devem ser disparadas em lote automaticamente. A aplicação pode organizar a fila e preparar os comentários, mas cada interação com a conta deve depender de uma ação explícita da pessoa na interface do Instagram. Não implementar envio automático em massa, nem mecanismos para contornar limites, desafios ou proteções da plataforma.
+O modo TESTE deve simular as mesmas decisões sem modificar a conta. O modo AUTOMÁTICO só pode executar ações pendentes após verificar novamente o estado e as instruções. O modo MANUAL apenas organiza o que falta. Em caso de instrução ambígua, identidade de mensagem não comprovada ou bloqueio do Instagram, interromper a ação correspondente e informar o motivo.
 
 ## Histórico CSV
 
