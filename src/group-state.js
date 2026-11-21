@@ -40,11 +40,11 @@ export function hasGroupCheck(_value) {
 
 export function mergeTaskState(previous = {}, observed = {}) {
   const merged = {};
-  for (const key of ["saved", "liked", "commented", "groupCheck"]) {
+  for (const key of ["saved", "liked", "commented", "sharedToGroup", "groupCheck", "commentForbidden"]) {
     merged[key] = Boolean(previous[key] || observed[key]);
   }
   merged.savedFolderVerified = merged.saved && Boolean(previous.savedFolderVerified || observed.savedFolderVerified);
-  merged.complete = merged.saved && merged.savedFolderVerified && merged.liked && merged.commented && merged.groupCheck;
+  merged.complete = merged.saved && merged.savedFolderVerified && merged.liked && (merged.commented || merged.commentForbidden) && merged.sharedToGroup && merged.groupCheck;
   return merged;
 }
 
@@ -55,7 +55,8 @@ export function taskStateLabel(state = {}) {
   if (!merged.saved) pending.push("salvar");
   else if (!merged.savedFolderVerified) pending.push("confirmar pasta correta");
   if (!merged.liked) pending.push("curtir");
-  if (!merged.commented) pending.push("comentar");
-  if (!merged.groupCheck) pending.push("check no grupo");
+  if (!merged.commented && !merged.commentForbidden) pending.push("comentar");
+  if (!merged.sharedToGroup) pending.push("enviar ao grupo coletivo");
+  if (!merged.groupCheck) pending.push("reagir à mensagem original");
   return `pendente: ${pending.join(", ")}`;
 }
