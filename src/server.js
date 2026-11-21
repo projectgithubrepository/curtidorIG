@@ -42,8 +42,14 @@ function reportItem(item) {
     collectionMode: item.collectionMode || "",
     status: item.status || "",
     taskState: item.taskState || null,
+    caption: item.caption || "",
     comment: item.comment || "",
     commentSource: item.commentSource || "",
+    instructionSummary: item.instructionSummary || null,
+    storyInspection: item.storyInspection ? {
+      publicCommentAvailable: Boolean(item.storyInspection.publicCommentAvailable),
+      stateKnown: item.storyInspection.stateKnown || null
+    } : null,
     stateVerification: item.stateVerification || null,
     identityVerified: Boolean(item.identityVerified),
     inspectionDiagnostics: item.inspectionDiagnostics || null,
@@ -75,9 +81,19 @@ app.get("/api/diagnostic-log", (_req, res) => {
       const selectors = detail.selectors || {};
       return `- ${item.url || "URL não informada"} | legenda: ${detail.captionAvailable === false ? "não legível" : "disponível"} | motivo: ${detail.reason || "ok"} | HTTP: ${detail.httpStatus ?? "?"} | artigo: ${selectors.article ? "sim" : "não"} | main: ${selectors.main ? "sim" : "não"} | diálogo: ${selectors.dialog ? "sim" : "não"} | mídia: ${detail.detectedMedia ? "sim" : "não"} | URL final: ${detail.finalUrl || "?"}`;
     });
-  const planLines = (report.publications || []).slice(0, 40).map(item => {
-    const actions = (item.plan || []).map(action => `${action.label}: ${action.status}${action.testMode?.mapped ? " [MAPEADA NO TESTE — NÃO EXECUTADA]" : ""}${action.reason ? " (" + action.reason + ")" : ""}`).join(" | ");
-    return `- ${item.url || "URL não informada"} | ${item.status || "sem status"} | ${actions || "planejamento indisponível"}`;
+  const planLines = (report.publications || []).map((item,index) => {
+    const actions = (item.plan || []).map(action =>
+      `  ${action.sequence || "?"}. ${action.label || action.action}: ${action.status}${action.testMode?.label ? " — " + action.testMode.label : ""}${action.reason ? " | Motivo: " + action.reason : ""}`
+    );
+    return [
+      `ITEM ${index+1} | ${item.contentType || "publicação"} | ${item.url || "URL não informada"}`,
+      `Status: ${item.status || "sem status"} | Identidade da mensagem: ${item.identityVerified ? "confirmada" : "não confirmada"}`,
+      `Regra: comentário ${item.instructionSummary?.comment === "forbidden" ? "proibido" : "obrigatório"}; envio ao grupo coletivo obrigatório`,
+      `Legenda/conteúdo: ${item.caption?.trim() || "não disponível"}`,
+      `Comentário preparado: ${item.comment || "não preparado"} | Origem: ${item.commentSource || "não informada"}`,
+      `Estado verificado: curtida=${item.stateVerification?.liked ?? "?"}; coleção=${item.stateVerification?.saveToCollection ?? "?"}; comentário=${item.stateVerification?.commented ?? "?"}`,
+      ...actions
+    ].join("\\n");
   });
   const page = report.pageDiagnostics || {};
   const scroll = report.scrollDiagnostics || {};
@@ -111,7 +127,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     ...(page.instagramLinks !== undefined ? ["", `PÁGINA: ${page.instagramLinks} links Instagram / ${page.anchors ?? "?"} links totais / ${page.messageNodes ?? "?"} nós de mensagem`] : []),
     ...scrollLines,
     ...(inspectionLines.length ? ["", "INSPEÇÃO DAS PUBLICAÇÕES:", ...inspectionLines] : []),
-    ...(planLines.length ? ["", "PLANO INDIVIDUAL POR PUBLICAÇÃO:", ...planLines] : []),
+    ...(planLines.length ? ["", "RELATÓRIO DETALHADO — CADA PUBLICAÇÃO E CADA ETAPA:", ...planLines] : []),
     ...(errorLines.length ? ["", "ERROS/AVISOS:", ...errorLines] : []),
     "",
     `Gerado: ${report.generatedAt || new Date().toISOString()}`,
@@ -362,7 +378,7 @@ app.post("/api/start", async (req, res) => {
             } else if(mode==="automatic" && !previousState.commented) {
               actionLog.push({action:"commentStory",status:"bloqueada",reason:!story.publicCommentAvailable ? "Comentários públicos indisponíveis; nenhuma DM será enviada." : "Não foi possível verificar com segurança se já existe comentário do perfil."});
             }
-            const result={...item,taskState,caption:story.bodyText||"",comment,commentSource:"fallback ou legenda do Story",storyInspection:story,plan:storyPlan,actionLog,status:taskState.commented ? "Story comentado publicamente ou já concluído" : "Story analisado — comentário público pendente ou indisponível"};
+            const result={...item,taskState,caption:story.bodyText||"",comment,commentSource:story.bodyText?.trim()?"texto do Story":"fallback sem texto legível",instructionSummary:{comment:"required",shareToGroup:"required"},storyInspection:story,plan:storyPlan,actionLog,status:taskState.commented ? "Story comentado publicamente ou já concluído" : "Story analisado — comentário público pendente ou indisponível"};
             results.push(result);
             appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,comment,groupName,collectionName,sharedAt:item.sharedAt,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,completionEmoji,status:result.status,detail:"Inspeção e regra de comentário público em Story"});
           } catch(error) {
@@ -440,7 +456,7 @@ app.post("/api/start", async (req, res) => {
               return entry;
             });
           }
-          const result = { ...item, caption:inspection.caption, comment, taskState, comment, commentSource, stateVerification:{ ...stateKnown, controlCount:inspection.observedState.controlCount || 0, controlLabels:inspection.observedState.controlLabels || "" }, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
+          const result = { ...item, caption:inspection.caption, comment, taskState, commentSource, instructionSummary:{comment:instructions.comment,shareToGroup:instructions.shareToGroup}, stateVerification:{ ...stateKnown, controlCount:inspection.observedState.controlCount || 0, controlLabels:inspection.observedState.controlLabels || "" }, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
           results.push(result);
           appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,completionEmoji,commentForbidden:instructions.comment==="forbidden",complete:taskState.complete,milestone:item.administrativeMilestones,detail:mode==="test"?"Simulação sem ações":"Planejamento e execução da publicação"});
         } catch (error) {
