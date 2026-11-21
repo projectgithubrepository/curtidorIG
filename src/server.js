@@ -76,7 +76,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
       return `- ${item.url || "URL não informada"} | legenda: ${detail.captionAvailable === false ? "não legível" : "disponível"} | motivo: ${detail.reason || "ok"} | HTTP: ${detail.httpStatus ?? "?"} | artigo: ${selectors.article ? "sim" : "não"} | main: ${selectors.main ? "sim" : "não"} | diálogo: ${selectors.dialog ? "sim" : "não"} | mídia: ${detail.detectedMedia ? "sim" : "não"} | URL final: ${detail.finalUrl || "?"}`;
     });
   const planLines = (report.publications || []).slice(0, 40).map(item => {
-    const actions = (item.plan || []).map(action => `${action.label}: ${action.status}${action.reason ? " (" + action.reason + ")" : ""}`).join(" | ");
+    const actions = (item.plan || []).map(action => `${action.label}: ${action.status}${action.testMode?.mapped ? " [MAPEADA NO TESTE — NÃO EXECUTADA]" : ""}${action.reason ? " (" + action.reason + ")" : ""}`).join(" | ");
     return `- ${item.url || "URL não informada"} | ${item.status || "sem status"} | ${actions || "planejamento indisponível"}`;
   });
   const page = report.pageDiagnostics || {};
@@ -97,7 +97,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     `Grupo: ${report.request?.groupName || "não informado"} | Período: ${report.request?.startDate || "?"} a ${report.request?.endDate || "?"}`,
     `Coleção de destino: ${report.request?.collectionName || "não informada"}`,
     `Publicações: ${summary.publicationsFound ?? report.publications?.length ?? 0} | Feed/Reels: ${summary.feedsAndReels ?? "?"} | Stories: ${summary.stories ?? "?"} | Marcos administrativos: ${summary.administrativeMilestones ?? "?"} | Sem data: ${summary.itemsWithoutDate ?? "?"}`,
-    ...(report.request?.mode === "test" ? [`PLANO DE TESTE: ${summary.publicationsInspected ?? 0} itens processados | ${summary.inspectionFailures ?? 0} inspeções interrompidas | ${summary.captionUnavailable ?? 0} sem legenda legível | ${summary.storiesBlocked ?? 0} Stories bloqueadas | ${summary.plannedActions ?? 0} etapas planejadas | ${summary.unverifiedActions ?? 0} ações não verificadas | Inventário da coleção: ${summary.savedCollectionInventoryAvailable ? "confirmado" : "indisponível"}`] : []),
+    ...(report.request?.mode === "test" ? [`PLANO DE TESTE: ${summary.publicationsInspected ?? 0} itens processados | ${summary.inspectionFailures ?? 0} inspeções interrompidas | ${summary.captionUnavailable ?? 0} sem legenda legível | ${summary.storiesBlocked ?? 0} Stories bloqueadas | ${summary.plannedActions ?? 0} etapas planejadas | ${summary.mappedActions ?? 0} ações mapeadas para execução, mas NÃO EXECUTADAS | ${summary.unverifiedActions ?? 0} estados não verificados | Inventário da coleção: ${summary.savedCollectionInventoryAvailable ? "confirmado" : "indisponível"}`] : []),
     "",
     "CAPTURA DE REDE",
     `Respostas: ${network.capturedResponses ?? 0} | Lidas: ${network.parsedResponses ?? 0} | Não interpretadas: ${network.unparsedResponses ?? 0}`,
@@ -341,15 +341,17 @@ app.post("/api/start", async (req, res) => {
             const story = await inspectStory(page, item.url);
             const comment = previousState.commented ? "" : createComment("", [...previous, ...results.map(r => r.comment).filter(Boolean)]);
             const storyPlan = [
-              { action:"commentStory", label:"Comentar publicamente no próprio Story", required:true, alreadyDone:Boolean(previousState.commented || story.alreadyCommented), eligible:story.publicCommentAvailable }
+              { action:"commentStory", label:"Comentar publicamente no próprio Story", required:true, alreadyDone:Boolean(previousState.commented || story.alreadyCommented), eligible:story.publicCommentAvailable },
+              { action:"shareStoryToGroup", label:`Enviar o Story ao grupo coletivo “${destinationGroupName || "grupo de envios"}”`, required:true, alreadyDone:Boolean(previousState.sharedToGroup), eligible:true }
             ].map((entry,index) => {
               let status = entry.alreadyDone ? "já concluída — não repetir" :
                 entry.action==="commentStory" && !entry.eligible ? "bloqueada — comentários públicos indisponíveis neste Story" :
                 entry.action==="commentStory" && !story.stateKnown.alreadyCommented ? "não verificada — não foi possível confirmar comentários anteriores" :
                 mode==="test" ? "simulada — nenhuma ação executada" :
-                entry.action==="shareToGroup" ? "bloqueada — fluxo específico de compartilhamento de Stories ainda não validado" :
+                entry.action==="shareStoryToGroup" ? "bloqueada — fluxo específico de compartilhamento de Stories ainda não validado" :
                 "pronta para execução";
-              return {...entry,status,sequence:index+1,reason:entry.action==="commentStory" && !entry.eligible ? "O recurso de comentário público não está disponível neste Story; não enviar resposta privada." : ""};
+              const mapped = mode==="test" && !entry.alreadyDone && entry.eligible && !(entry.action==="commentStory" && !entry.eligible);
+              return {...entry,status,sequence:index+1,...(mode==="test"?{testMode:{mapped,executed:false,label:mapped?"MAPEADA — seria considerada na execução automática; NÃO EXECUTADA no modo TESTE":"não mapeada"}}:{}),reason:entry.action==="commentStory" && !entry.eligible ? "O recurso de comentário público não está disponível neste Story; não enviar resposta privada." : ""};
             });
             const actionLog=[];
             let taskState=previousState;
@@ -459,6 +461,7 @@ app.post("/api/start", async (req, res) => {
       const captionUnavailable = results.filter(item => item.inspectionDiagnostics?.captionAvailable === false).length;
       const storiesBlocked = results.filter(item => item.contentType === "story" && (item.plan || []).some(action => /^(bloqueada|não verificada)/.test(action.status))).length;
       const plannedActions = results.reduce((sum,item) => sum + (item.plan?.length || 0), 0);
+      const mappedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => action.testMode?.mapped).length, 0);
       const inspectedFeedReels = results.filter(item => item.contentType !== "story" ? Boolean(item.stateVerification) : Boolean(item.storyInspection)).length;
       const unverifiedActions = results.filter(item => item.contentType !== "story").reduce((sum,item) =>
         sum + (item.plan || []).filter(action => /^(não verificada|bloqueada)/.test(action.status)).length, 0);
@@ -487,6 +490,7 @@ app.post("/api/start", async (req, res) => {
           captionUnavailable,
           storiesBlocked,
           plannedActions,
+          mappedActions,
           unverifiedActions,
           savedCollectionInventoryAvailable
         },
