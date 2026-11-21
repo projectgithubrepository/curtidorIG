@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { olderScrollPosition, didScrollTowardOlderMessages } from "../src/instagram.js";
+import { olderScrollPosition, didScrollTowardOlderMessages, didReachHistoryStart } from "../src/instagram.js";
 
 test("moves toward older messages in a normal scroll container without going below zero", () => {
   assert.equal(olderScrollPosition(1200, 500, "column"), 700);
@@ -26,4 +26,11 @@ test("counts only movement toward older messages as progress", () => {
   assert.equal(didScrollTowardOlderMessages({ found: true, scrollTop: 500 }, { found: true, scrollTop: 300 }), true);
   assert.equal(didScrollTowardOlderMessages({ found: true, scrollTop: 300 }, { found: true, scrollTop: 500 }), false);
   assert.equal(didScrollTowardOlderMessages({ found: false, scrollTop: 500 }, { found: true, scrollTop: 300 }), false);
+});
+
+
+test("does not declare history complete when the selected container starts at the top without moving", () => {
+  const top = { found: true, scrollTop: 0, scrollHeight: 2400, clientHeight: 800, flexDirection: "column" };
+  assert.equal(didReachHistoryStart(top, false), false);
+  assert.equal(didReachHistoryStart(top, true), true);
 });
