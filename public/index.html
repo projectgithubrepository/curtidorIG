@@ -12,6 +12,13 @@
 </section>
 <section class="panel"><div class="section-head"><h2>Andamento</h2><span id="state">Pronto</span></div><div class="track"><div id="bar"></div></div><p id="message">Informe o grupo e o período.</p><p id="counter">0 publicações processadas</p><p id="current" class="current"></p></section>
 <section class="panel"><div class="section-head"><h2>Publicações encontradas</h2><a href="/api/history" download="historico.csv">Baixar histórico CSV</a></div><p class="hint">Abra cada publicação, confira e execute as ações diretamente no Instagram. Depois, use os botões de confirmação do item para atualizar o checklist e o histórico. A aplicação não marca uma ação como concluída sem sua confirmação.</p><div id="results" class="results"><p class="muted">Os resultados aparecerão aqui após a coleta.</p></div></section>
+<section class="panel">
+<div class="section-head"><h2>Dessalvar publicações em lote</h2><span>Processamento individual</span></div>
+<label for="cleanupCollection">Coleção de origem nos Salvos</label><input id="cleanupCollection" value="laranja antigos" placeholder="Ex.: laranja antigos">
+<p class="hint">Remove o estado de salvo de cada publicação (Feed, Reel ou carrossel), sem apagar a publicação nem a coleção. O modo TESTE apenas lista os itens. Use primeiro uma coleção pequena para validar a interface.</p>
+<div class="actions"><button id="cleanupTest" class="secondary">TESTE — apenas listar</button><button id="cleanupAutomatic">AUTOMÁTICO — dessalvar</button><button id="cleanupStop" class="secondary" disabled>Parar</button></div>
+<p id="cleanupMessage" class="hint">Nenhuma limpeza iniciada.</p><p id="cleanupCounter" class="hint"></p><div id="cleanupResults" class="results"><p class="muted">Os itens da coleção aparecerão aqui.</p></div>
+</section>
 <section class="panel"><div class="section-head"><h2>Diagnóstico da coleta</h2><a id="downloadDiagnostic" href="/api/diagnostic-log" download="curtidorig-diagnostico.txt">Baixar resumo .txt</a></div><p class="hint">Relatório curto com o que foi encontrado, operações capturadas e eventuais erros.</p><button id="copyDiagnostic" class="secondary" disabled>Copiar diagnóstico para enviar</button><span id="diagnosticCopyStatus" class="hint"></span></section>
 <footer>Execução local no computador · Login manual · Nenhuma curtida ou comentário é publicado automaticamente.</footer>
 </main><script src="/app.js"></script></body></html>
