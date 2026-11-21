@@ -27,6 +27,8 @@ Não haverá campo para colar links manualmente como fluxo principal.
 7. Vincular cada publicação ao ID exato da mensagem de origem; a mesma URL em mensagens distintas continua tendo identidades distintas.
 8. Consultar o histórico local para evitar repetir ações já confirmadas.
 9. Apresentar a quantidade encontrada e o plano por publicação. No modo TESTE, nenhuma interação é executada.
+10. Ao concluir o TESTE, exibir na própria interface um relatório preliminar com totais separados por tipo de ação: curtidas, salvamentos, comentários, envios ao grupo coletivo, reações na mensagem original, comentários públicos em Stories e envios de Stories. Para cada tipo, discriminar ocorrências analisadas, aptas no plano, aguardando pré-requisitos, já concluídas, bloqueadas e não verificadas; nunca chamar ações simuladas de executadas.
+11. No detalhamento individual, exibir o texto original do pedido do grupo e relacioná-lo à publicação correspondente, além da decisão e justificativa de cada ação.
 
 **Definição do período:** o filtro considera a data em que a publicação foi compartilhada na conversa, não a data original em que o autor publicou o conteúdo no Instagram.
 
