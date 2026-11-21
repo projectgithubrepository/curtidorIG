@@ -41,7 +41,7 @@ Não haverá campo para colar links manualmente como fluxo principal.
 - A captura de rede deve continuar processando respostas além de 500; o relatório pode limitar apenas a quantidade de detalhes individuais exibidos, sem descartar mensagens capturadas.
 
 
-## Referência administrativa posterior ao fechamento
+### Identificação e conferência de Stories\n\n- Extrair Stories tanto de URLs/permalinks quanto de estruturas de compartilhamento recebidas pela rede do Direct, incluindo variantes aninhadas de `story_share`, `shared_story`, `story_media`, `story_item`, `story_items` e XMA quando houver identidade de Story verificável.\n- O ID numérico do Story e o nome de usuário do autor devem pertencer ao mesmo objeto/estrutura de mídia; não fabricar links a partir de IDs sem autor identificável.\n- Não limitar artificialmente a quantidade de URLs por mensagem. Deduplicar por ID de mensagem + URL, preservando Stories distintos do mesmo perfil e compartilhamentos repetidos em mensagens diferentes.\n- Comparar a quantidade extraída com a referência administrativa da data. Divergência deve manter a coleta como parcial e registrar contagens por fonte/operação, sem completar a meta com números artificiais.\n\n## Referência administrativa posterior ao fechamento
 
 A mensagem administrativa com os totais de Feed/Reels e Stories é publicada depois do fechamento do período. Portanto, ela é um gabarito de conferência, não uma fonte necessária para executar a coleta.
 
