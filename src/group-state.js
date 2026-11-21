@@ -65,8 +65,8 @@ export function taskStateLabel(state = {}) {
 // Localiza a meta publicada pela administração para a janela coletada.
 // Datas sem ano (ex.: 18/11) são associadas ao ano do período solicitado.
 export function administrativeTargetsForRange(markers = [], startDate = "", endDate = "") {
-  const validRange = /^\\d{4}-\\d{2}-\\d{2}$/.test(startDate) &&
-    /^\\d{4}-\\d{2}-\\d{2}$/.test(endDate) && startDate <= endDate;
+  const validRange = /^\d{4}-\d{2}-\d{2}$/.test(startDate) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(endDate) && startDate <= endDate;
   if (!validRange) return null;
   const days = new Set();
   const cursor = new Date(startDate + "T12:00:00Z");
@@ -78,9 +78,9 @@ export function administrativeTargetsForRange(markers = [], startDate = "", endD
   const marker = markers.find(item => {
     if (item.feedCount == null && item.storiesCount == null) return false;
     const date = String(item.date || "");
-    const matches = /^\\d{4}-\\d{2}-\\d{2}$/.test(date)
+    const matches = /^\d{4}-\d{2}-\d{2}$/.test(date)
       ? date >= startDate && date <= endDate
-      : /^\\d{2}-\\d{2}$/.test(date) && days.has(date);
+      : /^\d{2}-\d{2}$/.test(date) && days.has(date);
     return matches;
   });
   if (!marker) return null;
