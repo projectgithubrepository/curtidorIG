@@ -636,7 +636,7 @@ app.post("/api/start", async (req, res) => {
       const testIncomplete = mode === "test" && (inspectionFailures > 0 || captionUnavailable > 0 || unverifiedActions > 0 || blockedActions > 0 || storiesBlocked > 0 || !savedCollectionInventoryAvailable || collectionIncomplete);
       progress.message = mode === "test"
         ? `TESTE ${testIncomplete ? "PARCIAL" : "CONCLUÍDO"}: ${inspectedFeedReels}/${collected.length} itens analisados; ${collectionCoverage.available ? `cobertura da administração: Feed ${actualFeedForDate}/${collectionCoverage.expectedFeed}, Stories ${actualStoriesForDate}/${collectionCoverage.expectedStories}; ` : ""}${withoutDate} candidatos sem data incluídos; ${withoutIdentity} sem identidade;  ${mappedActions} ações simuladas e aptas à execução automática, mas NÃO EXECUTADAS; ${candidateActions} candidatas aguardando verificação/pré-requisitos; ${alreadyDoneActions} já concluídas; ${blockedActions} bloqueadas; ${unverifiedActions} estados não verificados; ${storiesBlocked} Stories com etapas bloqueadas ou não verificadas; ${inspectionFailures} inspeções interrompidas; ${captionUnavailable} sem legenda legível; ${plannedActions} etapas no plano. Nenhuma ação foi executada.`
-        : mode === "manual" ? `Coleta concluída: ${results.length} itens preparados para execução manual.`
+        : mode === "manual" ? `Coleta ${collectionIncomplete ? "PARCIAL" : "concluída"}: ${results.length} itens preparados para execução manual; ${withoutDate} sem data e ${withoutIdentity} sem identidade.`
         : `Execução automática finalizada: ${results.length} itens analisados. Consulte o resultado de cada ação.`;
       logDiagnostic("INFO", "Coleta concluída", { listed: results.length, inspectionFailures, captionUnavailable, unverifiedActions, savedCollectionInventoryAvailable, networkResponses: network?.capturedResponses ?? 0 });
       diagnosticReport = {
@@ -645,7 +645,7 @@ app.post("/api/start", async (req, res) => {
         generatedAt: new Date().toISOString(),
         startedAt,
         finishedAt: new Date().toISOString(),
-        outcome: stopRequested ? "interrompida" : testIncomplete ? "parcial" : "concluída",
+        outcome: stopRequested ? "interrompida" : (testIncomplete || collectionIncomplete) ? "parcial" : "concluída",
         request: { groupName, collectionName, destinationGroupName, mode, completionEmoji, startDate, endDate },
         summary: {
           publicationsFound: collected.length,
