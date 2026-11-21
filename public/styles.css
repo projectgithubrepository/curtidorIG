@@ -2,3 +2,12 @@
 .result-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px}.small-action{font-size:12px;padding:8px 10px}.result-actions small{align-self:center;color:#9a4b28;font-size:12px}
 
 select{width:100%;border:1px solid #d8dbe1;border-radius:9px;padding:12px;font:inherit;background:white}.action-details{display:grid;gap:4px;margin:5px 0}.action-details small{color:#555;font-size:12px;line-height:1.4}
+
+
+/* Relatório TESTE: leitura por publicação e por etapa */
+.publication-details { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border, #ddd); }
+.publication-details summary { cursor: pointer; font-weight: 600; margin-bottom: 10px; }
+.publication-details > strong { display: block; margin-top: 12px; }
+.publication-details ul, .publication-details ol { padding-left: 22px; }
+.planned-action { margin: 10px 0; padding: 9px; border-left: 3px solid var(--border, #999); }
+.planned-action small, .planned-action p { display: block; margin: 5px 0 0; }
