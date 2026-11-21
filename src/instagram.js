@@ -339,11 +339,27 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   }
 
   const milestoneList = [...milestones.values()];
-  return [...found.values()].map(item => ({
+  const collectionDiagnostics = {
+    historyRounds,
+    scrollProgressRounds,
+    stalledRounds: noScrollProgressRounds,
+    wheelFallbackRounds,
+    scrollTargetFound,
+    stableBoundaryReached: noScrollProgressRounds >= 6,
+    scanLimitReached: historyRounds >= 70 && !shouldStop(),
+    stoppedByUser: Boolean(shouldStop()),
+    visibleItems: found.size,
+    unknownDateCandidates: fallback.size
+  };
+  // Não descartar silenciosamente mensagens com link e identidade, mas sem timestamp.
+  // Elas seguem para inspeção como candidatas com data desconhecida e não entram na contagem
+  // de cobertura da data até que a data seja confirmada.
+  return [...found.values(), ...fallback.values()].map(item => ({
     ...item,
     threadId: String(item.threadId || activeThreadId),
     identityVerified: Boolean(item.messageId && (item.threadId || activeThreadId)),
     administrativeMilestones: milestoneList,
+    collectionDiagnostics,
     networkDiagnostics: {
       ...networkDiagnostics,
       normalizedNetworkMessages: networkRecords.length,
