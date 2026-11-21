@@ -18,9 +18,9 @@ function sameInstagramContentUrl(actualValue, requestedValue) {
   try {
     const actual=new URL(actualValue);
     const requested=new URL(requestedValue);
-    return /(^|\\.)instagram\\.com$/i.test(actual.hostname) &&
-      /(^|\\.)instagram\\.com$/i.test(requested.hostname) &&
-      actual.pathname.replace(/\\/$/,"")===requested.pathname.replace(/\\/$/,"");
+    return /(^|\.)instagram\.com$/i.test(actual.hostname) &&
+      /(^|\.)instagram\.com$/i.test(requested.hostname) &&
+      actual.pathname.replace(/\/$/,"")===requested.pathname.replace(/\/$/,"");
   } catch { return false; }
 }
 
