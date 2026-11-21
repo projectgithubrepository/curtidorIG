@@ -1,4 +1,4 @@
-const MAX_RESPONSES = 160;
+const MAX_RESPONSES = 500;
 const MAX_DEPTH = 20;
 const MAX_URLS_PER_MESSAGE = 12;
 const URL_PATTERN = /(?:https?:\/\/(?:www\.)?instagram\.com)?\/(?:p|reel|tv|stories)\/[A-Za-z0-9._-]+(?:\/[^\s"'<>]*)?/gi;
@@ -92,7 +92,16 @@ function collectUrls(value, output, seen = new WeakSet(), depth = 0) {
         if (!/^(?:www\.)?instagram\.com$/i.test(parsed.hostname)) continue;
         const match = parsed.pathname.match(/^\/(p|reel|tv|stories)\/([A-Za-z0-9._-]+)/i);
         if (!match) continue;
-        const url = "https://www.instagram.com/" + match[1].toLowerCase() + "/" + match[2];
+        // URLs de Stories têm três segmentos: /stories/username/story_id.
+        // Preservar o ID evita colapsar todos os Stories do mesmo perfil em um único item.
+        let url;
+        if (match[1].toLowerCase() === "stories") {
+          const segments = parsed.pathname.split("/").filter(Boolean);
+          if (segments.length < 3 || !/^\d+$/.test(segments[2])) continue;
+          url = "https://www.instagram.com/stories/" + segments[1] + "/" + segments[2];
+        } else {
+          url = "https://www.instagram.com/" + match[1].toLowerCase() + "/" + match[2];
+        }
         if (!output.includes(url) && output.length < MAX_URLS_PER_MESSAGE) output.push(url);
       } catch {}
     }
