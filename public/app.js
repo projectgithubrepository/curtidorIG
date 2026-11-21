@@ -1,6 +1,7 @@
 const groupName = document.querySelector("#groupName");
 const collectionName = document.querySelector("#collectionName");
 const destinationGroupName = document.querySelector("#destinationGroupName");
+const destinationGroupUrl = document.querySelector("#destinationGroupUrl");
 const mode = document.querySelector("#mode");
 const completionEmoji = document.querySelector("#completionEmoji");
 const startDate = document.querySelector("#startDate");
@@ -70,7 +71,7 @@ start.addEventListener("click", async () => {
   try {
     const confirmed = mode.value === "automatic" ? window.confirm("AUTOMÁTICO: o app poderá curtir, salvar, comentar e compartilhar publicações, além de reagir às mensagens originais. Confirme que o grupo coletivo e a coleção estão corretos. Continuar?") : false;
   if (mode.value === "automatic" && !confirmed) { start.disabled = false; return; }
-  const response = await fetch("/api/start", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ groupName:groupName.value, collectionName:collectionName.value, destinationGroupName:destinationGroupName.value, mode:mode.value, completionEmoji:completionEmoji.value, confirm:confirmed, startDate:startDate.value, endDate:endDate.value }) });
+  const response = await fetch("/api/start", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ groupName:groupName.value, collectionName:collectionName.value, destinationGroupName:destinationGroupName.value, destinationGroupUrl:destinationGroupUrl.value, mode:mode.value, completionEmoji:completionEmoji.value, confirm:confirmed, startDate:startDate.value, endDate:endDate.value }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Não foi possível iniciar.");
     message.textContent = data.message;
