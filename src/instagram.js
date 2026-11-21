@@ -227,7 +227,7 @@ export function addNetworkMessages(records, { groupThreadId, startDate, endDate,
   const storyUrlsRejectedAdministrative = new Set();
   const storyUrlsRejectedOutsideDate = new Set();
   for (const record of records) {
-    const recordStories = (record.urls || []).filter(url => /\\/stories\\//i.test(url));
+    const recordStories = (record.urls || []).filter(url => /\/stories\//i.test(url));
     for (const url of recordStories) storyUrlsObserved.add(url);
     if (!groupThreadId || !record.threadId) {
       for (const url of recordStories) storyUrlsRejectedUnscoped.add(url);
@@ -249,7 +249,7 @@ export function addNetworkMessages(records, { groupThreadId, startDate, endDate,
     }
     for (const url of record.urls || []) {
       const date = dateInRange(record.timestamp, startDate, endDate);
-      if (date.known && !date.inRange) { if (/\\/stories\\//i.test(url)) storyUrlsRejectedOutsideDate.add(url); continue; }
+      if (date.known && !date.inRange) { if (/\/stories\//i.test(url)) storyUrlsRejectedOutsideDate.add(url); continue; }
       const item = {
         url,
         messageId: String(record.messageId),
@@ -273,7 +273,7 @@ export function addNetworkMessages(records, { groupThreadId, startDate, endDate,
         found.delete(url);
         found.set(identityKey, { ...previous, ...item, sharedAt: date.iso, dateUnknown: false, collectionMode: "network-date" });
         accepted++;
-        if (/\\/stories\\//i.test(url)) storyUrlsAccepted.add(url);
+        if (/\/stories\//i.test(url)) storyUrlsAccepted.add(url);
       } else {
         const previous = fallback.get(identityKey) || found.get(identityKey) || found.get(url) || {};
         const merged = { ...previous, ...item, dateUnknown: true, collectionMode: "network-date-unknown" };
@@ -287,7 +287,7 @@ export function addNetworkMessages(records, { groupThreadId, startDate, endDate,
         else if (found.has(identityKey)) found.set(identityKey, merged);
         else fallback.set(identityKey, merged);
         unknownDateCandidates++;
-        if (/\\/stories\\//i.test(url)) storyUrlsUnknownDate.add(url);
+        if (/\/stories\//i.test(url)) storyUrlsUnknownDate.add(url);
       }
     }
   }
