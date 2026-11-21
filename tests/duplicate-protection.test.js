@@ -31,3 +31,8 @@ test("absence from an incomplete destination history remains unknown and blocks 
   assert.equal(getGroupShareState("https://www.instagram.com/p/ABC123",{inventoryComplete:false,sharedUrls:["https://www.instagram.com/p/ABC123/"]}),"already-shared");
   assert.equal(getGroupShareState("https://www.instagram.com/p/ABC123",{inventoryComplete:true,sharedUrls:[]}),"not-shared");
 });
+
+test("recognizes the verified destination inventory shape returned by inspectDestinationGroup", () => {
+  const inventory={verified:true,threadId:"1783131735658148",sharedInventoryComplete:true,sharedUrls:[]};
+  assert.equal(getGroupShareState("https://www.instagram.com/p/ABC123",inventory),"not-shared");
+});
