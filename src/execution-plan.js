@@ -29,6 +29,7 @@ export function buildExecutionPlan({
     liked: Boolean(taskState.liked),
     commented: Boolean(taskState.commented),
     sharedToGroup: Boolean(taskState.sharedToGroup),
+    shareAttempted: Boolean(taskState.shareAttempted),
     saved: Boolean(taskState.saved),
     savedFolderVerified: Boolean(taskState.savedFolderVerified),
     groupCheck: Boolean(taskState.groupCheck)
@@ -41,7 +42,7 @@ export function buildExecutionPlan({
     { action: "like", label: "Curtir", alreadyDone: state.liked, eligible: true, required: true },
     { action: "saveToCollection", label: `Salvar na coleção “${collectionName || "Curtido"}”`, alreadyDone: state.saved && state.savedFolderVerified, eligible: Boolean(collectionName), required: true },
     { action: "comment", label: "Comentar", alreadyDone: state.commented, eligible: policy.comment !== "forbidden" && isValidComment(comment), required: policy.comment !== "forbidden", policy: policy.comment },
-    { action: "shareToGroup", label: "Enviar para o grupo de destino", alreadyDone: state.sharedToGroup, eligible: true, required: true, policy: "required" },
+    { action: "shareToGroup", label: "Enviar para o grupo de destino", alreadyDone: state.sharedToGroup, eligible: !state.shareAttempted || state.sharedToGroup, required: true, policy: "required" },
     { action: "completionReaction", label: `Reagir à mensagem original com ${completionEmoji}`, alreadyDone: state.groupCheck, eligible: true, required: true, requiresAllPrevious: true }
   ];
   const requiredStepsDone = plan.slice(0, 4).every(item => !item.required || item.alreadyDone);
@@ -50,6 +51,7 @@ export function buildExecutionPlan({
     let reason = "";
     if (item.alreadyDone) status = "já concluída — não repetir";
     else if (item.action === "comment" && item.policy === "forbidden") status = "dispensada — pedido explícito para não comentar";
+    else if (item.action === "shareToGroup" && state.shareAttempted && !state.sharedToGroup) { status = "bloqueada"; reason = "Tentativa anterior sem confirmação; verifique o grupo para evitar envio duplicado."; }
     else if (!item.eligible) {
       status = "bloqueada";
       reason = item.action === "saveToCollection" ? "Informe a coleção obrigatória de destino." : "O comentário precisa ter pelo menos duas palavras e um emoji.";
