@@ -92,7 +92,7 @@ O histórico continua local, sem banco de dados ou envio a serviços externos.
 
 ## Estado e limites da implementação
 
-A interface possui os modos TESTE, AUTOMÁTICO e MANUAL. A execução automática de Feed/Reels usa a interface visível do Instagram e interrompe a etapa quando não consegue identificar ou verificar o controle correto. A seleção da coleção depende de o Instagram exibir o seletor de coleções; se a publicação já estiver salva sem confirmação da pasta, a aplicação não alterna o estado para evitar dessalvar por engano. Stories ainda são identificados, mas permanecem bloqueados para execução porque exigem fluxo específico. O comportamento real dos seletores deve ser validado com a conta autenticada e uma publicação de teste antes de usar em lote.
+A interface possui os modos TESTE, AUTOMÁTICO e MANUAL. A execução automática de Feed/Reels usa a interface visível do Instagram e interrompe a etapa quando não consegue identificar ou verificar o controle correto. A seleção da coleção depende do inventário da pasta e do seletor de coleções; se a publicação já estiver salva sem confirmação da pasta, a aplicação não alterna o estado para evitar dessalvar por engano. Stories possuem inspeção, comentário público (quando disponível), compartilhamento para o grupo coletivo e reação à mensagem original. O envio de Story só é registrado como concluído depois que o link aparece nas mensagens recentes do destino; se essa confirmação falhar, a tentativa fica registrada e não é repetida automaticamente. Todos esses seletores e fluxos ainda precisam ser validados com a conta autenticada antes do uso em lote.
 
 
 ## Limpeza posterior dos Salvos
