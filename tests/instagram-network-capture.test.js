@@ -315,7 +315,7 @@ test("does not truncate more than twelve Story links in a single message", async
   const page = new EventEmitter();
   const capture = createInstagramNetworkCapture(page);
   const stories = Array.from({ length: 20 }, (_, index) => ({
-    story_id: String(390000000000000100 + index),
+    story_id: String(390000000000000100n + BigInt(index)),
     user: { username: "story.creator" },
     product_type: "story"
   }));
@@ -459,4 +459,27 @@ test("extracts deeply nested Story media using additional Instagram media type m
   });
   await capture.stop();
   assert.deepEqual(capture.records()[0].urls, ["https://www.instagram.com/stories/story.deep/390000000000000044"]);
+});
+
+test("preserves distinct 64-bit numeric Story IDs from raw GraphQL JSON", async () => {
+  const page = new EventEmitter();
+  const capture = createInstagramNetworkCapture(page);
+  const ids = Array.from({ length: 20 }, (_, index) => (390000000000000100n + BigInt(index)).toString());
+  const items = ids.map(id => '{"story_id":' + id + ',"user":{"username":"story.numeric"},"product_type":"story"}').join(",");
+  const raw = '{"data":{"thread":{"items":[{"message_id":"numeric-story-batch","timestamp_ms":1795021200000,"sender":{"username":"member"},"content":{"story_items":[' + items + ']}}]}}}';
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql",
+    status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({
+      postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: { thread_id: "1783131735658148" } }),
+      url: () => "https://www.instagram.com/api/graphql"
+    }),
+    text: async () => raw
+  });
+  await capture.stop();
+  const urls = capture.records()[0].urls;
+  assert.equal(urls.length, 20);
+  assert.equal(new Set(urls).size, 20);
+  assert.equal(capture.summary().uniqueStoryUrls, 20);
 });
