@@ -138,11 +138,13 @@ app.get("/api/history", (_req, res) => res.type("text/csv; charset=utf-8").send(
 
 app.post("/api/confirm-action", (req, res) => {
   const url = String(req.body.url ?? "");
+  const messageId = String(req.body.messageId ?? "");
+  const threadId = String(req.body.threadId ?? "");
   const action = String(req.body.action ?? "");
   const allowed = new Set(["saved", "savedFolderVerified", "liked", "commented", "sharedToGroup", "groupCheck"]);
   if (!url || !allowed.has(action)) return res.status(400).json({ error: "Publicação ou ação inválida." });
 
-  const item = results.find(entry => entry.url === url);
+  const item = results.find(entry => entry.url === url && entry.messageId === messageId && entry.threadId === threadId);
   if (!item) return res.status(404).json({ error: "Publicação não encontrada nesta execução. Faça uma nova coleta." });
   if (!item.identityVerified || !item.threadId || !item.messageId) {
     return res.status(409).json({ error: "Não há vínculo comprovado com a mensagem original. A confirmação foi bloqueada." });
@@ -154,6 +156,7 @@ app.post("/api/confirm-action", (req, res) => {
   if (action === "savedFolderVerified" && !current.saved) {
     return res.status(409).json({ error: "Confirme primeiro que a publicação foi salva." });
   }
+  if (action === "groupCheck" && !(current.liked && current.saved && current.savedFolderVerified && (current.commented || current.commentForbidden) && current.sharedToGroup)) return res.status(409).json({ error: "A reação de conclusão só pode ser registrada depois de curtir, salvar na coleção e enviar ao grupo coletivo; o comentário também precisa estar concluído, salvo proibição explícita." });
   if (current[action]) return res.json({ ok: true, taskState: current, status: item.status, unchanged: true });
 
   const taskState = mergeTaskState(current, { [action]: true });
