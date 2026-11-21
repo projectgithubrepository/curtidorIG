@@ -75,7 +75,7 @@ app.get("/api/diagnostic-summary", (_req, res) => {
   const coverage = summary.collectionCoverage || {};
   const scan = report.collectionDiagnostics || {};
   const operations = (network.operationDetails || []).slice(0, 5).map(item =>
-    `- ${item.operation}: ${item.responses || 0} respostas / ${item.messageLikeObjects || 0} mensagens / ${item.sharedMediaObjects || 0} compartilhamentos`
+    `- ${item.operation}: ${item.responses || 0} respostas / ${item.messageLikeObjects || 0} mensagens / ${item.sharedMediaObjects || 0} compartilhamentos / ${item.storyUrls || 0} URLs de Stories`
   );
   const warnings = (report.log || []).filter(item => item.level === "ERROR" || item.level === "WARN").slice(-4)
     .map(item => `- ${item.level}: ${item.message}`);
@@ -88,7 +88,7 @@ app.get("/api/diagnostic-summary", (_req, res) => {
     `Varredura: ${scan.historyRounds ?? "?"} rodadas | avanço: ${scan.scrollProgressRounds ?? "?"} | topo: ${scan.stableBoundaryReached ? "sim" : "não"} | marco temporal: ${scan.dateBoundaryReached ? "sim" : "não"} | travada: ${scan.historyStalled ? "sim" : "não"}`,
     `Rede: ${network.capturedResponses ?? 0} respostas / ${network.parsedResponses ?? 0} interpretadas / ${network.unparsedResponses ?? 0} não interpretadas`,
     `Direct: ${network.websocketConnections ?? 0} WebSockets / ${network.websocketFrames ?? 0} quadros | IDs de mensagens: ${network.distinctMessageIds ?? 0}`,
-    `Stories extraídas da rede: ${network.storyUrlsExtracted ?? 0} (WebSocket: ${network.webSocketStoryUrls ?? 0}) | objetos compartilhados: ${network.sharedMediaObjects ?? 0}`,
+    `Stories extraídas da rede: ${network.storyUrlsExtracted ?? 0} ocorrências / ${network.uniqueStoryUrls ?? 0} URLs únicas (WebSocket: ${network.webSocketStoryUrls ?? 0}) | objetos compartilhados: ${network.sharedMediaObjects ?? 0}`,
     "Operações de rede:",
     ...(operations.length ? operations : ["- Nenhuma identificada"]),
     `Coleção de destino "${report.request?.collectionName || "?"}": ${summary.savedCollectionInventoryAvailable ? "inventariada" : "NÃO localizada/inventariada"}`,
