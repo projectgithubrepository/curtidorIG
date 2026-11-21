@@ -50,6 +50,12 @@ function reportItem(item) {
     instructionSummary: item.instructionSummary || null,
     storyInspection: item.storyInspection ? {
       publicCommentAvailable: Boolean(item.storyInspection.publicCommentAvailable),
+      publicCommentLabel: item.storyInspection.publicCommentLabel || "",
+      usernameKnown: Boolean(item.storyInspection.usernameKnown),
+      commentListComplete: Boolean(item.storyInspection.commentListComplete),
+      expectedComments: item.storyInspection.expectedComments ?? null,
+      commentRowsInspected: item.storyInspection.commentRowsInspected ?? 0,
+      alreadyCommented: Boolean(item.storyInspection.alreadyCommented),
       stateKnown: item.storyInspection.stateKnown || null
     } : null,
     stateVerification: item.stateVerification || null,
@@ -586,7 +592,7 @@ app.post("/api/start", async (req, res) => {
               const candidate=mode==="test"&&entry.status.startsWith("candidata");
               return {...entry,sequence:index+1,...(mode==="test"?{testMode:{mapped,candidate,executed:false,label:mapped?"AÇÃO APTA — seria executada no AUTOMÁTICO; não foi executada no TESTE":candidate?"CANDIDATA — depende de pré-requisitos":"NÃO EXECUTÁVEL — "+entry.status}}:{})};
             });
-            const result={...item,taskState,caption:story.bodyText||"",comment,commentSource:story.bodyText?.trim()?"texto do Story":"fallback sem texto legível",instructionSummary:{comment:instructions.comment,shareToGroup:"required"},storyInspection:story,stateVerification:{commented:story.alreadyCommented,commentedKnown:story.stateKnown?.alreadyCommented===true,destinationGroupVerified:destinationGroupVerification.verified&&destinationGroupVerification.sharedInventoryComplete,destinationGroupReason:destinationGroupVerification.reason,messageIdentityVerified:Boolean(item.identityVerified&&item.threadId&&item.messageId)},plan:storyPlan,actionLog,status:taskState.sharedToGroup?"Story enviado ou já localizado no grupo coletivo":taskState.commented?"Story comentado publicamente ou já concluído":"Story analisado — etapas pendentes ou bloqueadas"};
+            const result={...item,taskState,caption:story.bodyText||"",comment,commentSource:commentForbidden?"dispensado — pedido explícito para não comentar":story.bodyText?.trim()?"texto do Story":"fallback sem texto legível",instructionSummary:{comment:instructions.comment,shareToGroup:"required"},storyInspection:story,stateVerification:{commented:story.alreadyCommented,commentedKnown:story.stateKnown?.alreadyCommented===true,destinationGroupVerified:destinationGroupVerification.verified&&destinationGroupVerification.sharedInventoryComplete,destinationGroupReason:destinationGroupVerification.reason,messageIdentityVerified:Boolean(item.identityVerified&&item.threadId&&item.messageId),reasons:{commented:!story.stateKnown?.alreadyCommented?"Perfil ou lista integral de comentários não confirmado.":story.alreadyCommented?"Comentário do perfil já encontrado.":"Lista de comentários conferida; comentário do perfil não encontrado.",shareToGroup:destinationGroupVerification.reason,messageIdentityVerified:item.identityVerified?"Mensagem de origem identificada.":"ID da mensagem original não confirmado."}},plan:storyPlan,actionLog,status:taskState.sharedToGroup?"Story enviado ou já localizado no grupo coletivo":taskState.commented?"Story comentado publicamente ou já concluído":"Story analisado — etapas pendentes ou bloqueadas"};
             results.push(result);
             appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:story.bodyText||"",comment,groupName,collectionName,sharedAt:item.sharedAt,commented:taskState.commented,commentForbidden,sharedToGroup:taskState.sharedToGroup,shareAttempted:taskState.shareAttempted,groupCheck:taskState.groupCheck,completionEmoji,status:result.status,detail:"Inspeção, comentário público, envio ao grupo e reação do Story"});
           } catch(error) {
@@ -732,7 +738,10 @@ app.post("/api/start", async (req, res) => {
       const finalNetworkStatus = finalNetwork
         ? ` Captura de rede: ${finalNetwork.capturedResponses} respostas, ${finalNetwork.messageLikeObjects} objetos de mensagem; reações ${finalNetwork.hasReactionFields ? "detectadas" : "não detectadas"}.`
         : "";
-      const inspectionFailures = results.filter(item => item.status === "inspeção não concluída — ações não verificadas").length;
+      const inspectionFailures = results.filter(item =>
+        item.contentType === "story" ? !item.storyInspection :
+        item.status === "inspeção não concluída — ações não verificadas"
+      ).length;
       const captionUnavailable = results.filter(item => item.inspectionDiagnostics?.captionAvailable === false).length;
       const storiesBlocked = results.filter(item => item.contentType === "story" && (item.plan || []).some(action => /^(bloqueada|não verificada)/.test(action.status))).length;
       const actionLabels = {
