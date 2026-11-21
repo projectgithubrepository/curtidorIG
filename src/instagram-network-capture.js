@@ -273,7 +273,12 @@ export function createInstagramNetworkCapture(page) {
         return;
       }
       websocketStats.parsedFrames++;
-      const extracted = extractPayload(payload, { threadId: "", operation: "websocket" });
+      // Frames de Direct frequentemente omitem o thread_id no próprio payload.
+      // A captura é iniciada antes de abrir o grupo e permanece restrita à conversa
+      // ativa durante a varredura; use a rota atual como escopo somente quando o
+      // quadro não trouxer uma identificação própria.
+      const activeThreadId = String(page.url?.() || "").match(/\\/direct\\/t\\/(\\d+)/)?.[1] || "";
+      const extracted = extractPayload(payload, { threadId: activeThreadId, operation: "websocket" });
       websocketStats.messageLikeObjects += extracted.messageLikeObjects;
       websocketStats.sharedMediaObjects += extracted.sharedMediaObjects;
       websocketStats.hasMessageId ||= extracted.hasMessageId;
