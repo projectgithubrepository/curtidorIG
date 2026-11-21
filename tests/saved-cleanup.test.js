@@ -53,3 +53,10 @@ test("normalizes whitespace and accents in collection labels without relaxing ex
   ], "Laranja antigo", "https://www.instagram.com/saved/");
   assert.equal(result, "https://www.instagram.com/usuario/saved/98765/");
 });
+
+test("matches exact collection name on its own line when the card also shows a post count", () => {
+  const result = selectSavedCollectionHref([
+    { href: "/usuario/saved/collections/98765/", text: "Laranja antigo\\n12 publicações" }
+  ], "Laranja antigo", "https://www.instagram.com/saved/");
+  assert.equal(result, "https://www.instagram.com/usuario/saved/collections/98765/");
+});
