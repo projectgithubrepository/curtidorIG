@@ -75,7 +75,7 @@ test("salvamento já existente exige confirmação da coleção exata", () => {
   });
   const save = plan.find(entry => entry.action === "saveToCollection");
   assert.match(save.status, /^bloqueada/);
-  assert.match(save.reason, /coleção confirmada|inclusão não foi comprovada/i);
+  assert.match(save.reason, /presença na coleção escolhida não foi comprovada/i);
 });
 
 
