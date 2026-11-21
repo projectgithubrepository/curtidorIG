@@ -504,13 +504,18 @@ export function isInstagramSavedUrl(value, base = "https://www.instagram.com/") 
   } catch { return false; }
 }
 
+function normalizeSavedCollectionLabel(value) {
+  return String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/\\s+/g, " ").trim().toLocaleLowerCase();
+}
+
 export function selectSavedCollectionHref(anchors, collectionName, baseUrl) {
-  const wanted = String(collectionName || "").trim().toLocaleLowerCase();
+  const wanted = normalizeSavedCollectionLabel(collectionName);
   if (!wanted) throw new Error("Informe o nome exato da coleção.");
   const base = new URL(baseUrl);
   if (!isInstagramSavedUrl(base.href)) throw new Error("A página atual não pertence à área Salvos do Instagram.");
   const matches = (anchors || []).filter(anchor => {
-    if (String(anchor.text || "").trim().toLocaleLowerCase() !== wanted) return false;
+    const labels = [anchor.text, anchor.ariaLabel, anchor.title, ...(Array.isArray(anchor.labels) ? anchor.labels : [])];
+    if (!labels.some(label => normalizeSavedCollectionLabel(label) === wanted)) return false;
     try {
       const url = new URL(anchor.href, base.href);
       return url.origin === base.origin && isInstagramSavedUrl(url.href, base.href);
@@ -538,10 +543,22 @@ export async function inspectSavedCollection(page, collectionName) {
   if (!isInstagramSavedUrl(page.url())) {
     throw new Error("O Instagram redirecionou para fora de Salvos (" + page.url() + "). Navegação e dessalvamento cancelados.");
   }
-  const anchors = await page.locator("main a[href]").evaluateAll(nodes => nodes.map(anchor => ({
-    href: anchor.href,
-    text: (anchor.innerText || anchor.getAttribute("aria-label") || "").trim()
-  })));
+  // A interface do Instagram varia: o nome pode estar no texto de um filho,
+  // no aria-label, no title ou em um cartão cujo link envolve a miniatura.
+  const anchors = await page.locator("a[href]").evaluateAll(nodes => nodes
+    .filter(anchor => {
+      const rect = anchor.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    })
+    .map(anchor => ({
+      href: anchor.href,
+      text: (anchor.innerText || "").trim(),
+      ariaLabel: (anchor.getAttribute("aria-label") || "").trim(),
+      title: (anchor.getAttribute("title") || "").trim(),
+      labels: [...anchor.querySelectorAll("[aria-label],[title],img[alt]")]
+        .flatMap(node => [node.getAttribute("aria-label"), node.getAttribute("title"), node.getAttribute("alt")])
+        .filter(Boolean)
+    })));
   const collectionHref = selectSavedCollectionHref(anchors, name, page.url());
   await page.goto(collectionHref, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1400);
