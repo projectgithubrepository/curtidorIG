@@ -60,3 +60,35 @@ export function taskStateLabel(state = {}) {
   if (!merged.groupCheck) pending.push("reagir à mensagem original");
   return `pendente: ${pending.join(", ")}`;
 }
+
+
+// Localiza a meta publicada pela administração para a janela coletada.
+// Datas sem ano (ex.: 18/11) são associadas ao ano do período solicitado.
+export function administrativeTargetsForRange(markers = [], startDate = "", endDate = "") {
+  const validRange = /^\\d{4}-\\d{2}-\\d{2}$/.test(startDate) &&
+    /^\\d{4}-\\d{2}-\\d{2}$/.test(endDate) && startDate <= endDate;
+  if (!validRange) return null;
+  const days = new Set();
+  const cursor = new Date(startDate + "T12:00:00Z");
+  const finish = new Date(endDate + "T12:00:00Z");
+  for (let count = 0; cursor <= finish && count <= 370; count++) {
+    days.add(cursor.toISOString().slice(5, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  const marker = markers.find(item => {
+    if (item.feedCount == null && item.storiesCount == null) return false;
+    const date = String(item.date || "");
+    const matches = /^\\d{4}-\\d{2}-\\d{2}$/.test(date)
+      ? date >= startDate && date <= endDate
+      : /^\\d{2}-\\d{2}$/.test(date) && days.has(date);
+    return matches;
+  });
+  if (!marker) return null;
+  return {
+    date: marker.date,
+    feedCount: marker.feedCount,
+    storiesCount: marker.storiesCount,
+    totalCount: (marker.feedCount ?? 0) + (marker.storiesCount ?? 0),
+    sourceText: marker.text || ""
+  };
+}
