@@ -1198,6 +1198,25 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
   };
 }
 
+async function verifyNewShareInDestination(page, url, groupInventory) {
+  const threadId=String(groupInventory?.threadId||"");
+  if(!threadId) throw new Error("ID do grupo coletivo não disponível para confirmar o envio.");
+  await page.goto("https://www.instagram.com/direct/t/"+encodeURIComponent(threadId)+"/",{waitUntil:"domcontentloaded",timeout:60000});
+  const openedThreadId=page.url().match(/\/direct\/t\/(\d+)/)?.[1]||"";
+  if(openedThreadId!==threadId) throw new Error("O Instagram não reabriu a conversa coletiva esperada após o envio.");
+  for(let attempt=0;attempt<5;attempt++){
+    const visible=await readVisiblePostLinks(page);
+    if(getGroupShareState(url,{sharedUrls:visible.map(item=>item.url),inventoryComplete:true})==="already-shared"){
+      const existing=Array.isArray(groupInventory.sharedUrls)?groupInventory.sharedUrls:[];
+      if(!existing.some(value=>getGroupShareState(url,{sharedUrls:[value],inventoryComplete:true})==="already-shared")) existing.push(url);
+      groupInventory.sharedUrls=existing;
+      return true;
+    }
+    await page.waitForTimeout(500);
+  }
+  throw new Error("O envio foi solicitado, mas o link não apareceu nas mensagens recentes do grupo. A tentativa permanece registrada e não será repetida automaticamente.");
+}
+
 export async function executeShareToGroup(page, url, destinationGroupName, onBeforeSend = async () => {}, groupInventory = null) {
   const groupName = String(destinationGroupName || "").trim();
   if (!groupName) throw new Error("O nome do grupo não foi identificado a partir da URL informada.");
@@ -1223,10 +1242,9 @@ export async function executeShareToGroup(page, url, destinationGroupName, onBef
   if (!(await send.count())) throw new Error("Botão de envio não identificado.");
   await onBeforeSend();
   await send.click();
-  await page.waitForTimeout(1200);
-  const confirmation = await page.locator("body").innerText();
-  if (!/enviado|enviada|sent|compartilhado|shared/i.test(confirmation)) throw new Error("O Instagram não exibiu confirmação de envio; estado não registrado.");
-  return { sharedToGroup: true, status: "enviado ao grupo coletivo e confirmado" };
+  await page.waitForTimeout(900);
+  await verifyNewShareInDestination(page,url,groupInventory);
+  return { sharedToGroup: true, status: "publicação localizada nas mensagens recentes do grupo coletivo" };
 }
 
 export async function executeCompletionReaction(page, item, emoji = "🌸") {
@@ -1361,11 +1379,8 @@ export async function executeStoryShareToGroup(page, url, destinationGroupName, 
   await onBeforeSend();
   await send.click();
   await page.waitForTimeout(1000);
-  // A confirmação visual isolada pode pertencer a outro envio. Reabrir o
-  // destino e exigir que o Story apareça no histórico antes de registrar sucesso.
-  const refreshed=await inspectDestinationGroup(page,destinationUrl);
-  if(!refreshed.verified || !refreshed.sharedInventoryComplete || getGroupShareState(url,refreshed)!=="already-shared") {
-    throw new Error("O envio foi solicitado, mas o Story não apareceu no inventário atualizado do grupo. A tentativa permanece registrada e não será repetida automaticamente.");
-  }
-  return {sharedToGroup:true,status:"Story localizado no histórico atualizado do grupo coletivo"};
+  // Confirma apenas nas mensagens recentes do destino, sem repetir a varredura
+  // completa do histórico a cada Story enviado.
+  await verifyNewShareInDestination(page,url,groupInventory);
+  return {sharedToGroup:true,status:"Story localizado nas mensagens recentes do grupo coletivo"};
 }
