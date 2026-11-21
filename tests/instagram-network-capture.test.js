@@ -180,3 +180,31 @@ test("extracts shortcodes nested in media-share payloads without explicit media_
   const [record] = capture.records();
   assert.deepEqual(record.urls, ["https://www.instagram.com/p/NESTEDCODE123"]);
 });
+
+
+test("keeps distinct Story IDs from the same Instagram profile", async () => {
+  const page = new EventEmitter();
+  const capture = createInstagramNetworkCapture(page);
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql",
+    status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({
+      postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: { thread_id: "1783131735658148" } }),
+      url: () => "https://www.instagram.com/api/graphql"
+    }),
+    json: async () => ({
+      data: { thread: { items: [
+        { message_id: "story-message-1", timestamp_ms: 1794960000000, sender: { username: "member" }, share: { url: "https://www.instagram.com/stories/member.name/390000000000000001/" } },
+        { message_id: "story-message-2", timestamp_ms: 1794960100000, sender: { username: "member" }, share: { url: "https://www.instagram.com/stories/member.name/390000000000000002/" } }
+      ] } }
+    })
+  });
+  await capture.stop();
+  const records = capture.records();
+  assert.equal(records.length, 2);
+  assert.deepEqual(records.map(item => item.urls[0]).sort(), [
+    "https://www.instagram.com/stories/member.name/390000000000000001",
+    "https://www.instagram.com/stories/member.name/390000000000000002"
+  ]);
+});
