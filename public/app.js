@@ -92,7 +92,7 @@ function renderPreliminary(summary, request) {
     number.textContent = String(value.total ?? 0);
     const detail = document.createElement("small");
     detail.className = "metric-detail";
-    detail.textContent = `${value.simulated ?? 0} aptas · ${value.candidate ?? 0} candidatas · ${value.waiting ?? 0} aguardando · ${value.done ?? 0} concluídas · ${value.blocked ?? 0} bloqueadas · ${value.unverified ?? 0} não verificadas · ${value.unclassified ?? 0} sem classificação`;
+    detail.textContent = `${value.simulated ?? 0} aptas · ${value.candidate ?? 0} candidatas · ${value.waiting ?? 0} aguardando · ${value.dispensed ?? 0} dispensadas · ${value.done ?? 0} concluídas · ${value.blocked ?? 0} bloqueadas · ${value.unverified ?? 0} não verificadas · ${value.unclassified ?? 0} sem classificação`;
     tile.append(label, number, detail);
     preliminaryMetrics.append(tile);
   }
