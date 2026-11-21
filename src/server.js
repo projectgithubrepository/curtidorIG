@@ -371,7 +371,8 @@ app.post("/api/start", async (req, res) => {
       logDiagnostic("INFO", "Varredura da conversa concluída", {
         publicationsFound: collected.length,
         administrativeMilestones: new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size,
-        networkResponses: collected[0]?.networkDiagnostics?.capturedResponses ?? 0
+        networkResponses: collected[0]?.networkDiagnostics?.capturedResponses ?? 0,
+        storyCollection: collected[0]?.collectionDiagnostics?.storyNetwork || null
       });
       let savedCollectionUrls = null;
       let savedCollectionInventoryAvailable = false;
