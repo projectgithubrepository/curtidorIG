@@ -92,15 +92,19 @@ async function readDirectConversationHeader(page) {
   let evidence=[];
   for(let attempt=0;attempt<7;attempt++){
     evidence=await page.locator(
-      "main header, [role='main'] header, main [role='heading'], [role='main'] [role='heading'], main h1, [role='main'] h1, main header [role='button'], main header button, [role='main'] header [role='button'], [role='main'] header button"
+      "main header, [role='main'] header, main [role='heading'], [role='main'] [role='heading'], main h1, [role='main'] h1, main header [role='button'], main header button, [role='main'] header [role='button'], [role='main'] header button, main [role='button'][aria-label], [role='main'] [role='button'][aria-label]"
     ).evaluateAll(nodes=>nodes.filter(node=>{
       const rect=node.getBoundingClientRect();
       return rect.width>0&&rect.height>0;
-    }).map(node=>[
-      node.innerText,node.getAttribute("aria-label"),node.getAttribute("title")
-    ].filter(Boolean).join("\n").trim()).filter(Boolean)).catch(()=>[]);
+    }).map(node=>{
+      const own=[node.innerText,node.getAttribute("aria-label"),node.getAttribute("title")];
+      const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[
+        child.getAttribute("aria-label"),child.getAttribute("title")
+      ]);
+      return [...own,...nested].filter(Boolean).join("\n").trim();
+    }).filter(Boolean)).catch(()=>[]);
     const name=evidence.flatMap(value=>value.split(/\r?\n/)).map(value=>value.trim())
-      .find(value=>value&&value.length<120&&!/^(instagram|mensagens|messages|detalhes|details|audio|video|ligar|call|search|ativo agora|active now)$/i.test(value))||"";
+      .find(value=>value&&value.length<120&&!/^(instagram|mensagens|messages|detalhes|details|audio|video|ligar|call|search|pesquisar|ativo agora|active now|voltar|back|mais opções|more options|info|informações)$/i.test(value))||"";
     if(name)return {name,evidence:evidence.slice(0,8)};
     await page.waitForTimeout(700);
   }
