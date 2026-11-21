@@ -831,6 +831,7 @@ export async function inspectSavedCollection(page, collectionNameOrUrl) {
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
       await page.waitForTimeout(650);
     }
+    if (stableRounds < 5) throw new Error("O inventário da coleção não estabilizou após 80 tentativas de rolagem. A coleção não será considerada completa.");
     const items = await page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]').evaluateAll(anchors => {
       const map = new Map();
       for (const anchor of anchors) { try {
@@ -967,6 +968,7 @@ export async function inspectSavedCollection(page, collectionNameOrUrl) {
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await page.waitForTimeout(650);
   }
+  if (stableRounds < 5) throw new Error("O inventário da coleção não estabilizou após 80 tentativas de rolagem. A coleção não será considerada completa.");
   const items = await page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]').evaluateAll(anchors => {
     const map = new Map();
     for (const anchor of anchors) {
