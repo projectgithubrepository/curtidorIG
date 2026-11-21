@@ -349,7 +349,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     groupThreadId: activeThreadId, startDate, endDate, found, fallback, milestones
   });
 
-  if (!found.size) {
+  if (!found.size && !fallback.size) {
     const diagnostics = await page.evaluate(() => {
       const anchors = [...document.querySelectorAll("a[href]")];
       const instagramLinks = anchors.filter(a => /instagram\.com\/(?:p|reel|tv|stories)\//i.test(a.href)).length;
