@@ -441,10 +441,12 @@ app.post("/api/start", async (req, res) => {
         !collectionDiagnostics?.stoppedByUser);
       const collectionIncomplete = !collectionScanComplete || withoutDate > 0 || withoutIdentity > 0 ||
         (collectionCoverage.available && !collectionCoverage.matches);
-      const executionPreflightIncomplete = collectionIncomplete || !destinationGroupVerification.verified || !destinationGroupVerification.sharedInventoryComplete;
+      const executionPreflightIncomplete = collectionIncomplete || !savedCollectionInventoryAvailable ||
+        !destinationGroupVerification.verified || !destinationGroupVerification.sharedInventoryComplete;
       if (mode === "automatic" && executionPreflightIncomplete) {
         const reasons = [];
         if (!collectionScanComplete) reasons.push("o limite do histórico não foi confirmado");
+        if (!savedCollectionInventoryAvailable) reasons.push(savedCollectionInventoryError || "a coleção de destino não foi inventariada integralmente");
         if (withoutDate > 0) reasons.push(`${withoutDate} itens estão sem data verificável`);
         if (withoutIdentity > 0) reasons.push(`${withoutIdentity} itens não têm vínculo com a mensagem original`);
         if (!destinationGroupVerification.verified || !destinationGroupVerification.sharedInventoryComplete) reasons.push(destinationGroupVerification.reason);
