@@ -10,11 +10,11 @@ A interface deverá solicitar:
 
 - **Grupo do Instagram:** selecionar ou informar a conversa/grupo de onde serão coletadas as publicações.
 - **Data inicial e data final:** período em que as publicações foram compartilhadas/adicionadas à conversa.
-- **Coleção de destino:** nome exato da coleção dos Salvos; o valor inicial é `Curtido`, editável pelo usuário.
-- **Grupo coletivo de envios:** nome exato da conversa que receberá cada publicação; o valor inicial é `grupo de envios`, editável pelo usuário.
+- **Coleção de destino:** URL direta da coleção dos Salvos, no formato `https://www.instagram.com/usuario/saved/slug/ID/`. A aplicação deve abrir a URL informada, validar usuário, slug e ID da coleção e extrair o nome exibido para selecionar a pasta no diálogo de salvamento.
+- **Grupo coletivo de envios:** URL direta da conversa no formato `https://www.instagram.com/direct/t/ID/`. A aplicação deve abrir a conversa pelo ID, validar o ID aberto, ler o nome do cabeçalho e usá-lo internamente no seletor de destinatários.
 - **Modo:** TESTE, AUTOMÁTICO ou MANUAL. TESTE é o padrão; AUTOMÁTICO exige confirmação explícita.
 
-Não haverá campo para colar links manualmente como fluxo principal.
+Não haverá campo para colar links de publicações individualmente como fluxo principal. As duas URLs de destino (coleção e conversa coletiva) são campos obrigatórios no formulário; não solicitar nomes para localizar esses destinos.
 
 ## Coleta das publicações
 
