@@ -1134,7 +1134,7 @@ export async function executeLike(page, url) {
   }).catch(() => null);
   if (likeState === null) throw new Error("Estado da curtida não identificado com segurança; clique bloqueado para não desfazer uma curtida existente.");
   if (likeState) return { liked: true, status: "já curtida — não repetida" };
-  const button = await uniqueButton(page, [/\\b(?:curtir|like)\\b/i]);
+  const button = await uniqueButton(page, [/\b(?:curtir|like)\b/i]);
   await button.click();
   await page.waitForTimeout(700);
   const verified = await page.locator("main,article,[role='dialog']").first().evaluate(root => [...root.querySelectorAll("button,[role=button]")].some(node => {
@@ -1169,7 +1169,7 @@ export async function executeSaveToCollection(page, url, collectionName, knownCo
     if (!knownCollectionUrls && await (async()=>{const collection=await inspectSavedCollection(page,collectionName);return collection.items.some(item=>savedCollectionKey(item.url)===key);})()) return { saved:true,savedFolderVerified:true,status:"já salva na coleção correta — não repetida" };
     throw new Error("A publicação já está salva, mas não aparece comprovadamente na coleção solicitada. Não vou alternar o estado de salvamento.");
   }
-  const saveControl = await uniqueButton(page, [/^(?:salvar|save|adicionar aos salvos|add to saved)\\b/i]);
+  const saveControl = await uniqueButton(page, [/^(?:salvar|save|adicionar aos salvos|add to saved)\b/i]);
   await saveControl.click();
   await page.waitForTimeout(700);
   const dialog = page.getByRole("dialog").last();
@@ -1323,7 +1323,7 @@ export async function executeShareToGroup(page, url, destinationGroupName, onBef
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1000);
   if (!sameInstagramContentUrl(page.url(),url)) throw new Error("O Instagram não abriu a publicação solicitada; compartilhamento bloqueado.");
-  const share = await uniqueButton(page, [/\\b(?:compartilhar|share)\\b/i]);
+  const share = await uniqueButton(page, [/\b(?:compartilhar|share)\b/i]);
   await share.click();
   await page.waitForTimeout(700);
   const dialog = page.getByRole("dialog").last();
@@ -1466,7 +1466,7 @@ export async function executeStoryShareToGroup(page, url, destinationGroupName, 
   let opened;
   try { opened=new URL(page.url()); } catch { throw new Error("O Instagram abriu um endereço inválido para o Story."); }
   if(opened.origin!==requested.origin || opened.pathname.replace(/\/$/,"")!==requested.pathname.replace(/\/$/,"")) throw new Error("O Instagram redirecionou para outro conteúdo; Story não compartilhado.");
-  const share=await uniqueButton(page,[/\\b(?:compartilhar|share|enviar)\\b/i],"main,[role='dialog']");
+  const share=await uniqueButton(page,[/\b(?:compartilhar|share|enviar)\b/i],"main,[role='dialog']");
   await share.click();
   await page.waitForTimeout(700);
   const dialog=page.getByRole("dialog").last();
