@@ -78,7 +78,8 @@ export function buildExecutionPlan({
     const mappedInTest = mode === "test" && status.startsWith("simulada");
     const candidateInTest = mode === "test" && !mappedInTest && !item.alreadyDone && item.eligible &&
       item.policy !== "forbidden" && !status.startsWith("bloqueada") &&
-      !status.startsWith("dispensada");
+      !status.startsWith("dispensada") && !status.startsWith("não verificada") &&
+      !status.startsWith("aguardando etapas");
     return {
       ...item,
       status,
