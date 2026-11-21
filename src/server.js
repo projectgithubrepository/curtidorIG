@@ -385,6 +385,27 @@ app.post("/api/start", async (req, res) => {
         if (stopRequested) break;
         const previousState = mergeTaskState(getTaskState(item.url, item.threadId, item.messageId, completionEmoji), {});
         const instructions = interpretGroupInstructions(item.messageText || "");
+        if (item.dateUnknown) {
+          const reason = "A mensagem e o link foram extraídos, mas o Instagram não forneceu um timestamp válido. O item foi mantido como candidato, porém não pode ser atribuído com segurança ao período selecionado nem executado.";
+          const unknownPlan = item.contentType === "story"
+            ? [
+                { action:"commentStory", label:"Comentar publicamente no próprio Story", required:true, status:"não verificada — data do pedido não identificada", reason },
+                { action:"shareStoryToGroup", label:"Enviar o Story ao grupo coletivo", required:true, status:"não verificada — data do pedido não identificada", reason }
+              ]
+            : buildExecutionPlan({ mode, collectionName, destinationGroupName, completionEmoji, taskState:previousState, instructions })
+                .map(action => action.alreadyDone ? action : { ...action, status:"não verificada — data do pedido não identificada", reason });
+          const result = {
+            ...item, taskState:previousState, caption:"", comment:"", commentSource:"",
+            instructionSummary:{comment:instructions.comment,shareToGroup:instructions.shareToGroup},
+            plan:unknownPlan, actionLog:[],
+            status:"candidato fora da cobertura confirmada — data desconhecida",
+            detail:reason
+          };
+          results.push(result);
+          appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,groupName,collectionName,status:result.status,detail:reason});
+          progress.done++;
+          continue;
+        }
         if (item.contentType === "story") {
           try {
             const story = await inspectStory(page, item.url);
