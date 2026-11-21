@@ -516,8 +516,8 @@ export async function inspectSavedCollection(page, collectionName) {
     for (const anchor of anchors) {
       try {
         const url = new URL(anchor.href);
-        if (!/\\/(p|reel|tv)\\//.test(url.pathname)) continue;
-        const clean = url.origin + url.pathname.replace(/\\/$/, "");
+        if (!/\/(p|reel|tv)\//.test(url.pathname)) continue;
+        const clean = url.origin + url.pathname.replace(/\/$/, "");
         if (!map.has(clean)) map.set(clean, { url: clean, contentType: url.pathname.includes("/reel/") ? "reel" : "feed" });
       } catch {}
     }
