@@ -119,6 +119,8 @@ A proibição explícita de comentar prevalece sobre a regra padrão de comentá
 - Não somar estados não verificados como ações aptas à execução.
 - O resumo geral deve ser coerente com o detalhamento por item. “Itens analisados” não significa “ações executadas”; “etapas no plano” não significa “etapas concluídas”.
 - O TESTE deve mostrar o plano completo, e não apenas totais ou uma contagem agregada.
+- Ao terminar o TESTE, exibir imediatamente um **relatório preliminar na própria interface** com totais separados por tipo de ação (curtidas, salvamentos na coleção, comentários em publicações, envios ao grupo coletivo, reações na mensagem original, comentários públicos em Stories e envios de Stories). Para cada tipo, separar ocorrências analisadas, aptas no plano, aguardando pré-requisitos, já concluídas, bloqueadas e não verificadas. Esses números nunca podem ser apresentados como ações executadas.
+- Em cada publicação, mostrar também o texto original do pedido capturado no grupo, o link, o tipo, a data do compartilhamento, o comentário preparado e a decisão individual de cada etapa.
 
 #### AUTOMÁTICO
 
