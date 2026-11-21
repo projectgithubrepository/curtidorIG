@@ -347,7 +347,8 @@ app.post("/api/start", async (req, res) => {
           const collectionKey = new URL(item.url).pathname.replace(/\/$/, "");
           const savedFolderVerified = Boolean(inspection.observedState.saved && savedCollectionInventoryAvailable && savedCollectionUrls?.has(collectionKey));
           let taskState = mergeTaskState(previousState, { ...inspection.observedState, savedFolderVerified, commentForbidden: instructions.comment === "forbidden" });
-          const comment = taskState.commented || instructions.comment === "forbidden" || !inspection.caption ? "" : createComment(inspection.caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
+          const comment = taskState.commented || instructions.comment === "forbidden" ? "" : createComment(inspection.caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
+          const commentSource = inspection.caption?.trim() ? "legenda" : "fallback sem legenda";
           const stateKnown = {
             liked: inspection.stateKnown?.liked ?? false,
             saveToCollection: Boolean(savedCollectionInventoryAvailable && inspection.stateKnown?.saved),
@@ -408,7 +409,7 @@ app.post("/api/start", async (req, res) => {
               return entry;
             });
           }
-          const result = { ...item, caption:inspection.caption, comment, taskState, stateVerification:{ ...stateKnown, controlCount:inspection.observedState.controlCount || 0, controlLabels:inspection.observedState.controlLabels || "" }, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
+          const result = { ...item, caption:inspection.caption, comment, taskState, comment, commentSource, stateVerification:{ ...stateKnown, controlCount:inspection.observedState.controlCount || 0, controlLabels:inspection.observedState.controlLabels || "" }, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
           results.push(result);
           appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,completionEmoji,commentForbidden:instructions.comment==="forbidden",complete:taskState.complete,milestone:item.administrativeMilestones,detail:mode==="test"?"Simulação sem ações":"Planejamento e execução da publicação"});
         } catch (error) {
