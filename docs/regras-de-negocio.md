@@ -23,7 +23,7 @@ Não haverá campo para colar links manualmente como fluxo principal.
 3. Identificar publicações compartilhadas na conversa, incluindo links de posts e Reels que estejam acessíveis.
 4. Extrair a URL e a data/hora da mensagem que compartilhou cada publicação.
 5. Ignorar mensagens fora do período, links que não sejam publicações compatíveis e itens indisponíveis.
-6. Remover duplicatas, inclusive quando a mesma publicação tiver sido compartilhada mais de uma vez.
+6. Remover duplicatas da mesma URL dentro da mesma mensagem, preservando ocorrências em mensagens diferentes para que cada mensagem original receba sua própria reação.
 7. Vincular cada publicação ao ID exato da mensagem de origem; a mesma URL em mensagens distintas continua tendo identidades distintas.
 8. Consultar o histórico local para evitar repetir ações já confirmadas.
 9. Apresentar a quantidade encontrada e o plano por publicação. No modo TESTE, nenhuma interação é executada.
