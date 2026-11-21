@@ -55,7 +55,7 @@ export function buildExecutionPlan({
     else if (item.action === "comment" && item.policy === "forbidden") status = "dispensada — pedido explícito para não comentar";
     else if (!item.eligible) {
       status = "bloqueada";
-      reason = item.action === "saveToCollection" ? "Informe a coleção obrigatória de destino." : "O comentário precisa ter pelo menos duas palavras e um emoji.";
+      reason = item.action === "saveToCollection" ? "Informe a coleção obrigatória de destino." : item.action === "comment" ? "O comentário precisa ter pelo menos duas palavras e um emoji." : "Uma tentativa anterior de envio não foi confirmada; verifique o destino para evitar duplicidade.";
     }
     else if (item.action === "shareToGroup" && state.shareAttempted && !state.sharedToGroup) { status = "bloqueada"; reason = "Tentativa anterior sem confirmação; verifique o grupo para evitar envio duplicado."; }
     else if (item.action === "saveToCollection" && state.saved && !state.savedFolderVerified && stateKnown.collectionInventoryAvailable !== true) {
