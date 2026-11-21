@@ -1,10 +1,11 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { openInstagram, collectGroupPosts, inspectPost, inspectSavedCollection, unsaveSavedCollectionItem } from "./instagram.js";
+import { openInstagram, collectGroupPosts, inspectPost, inspectSavedCollection, unsaveSavedCollectionItem, executeLike, executeSaveToCollection, executeComment, executeShareToGroup, executeCompletionReaction } from "./instagram.js";
 import { createComment } from "./comments.js";
 import { appendHistory, getTaskState, getRecentComments, readHistory } from "./history.js";
 import { mergeTaskState, taskStateLabel } from "./group-state.js";
+import { buildExecutionPlan, interpretGroupInstructions } from "./execution-plan.js";
 
 // Keep Direct network diagnostics metadata-only.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -250,10 +251,17 @@ app.post("/api/start", async (req, res) => {
   if (running) return res.status(409).json({ error: "Já existe uma coleta em andamento." });
   const groupName = String(req.body.groupName ?? "").trim();
   const collectionName = String(req.body.collectionName ?? "").trim();
+  const destinationGroupName = String(req.body.destinationGroupName ?? "").trim();
+  const mode = String(req.body.mode ?? "test").toLowerCase();
+  const completionEmoji = String(req.body.completionEmoji ?? "🌸").trim() || "🌸";
+  const confirmed = req.body.confirm === true;
   const startDate = String(req.body.startDate ?? "");
   const endDate = String(req.body.endDate ?? "");
   if (!groupName) return res.status(400).json({ error: "Informe o nome exato do grupo do Instagram." });
   if (!collectionName) return res.status(400).json({ error: "Informe o nome exato da coleção semanal de destino." });
+  if (!["test","automatic","manual"].includes(mode)) return res.status(400).json({ error: "Modo inválido." });
+  if (mode === "automatic" && !confirmed) return res.status(400).json({ error: "A execução automática exige confirmação explícita." });
+  if (mode === "automatic" && !destinationGroupName) return res.status(400).json({ error: "Informe o nome exato do grupo coletivo de envios." });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
     return res.status(400).json({ error: "Informe um período válido, com data inicial anterior ou igual à final." });
   }
@@ -264,9 +272,9 @@ app.post("/api/start", async (req, res) => {
   diagnosticLog = [];
   diagnosticReport = null;
   const startedAt = new Date().toISOString();
-  logDiagnostic("INFO", "Coleta iniciada", { groupName, startDate, endDate });
+  logDiagnostic("INFO", "Coleta iniciada", { groupName, startDate, endDate, mode, destinationGroupName, collectionName });
   progress = { total: 0, done: 0, current: groupName, message: "Abrindo o Instagram..." };
-  res.json({ ok: true, message: "Coleta iniciada." });
+  res.json({ ok: true, message: mode === "automatic" ? "Coleta e execução automática iniciadas. Cada ação será verificada." : mode === "manual" ? "Coleta iniciada em modo manual." : "Teste iniciado: nenhuma ação será executada no Instagram." });
 
   (async () => {
     try {
@@ -291,40 +299,70 @@ app.post("/api/start", async (req, res) => {
         : "Diagnóstico de rede indisponível.";
       progress.message = `${collected.length} links encontrados${usedFallback ? " pela varredura de recuperação" : ""}; ${withoutDate} sem data identificável; ${milestoneCount} marcos administrativos identificados; ${withoutIdentity} itens sem vínculo comprovado com mensagem. ${networkStatus} Verificando histórico...`;
       const previous = getRecentComments(200);
-      logDiagnostic("INFO", "Iniciando inspeção das publicações encontradas", { total: collected.length });
+      logDiagnostic("INFO", "Iniciando inspeção e planejamento das publicações", { total: collected.length, mode });
       for (const item of collected) {
         if (stopRequested) break;
-        const previousState = mergeTaskState(getTaskState(item.url, item.threadId, item.messageId), { groupCheck: false });
-        if (previousState.complete) {
-          results.push({ ...item, taskState: previousState, status: "fluxo completo — ignorar", comment: "" });
-          progress.done++;
-          continue;
-        }
+        const previousState = mergeTaskState(getTaskState(item.url, item.threadId, item.messageId), {});
+        const instructions = interpretGroupInstructions(item.messageText || "");
         if (item.contentType === "story") {
-          const result = { ...item, taskState: previousState, caption: "", comment: "", status: "Story identificada — análise e ações específicas ainda não disponíveis" };
+          const plan = buildExecutionPlan({ mode, collectionName, completionEmoji, taskState: previousState, instructions });
+          const result = { ...item, taskState: previousState, caption: "", comment: "", plan: plan.map(action => ({...action,status:"bloqueada",reason:"Publicações do tipo Story ainda exigem fluxo específico; nenhuma ação foi executada."})), status: "Story identificada — ações automáticas indisponíveis nesta versão" };
           results.push(result);
-          appendHistory({ url: item.url, groupThreadId: item.threadId, messageId: item.messageId, status: result.status, groupName, sharedAt: item.sharedAt, saved: previousState.saved, savedFolderVerified: previousState.savedFolderVerified, liked: previousState.liked, commented: previousState.commented, groupCheck: previousState.groupCheck, milestone: item.administrativeMilestones, detail: result.status });
+          appendHistory({ url:item.url, groupThreadId:item.threadId, messageId:item.messageId, status:result.status, groupName, collectionName, sharedAt:item.sharedAt, saved:previousState.saved, savedFolderVerified:previousState.savedFolderVerified, liked:previousState.liked, commented:previousState.commented, sharedToGroup:previousState.sharedToGroup, groupCheck:previousState.groupCheck, commentForbidden:instructions.comment==="forbidden", detail:result.status });
           progress.done++;
           continue;
         }
         try {
           const inspection = await inspectPost(page, item.url);
-          const taskState = mergeTaskState(previousState, inspection.observedState);
-          if (taskState.complete) {
-            results.push({ ...item, caption: inspection.caption, taskState, status: "fluxo completo — ignorar", comment: "" });
-            appendHistory({ url: item.url, groupThreadId: item.threadId, messageId: item.messageId, caption: inspection.caption, status: "fluxo completo — ignorar", groupName, sharedAt: item.sharedAt, saved: taskState.saved, savedFolderVerified: taskState.savedFolderVerified, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: true, milestone: item.administrativeMilestones });
-            progress.done++;
-            continue;
+          let taskState = mergeTaskState(previousState, inspection.observedState);
+          const comment = taskState.commented || instructions.comment === "forbidden" ? "" : createComment(inspection.caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
+          const actionLog = [];
+          if (mode === "automatic") {
+            const steps = [
+              ["like", !taskState.liked, async () => executeLike(page,item.url), "liked"],
+              ["saveToCollection", !(taskState.saved && taskState.savedFolderVerified), async () => executeSaveToCollection(page,item.url,collectionName), "saved"],
+              ["comment", instructions.comment !== "forbidden" && !taskState.commented, async () => executeComment(page,item.url,comment), "commented"],
+              ["shareToGroup", !taskState.sharedToGroup, async () => executeShareToGroup(page,item.url,destinationGroupName), "sharedToGroup"]
+            ];
+            let blocked = false;
+            for (const [action,needed,run,key] of steps) {
+              if (!needed) continue;
+              if (action === "comment" && !comment) { actionLog.push({action,status:"bloqueada",reason:"Comentário não passou na validação."}); blocked=true; break; }
+              try {
+                const outcome = await run();
+                taskState = mergeTaskState(taskState, { [key]: true, ...(action==="saveToCollection"?{savedFolderVerified:true}:{}) });
+                actionLog.push({action,status:outcome.status});
+                appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,commentForbidden:instructions.comment==="forbidden",status:taskStateLabel(taskState),detail:"Ação automática verificada: "+action});
+              } catch (error) {
+                actionLog.push({action,status:"bloqueada",reason:error.message});
+                logDiagnostic("WARN","Ação automática interrompida",{action,url:item.url,error:error.message});
+                blocked=true; break;
+              }
+            }
+            const requiredDone = taskState.liked && taskState.saved && taskState.savedFolderVerified && (taskState.commented || instructions.comment==="forbidden") && taskState.sharedToGroup;
+            if (requiredDone && !taskState.groupCheck) {
+              try {
+                const outcome = await executeCompletionReaction(page,item,completionEmoji);
+                taskState = mergeTaskState(taskState,{groupCheck:true});
+                actionLog.push({action:"completionReaction",status:outcome.status});
+                appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:true,commentForbidden:instructions.comment==="forbidden",status:taskStateLabel(taskState),detail:"Reação de conclusão verificada"});
+              } catch(error) {
+                actionLog.push({action:"completionReaction",status:"bloqueada",reason:error.message});
+                logDiagnostic("WARN","Reação à mensagem original bloqueada",{url:item.url,error:error.message});
+              }
+            } else if (!requiredDone) {
+              actionLog.push({action:"completionReaction",status:"aguardando etapas obrigatórias"});
+            }
           }
-          const comment = taskState.commented ? "" : createComment(inspection.caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
-          const result = { ...item, caption: inspection.caption, comment, taskState, inspectionDiagnostics: inspection.inspectionDiagnostics || null, status: item.dateUnknown ? "data do compartilhamento não identificada" : taskStateLabel(taskState) };
+          const plan = buildExecutionPlan({ mode, collectionName, completionEmoji, taskState, comment, instructions });
+          const result = { ...item, caption:inspection.caption, comment, taskState, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
           results.push(result);
-          appendHistory({ url: item.url, groupThreadId: item.threadId, messageId: item.messageId, caption: inspection.caption, comment, status: result.status, groupName, sharedAt: item.sharedAt, saved: taskState.saved, savedFolderVerified: taskState.savedFolderVerified, liked: taskState.liked, commented: taskState.commented, groupCheck: taskState.groupCheck, complete: taskState.complete, milestone: item.administrativeMilestones, detail: `Grupo: ${groupName}; mensagem: ${item.sharedAt}; ${result.status}` });
+          appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,commentForbidden:instructions.comment==="forbidden",complete:taskState.complete,milestone:item.administrativeMilestones,detail:mode==="test"?"Simulação sem ações":"Planejamento e execução da publicação"});
         } catch (error) {
-          logDiagnostic("ERROR", "Falha ao inspecionar publicação", { url: item.url, error: error.message, inspectionDiagnostics: error.inspectionDiagnostics || null });
-          const result = { ...item, caption: "", comment: "", status: "não foi possível analisar", detail: error.message, inspectionDiagnostics: error.inspectionDiagnostics || null };
+          logDiagnostic("ERROR", "Falha ao inspecionar publicação", { url:item.url,error:error.message,inspectionDiagnostics:error.inspectionDiagnostics||null });
+          const result={...item,caption:"",comment:"",taskState:previousState,status:"não foi possível analisar",detail:error.message};
           results.push(result);
-          appendHistory({ url: item.url, groupThreadId: item.threadId, messageId: item.messageId, status: "erro na análise", groupName, sharedAt: item.sharedAt, detail: error.message });
+          appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,status:"erro na análise",groupName,collectionName,sharedAt:item.sharedAt,detail:error.message});
         }
         progress.done++;
       }
@@ -332,7 +370,7 @@ app.post("/api/start", async (req, res) => {
       const finalNetworkStatus = finalNetwork
         ? ` Captura de rede: ${finalNetwork.capturedResponses} respostas, ${finalNetwork.messageLikeObjects} objetos de mensagem; reações ${finalNetwork.hasReactionFields ? "detectadas" : "não detectadas"}.`
         : "";
-      progress.message = `Coleta concluída: ${results.length} itens listados.${finalNetworkStatus} Nenhuma ação de curtir, comentar, salvar ou reagir foi executada.`;
+      progress.message = mode === "test" ? `Teste concluído: ${results.length} itens analisados. Nenhuma ação foi executada.` : mode === "manual" ? `Coleta concluída: ${results.length} itens preparados para execução manual.` : `Execução automática finalizada: ${results.length} itens analisados. Consulte o resultado de cada ação.`;
       logDiagnostic("INFO", "Coleta concluída", { listed: results.length, networkResponses: network?.capturedResponses ?? 0 });
       diagnosticReport = {
         schemaVersion: 1,
@@ -341,7 +379,7 @@ app.post("/api/start", async (req, res) => {
         startedAt,
         finishedAt: new Date().toISOString(),
         outcome: stopRequested ? "interrompida" : "concluída",
-        request: { groupName, collectionName, startDate, endDate },
+        request: { groupName, collectionName, destinationGroupName, mode, completionEmoji, startDate, endDate },
         summary: {
           publicationsFound: collected.length,
           publicationsInspected: results.length,
