@@ -43,6 +43,135 @@ O CSV é criado automaticamente nos dados locais do aplicativo e registra data/h
 
 A pessoa informa o nome do grupo e o período. A coleta procura links de posts/Reels nas mensagens e usa a data/hora exposta no DOM pelo Instagram. O resultado é heurístico: mensagens sem data legível são ignoradas; mudanças na interface podem impedir a coleta. A data usada é a do compartilhamento na conversa, não a publicação original. Os detalhes estão em [Regras de negócio](docs/regras-de-negocio.md).
 
+## Regras de negócio completas
+
+Esta seção consolida as regras funcionais que a aplicação deve seguir. As regras descrevem o comportamento esperado; quando uma função ainda não estiver validada na interface real do Instagram, isso é indicado em **Estado atual e limitações**, sem transformar uma limitação técnica em alteração da regra de negócio.
+
+### 1. Configuração e origem do trabalho
+
+- A pessoa seleciona/informa o **grupo de origem** do Instagram e o período de coleta.
+- Informa a **coleção de destino** dos Salvos pelo nome exato. O valor inicial é `Curtido`, mas pode ser alterado.
+- Informa o **grupo coletivo de envios** pelo nome exato. O valor inicial é `grupo de envios`, mas pode ser alterado.
+- Escolhe um dos modos: **TESTE**, **AUTOMÁTICO** ou **MANUAL**. TESTE é o modo padrão. AUTOMÁTICO exige confirmação explícita.
+- O fluxo normal começa pela conversa/grupo e pelo período; não depende de colar URLs individualmente.
+- Não escolher outro grupo, coleção ou conversa por aproximação quando o nome exato não puder ser confirmado.
+
+### 2. Coleta, período e vínculo com a mensagem
+
+- Coletar publicações compartilhadas no grupo de origem dentro do intervalo informado.
+- A data considerada é a data/hora em que o link foi compartilhado na conversa, não a data original da publicação no Instagram.
+- Identificar Feed, Reels, carrosséis e Stories quando estiverem disponíveis na conversa.
+- Ler o texto do pedido associado a cada link. Na organização habitual do grupo, o pedido informa o que deve ser feito e o link da publicação vem associado a esse pedido; interpretar o conjunto da mensagem, inclusive o texto que aparece antes e depois do link.
+- Um link não deve ser interpretado isoladamente quando o pedido está no mesmo bloco/mensagem ou em mensagens diretamente associadas.
+- Cada publicação precisa permanecer vinculada ao **ID exato da mensagem original**. A mesma URL compartilhada em mensagens diferentes representa ocorrências distintas e cada mensagem original pode exigir sua própria reação de conclusão.
+- Eliminar duplicação técnica do mesmo link dentro da mesma mensagem, mas não fundir ocorrências da mesma URL em mensagens diferentes.
+- Ignorar links incompatíveis, mensagens fora do período e publicações indisponíveis, registrando o motivo.
+- Consultar o histórico local para evitar repetir trabalho já confirmado.
+- Se o histórico da conversa não carregar por completo, não declarar que todo o período foi analisado.
+
+### 3. Regras obrigatórias por publicação
+
+Aplicar as regras a cada publicação individualmente, considerando o pedido associado:
+
+1. **Curtir:** obrigatório em toda publicação.
+2. **Salvar:** obrigatório em toda publicação, na coleção/pasta exata escolhida na configuração (por padrão, `Curtido`). Não basta confirmar que a publicação está genericamente salva: é necessário confirmar a coleção correta. Se o estado ou a coleção não puderem ser comprovados, não alternar o controle e não arriscar dessalvar por engano.
+3. **Comentar:** comentar por padrão, inclusive quando o pedido disser que o comentário é opcional. Só deixar de comentar quando houver uma instrução explícita proibindo comentário, como “não comentar”.
+4. **Enviar/compartilhar no grupo coletivo:** obrigatório para toda publicação, independentemente do pedido individual. O destino é o grupo coletivo configurado. Enviar ao grupo não substitui curtir, salvar ou comentar.
+5. **Reação de conclusão no grupo de origem:** usar o emoji configurado — padrão `🌸` — na mensagem exata que compartilhou aquela publicação. Só reagir depois de concluídas todas as ações obrigatórias e todas as ações adicionais explicitamente solicitadas. Se a reação já existir nessa mensagem, não repetir. Na interface, a configuração é identificada como **“Emoji de check no grupo”**.
+
+A proibição explícita de comentar prevalece sobre a regra padrão de comentário. Ela não elimina as demais ações obrigatórias. Pedidos opcionais de comentário não significam “não comentar”.
+
+### 4. Comentários: conteúdo, formato e fallback
+
+- Todo comentário deve conter **pelo menos duas palavras e pelo menos um emoji**.
+- Preferir comentários contextualizados, estruturados e relacionados ao texto/assunto identificável da publicação, evitando frases genéricas ou repetitivas.
+- A legenda deve ser usada quando estiver legível. O motor local identifica assunto, palavras-chave e intenção textual para compor o comentário.
+- **Quando não houver legenda legível ou ela estiver ausente**, ainda deve ser preparado um comentário alternativo para cumprir a regra de negócio, desde que o pedido não proíba comentar.
+- O fallback deve ser neutro, não inventar características, imagens, fatos ou assunto que não foram identificados e respeitar o mínimo de duas palavras e um emoji.
+- Consultar o histórico para evitar repetir comentários recentes.
+- Informar no resultado se o comentário veio da legenda/conteúdo textual ou do fallback sem legenda legível.
+- Se o pedido proibir comentário, não gerar nem publicar comentário, mesmo que exista legenda.
+
+### 5. Regras específicas para Stories
+
+- Stories também fazem parte do escopo de análise e devem aparecer individualmente no relatório.
+- Quando houver recurso de comentário público no Story, o comentário deve ser publicado **no próprio Story**, de forma pública/visível nele.
+- Não substituir comentário público por resposta privada/DM. Se o Instagram só permitir resposta privada ou não disponibilizar comentário público, bloquear essa etapa e explicar o motivo.
+- Todo Story identificado também deve ser compartilhado no **grupo coletivo de envios**, conforme a regra geral de envio de publicações.
+- A reação de conclusão continua vinculada à mensagem original do grupo de origem e só ocorre após as etapas obrigatórias daquele item.
+- A regra de comentário opcional e a exceção de proibição explícita também se aplicam aos Stories.
+
+### 6. Modos de operação
+
+#### TESTE (padrão)
+
+- Simular o fluxo completo que seria considerado no AUTOMÁTICO, sem alterar a conta do Instagram.
+- Não curtir, comentar, salvar/dessalvar, compartilhar/enviar ou reagir. Nenhuma mutação pode ocorrer no TESTE.
+- Inspecionar cada item, interpretar o pedido, identificar legenda/conteúdo, preparar o comentário (inclusive fallback), verificar os estados atuais e montar o plano de todas as etapas.
+- Mostrar por publicação: link e tipo de conteúdo; mensagem de origem e regra interpretada; legenda ou ausência dela; comentário preparado e sua origem; estado de curtida, coleção/salvamento, comentário, envio ao grupo e reação; decisão de cada etapa; dependências, bloqueios e justificativas.
+- Distinguir claramente:
+  - **já concluída/verificada**;
+  - **simulada e apta** — seria executada no AUTOMÁTICO, mas não foi executada no TESTE;
+  - **candidata aguardando verificação** — não pode ser contada como ação pronta;
+  - **bloqueada** — não executar, com motivo;
+  - **estado não verificado** — não presumir que está pendente nem concluído;
+  - **inspeção interrompida** — item ou etapa não foi analisado integralmente.
+- Não somar estados não verificados como ações aptas à execução.
+- O resumo geral deve ser coerente com o detalhamento por item. “Itens analisados” não significa “ações executadas”; “etapas no plano” não significa “etapas concluídas”.
+- O TESTE deve mostrar o plano completo, e não apenas totais ou uma contagem agregada.
+
+#### AUTOMÁTICO
+
+- Exige confirmação explícita da pessoa.
+- Antes de cada ação, reler a instrução associada e verificar novamente o estado atual no Instagram.
+- Executar somente ações realmente pendentes, permitidas e com pré-requisitos confirmados.
+- Executar uma etapa por vez e verificar o resultado após cada ação.
+- Não repetir ação já concluída, não duplicar comentários/envios/reação e não clicar em controles cujo estado seja desconhecido.
+- Se uma etapa falhar, ficar ambígua ou não puder ser verificada, interromper aquela etapa e registrar o motivo; não declarar sucesso sem confirmação.
+- A reação de conclusão é sempre a última etapa do item, respeitando todas as ações obrigatórias e adicionais solicitadas.
+
+#### MANUAL
+
+- Não executar interações automaticamente.
+- Organizar por publicação as ações pendentes, comentários preparados, coleção escolhida, destino de envio e reação que ainda precisa ser feita.
+- Permitir acompanhar/registrar as confirmações correspondentes sem confundir uma confirmação manual com uma verificação automática do Instagram.
+
+### 7. Limpeza de publicações salvas (dessalvar)
+
+- A limpeza deve abrir Salvos, localizar a coleção escolhida e listar as publicações nela.
+- O processamento é **individual por publicação** e inclui Feed, Reels e carrosséis identificados.
+- A operação deve remover o estado de salvo da publicação por completo, não apenas removê-la de uma coleção específica.
+- Não apagar a coleção e não apagar a publicação original.
+- No TESTE, apenas inventariar/listar e classificar; nunca clicar para salvar ou dessalvar.
+- No AUTOMÁTICO, exigir confirmação explícita, reabrir/revalidar cada publicação e dessalvar somente quando o estado atual comprovar que ela está salva.
+- Depois do clique, verificar que o estado passou a não salvo. Se não for possível provar o estado anterior ou o resultado, interromper aquele item e informar o motivo; nunca adivinhar.
+- A coleção usada em testes de limpeza pode ser `Laranja antigo`; isso não autoriza apagar a coleção.
+
+### 8. Histórico, relatório e diagnóstico
+
+- Manter histórico local para URLs, data/hora, grupo de origem, período, coleção selecionada, comentário preparado, status e detalhes de erro/confirmação.
+- O histórico deve apoiar deduplicação e prevenção de repetição, mas não substituir a verificação do estado atual antes de uma ação automática.
+- O relatório precisa permitir entender o resultado de cada publicação e cada etapa, inclusive quando não houve legenda, quando o estado não pôde ser verificado ou quando uma etapa foi bloqueada.
+- Não apresentar totais agregados como se fossem prova de execução.
+- Não afirmar que uma publicação foi curtida, salva, comentada, enviada ou reagida sem evidência de conclusão.
+- Preservar diagnósticos suficientes para explicar falhas de navegação, carregamento, identificação de mensagem, leitura de legenda e localização de controles, sem expor cookies, tokens, senhas ou conteúdo privado desnecessário.
+
+### 9. Segurança e condições de interrupção
+
+- Usar somente a sessão autenticada manualmente pela pessoa e conversas/publicações às quais essa conta tenha acesso.
+- Não contornar CAPTCHA, checkpoint, MFA, limites, bloqueios ou mecanismos de segurança do Instagram.
+- Interromper a etapa afetada se o grupo, a mensagem, a publicação, a coleção, o controle ou o estado não puderem ser identificados com segurança.
+- Não escolher destinos por aproximação nem executar cliques destrutivos com estado desconhecido.
+- Não enviar resposta privada quando a regra exigir comentário público no Story.
+- Respeitar a instrução explícita de não comentar.
+- Ações em lote não dispensam verificação individual e prevenção de duplicatas.
+
+### 10. Estado atual e limitações conhecidas
+
+As regras acima são o comportamento funcional esperado; nem todas as etapas estão validadas no Instagram real. Feed/Reels e a seleção da coleção dependem dos elementos que o Instagram efetivamente disponibilizar na sessão. O fluxo de Stories ainda possui etapas específicas bloqueadas enquanto não forem validadas, inclusive comentário público e compartilhamento no grupo coletivo. A limpeza de Salvos também depende da identificação inequívoca da coleção e da confirmação do estado individual; se a coleção não for localizada com segurança, nenhuma alteração deve ser feita. Esses bloqueios devem aparecer no relatório e não autorizam substituir as regras por um comportamento diferente.
+
+A interface do Instagram muda frequentemente. Publicações privadas, removidas, expiradas ou indisponíveis podem não ser processadas. A coleta é limitada ao histórico que o Instagram disponibilizar e não pode afirmar cobertura integral quando houver falha de carregamento ou rolagem.
+
 ## Biblioteca de comentários
 
 Os comentários são gerados localmente por composição, não pela escolha de uma lista curta de frases prontas. O motor identifica assunto, palavras-chave e intenção textual (pergunta, tutorial, conquista ou divulgação) e combina estruturas com vocabulário contextual. A biblioteca cobre 15 temas, mais de 100 palavras-chave e milhares de combinações possíveis. Todo comentário gerado precisa ter pelo menos duas palavras e um emoji. O histórico CSV é consultado para evitar repetir comentários recentes. Não há IA, API, chave, cobrança ou envio da legenda para terceiros. Como é um sistema baseado em regras, ele interpreta texto, não imagens, e pode não reconhecer ironia, contexto implícito ou assuntos fora da biblioteca.
