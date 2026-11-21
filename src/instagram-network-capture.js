@@ -324,7 +324,8 @@ export function createInstagramNetworkCapture(page) {
       const activeThreadId = String(page.url?.() || "").match(/\/direct\/t\/(\d+)/)?.[1] || "";
       const extracted = extractPayload(payload, { threadId: activeThreadId, operation: "websocket" });
       websocketStats.messageLikeObjects += extracted.messageLikeObjects;
-      websocketStats.sharedMediaObjects += extracted.sharedMediaObjects;\n      websocketStats.storyUrls += extracted.storyUrls;
+      websocketStats.sharedMediaObjects += extracted.sharedMediaObjects;
+      websocketStats.storyUrls += extracted.storyUrls;
       websocketStats.hasMessageId ||= extracted.hasMessageId;
       websocketStats.hasTextBody ||= extracted.hasTextBody;
       websocketStats.hasTimestampMs ||= extracted.hasTimestampMs;
@@ -398,7 +399,8 @@ export function createInstagramNetworkCapture(page) {
       const byOperation = new Map();
       const aggregate = parsed.reduce((result, item) => {
         result.messageLikeObjects += item.payload.messageLikeObjects;
-        result.sharedMediaObjects += item.payload.sharedMediaObjects;\n        result.storyUrls += item.payload.storyUrls;
+        result.sharedMediaObjects += item.payload.sharedMediaObjects;
+        result.storyUrls += item.payload.storyUrls;
         result.hasMessageId ||= item.payload.hasMessageId;
         result.hasReactionFields ||= item.payload.hasReactionFields;
         result.hasShareFields ||= item.payload.hasShareFields;
@@ -423,7 +425,9 @@ export function createInstagramNetworkCapture(page) {
         parsedWebSocketFrames: websocketStats.parsedFrames,
         unparsedWebSocketFrames: websocketStats.unparsedFrames,
         webSocketMessageLikeObjects: websocketStats.messageLikeObjects,
-        webSocketSharedMediaObjects: websocketStats.sharedMediaObjects,\n        webSocketStoryUrls: websocketStats.storyUrls,\n        storyUrlsExtracted: aggregate.storyUrls + websocketStats.storyUrls,
+        webSocketSharedMediaObjects: websocketStats.sharedMediaObjects,
+        webSocketStoryUrls: websocketStats.storyUrls,
+        storyUrlsExtracted: aggregate.storyUrls + websocketStats.storyUrls,
         operationDetails: [...byOperation.values()].slice(0, 30),
         distinctMessageIds: recordsByKey.size,
         extractedShareUrls: [...recordsByKey.values()].reduce((sum, item) => sum + item.urls.length, 0),
@@ -445,7 +449,8 @@ export function createInstagramNetworkCapture(page) {
             objectsVisited: item.payload.objectsVisited,
             messageLikeObjects: item.payload.messageLikeObjects,
             distinctMessageIds: item.payload.distinctMessageIds,
-            sharedMediaObjects: item.payload.sharedMediaObjects,\n            storyUrls: item.payload.storyUrls,
+            sharedMediaObjects: item.payload.sharedMediaObjects,
+            storyUrls: item.payload.storyUrls,
             hasMessageId: item.payload.hasMessageId,
             hasTextBody: item.payload.hasTextBody,
             hasTimestampMs: item.payload.hasTimestampMs,
