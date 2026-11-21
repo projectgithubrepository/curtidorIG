@@ -74,7 +74,15 @@ function renderPreliminary(summary, request) {
   }
   preliminaryPanel.hidden = false;
   preliminaryMode.textContent = "MODO TESTE — nenhuma ação executada";
-  preliminaryIntro.textContent = `${summary.publicationsFound ?? 0} publicações encontradas · ${summary.publicationsInspected ?? 0} inspecionadas · ${summary.stories ?? 0} Stories. Os quantitativos abaixo mostram o que o sistema avaliou para a execução; não são ações realizadas.`;
+  const coverage = summary.collectionCoverage || {};
+  const scan = summary.collectionDiagnostics || {};
+  const coverageText = coverage.available
+    ? `Meta administrativa: Feed ${coverage.actualFeed}/${coverage.expectedFeed} · Stories ${coverage.actualStories}/${coverage.expectedStories} · ${coverage.matches ? "contagens conferem" : "COLETA INCOMPLETA — divergência"}.`
+    : "Sem meta administrativa correspondente à data para validar a quantidade.";
+  const scanText = scan.historyRounds !== undefined
+    ? `Varredura: ${scan.historyRounds} rodadas · ${scan.stableBoundaryReached ? "limite do histórico detectado" : "fim do histórico não confirmado"} · ${summary.itemsWithoutDate ?? 0} itens sem data mantidos como candidatos.`
+    : "Diagnóstico de varredura indisponível.";
+  preliminaryIntro.textContent = `${summary.publicationsFound ?? 0} itens encontrados · ${summary.publicationsInspected ?? 0} inspecionados. ${coverageText} ${scanText} Os quantitativos abaixo mostram o que o sistema avaliou; não são ações realizadas.`;
   preliminaryMetrics.replaceChildren();
   const labels = {like:"Curtidas",saveToCollection:"Salvamentos",comment:"Comentários em publicações",shareToGroup:"Envios ao grupo coletivo",completionReaction:"Reações no grupo de origem",commentStory:"Comentários em Stories",shareStoryToGroup:"Envios de Stories"};
   const totals = summary.actionTotals || {};
