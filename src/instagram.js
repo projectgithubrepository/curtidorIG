@@ -561,9 +561,7 @@ export async function unsaveSavedCollectionItem(page, url) {
 
 function visibleButton(page, patterns, root = "article,main,[role='dialog']") {
   const names = patterns.map(pattern => new RegExp(pattern, "i"));
-  return page.locator(root).first().locator("button,[role='button']").filter({
-    has: page.locator("*")
-  }).evaluateAll((nodes, regexSources) => {
+  return page.locator(root).first().locator("button,[role='button']").evaluateAll((nodes, regexSources) => {
     const visible = nodes.filter(node => {
       const rect = node.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;
@@ -584,7 +582,6 @@ async function uniqueButton(page, patterns, root = "article,main,[role='dialog']
 export async function executeLike(page, url) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
-  const state = await readSavedToggle(page);
   const liked = await page.locator("article,main,[role='dialog']").first().evaluate(root => {
     const labels = [...root.querySelectorAll("button,[role=button]")].map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" ");
     return /descurtir|unlike/i.test(labels);
@@ -605,12 +602,10 @@ export async function executeSaveToCollection(page, url, collectionName) {
   const labels = await root.locator("button,[role='button']").evaluateAll(nodes => nodes.map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" | "));
   const isSaved = /remover dos salvos|remove from saved/i.test(labels);
   if (isSaved) {
-    const savedControl = root.locator('button[aria-label*="Remove from saved" i],button[aria-label*="Remover dos salvos" i],[role="button"][aria-label*="Remove from saved" i],[role="button"][aria-label*="Remover dos salvos" i]').first();
-    if (await savedControl.count()) await savedControl.click();
-  } else {
-    const saveControl = await uniqueButton(page, ["^salvar$", "^save$"]);
-    await saveControl.click();
+    throw new Error("A publicação já está salva, mas não foi possível comprovar que está na coleção solicitada. Não vou alternar o estado de salvamento.");
   }
+  const saveControl = await uniqueButton(page, ["^salvar$", "^save$"]);
+  await saveControl.click();
   await page.waitForTimeout(700);
   const dialog = page.getByRole("dialog").last();
   const dialogVisible = await dialog.count() && await dialog.isVisible().catch(() => false);
