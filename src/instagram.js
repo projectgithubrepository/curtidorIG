@@ -338,6 +338,23 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     throw new Error("Não foi possível confirmar o ID da conversa aberta. Coleta cancelada para evitar misturar mensagens de outros grupos.");
   }
 
+  // A seleção da conversa no painel lateral pode reutilizar dados do cache do
+  // Instagram e não disparar a consulta que lista as mensagens. Reabrir a rota
+  // direta com a captura já conectada força uma carga independente do histórico.
+  // Isso também evita considerar a conversa aberta só porque a URL mudou.
+  try {
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.waitForTimeout(3500);
+  } catch (error) {
+    await networkCapture.stop();
+    throw new Error("A conversa foi selecionada, mas não foi possível recarregar o Direct para capturar o histórico: " + error.message);
+  }
+  const reloadedThreadId = page.url().match(/\/direct\/t\/(\d+)/)?.[1] || "";
+  if (reloadedThreadId !== activeThreadId) {
+    await networkCapture.stop();
+    throw new Error("O Instagram saiu da conversa selecionada durante a recarga. A coleta foi cancelada para evitar misturar mensagens.");
+  }
+
   const found = new Map();
   const fallback = new Map();
   const milestones = new Map();
