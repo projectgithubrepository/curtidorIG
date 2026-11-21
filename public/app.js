@@ -74,33 +74,28 @@ function renderPreliminary(summary, request) {
   }
   preliminaryPanel.hidden = false;
   preliminaryMode.textContent = "MODO TESTE — nenhuma ação executada";
-  preliminaryIntro.textContent = `${summary.publicationsFound ?? 0} publicações encontradas · ${summary.publicationsInspected ?? 0} inspecionadas · ${summary.stories ?? 0} Stories · ${summary.plannedActions ?? 0} etapas avaliadas. Os números abaixo são previsões do plano, não interações realizadas.`;
+  preliminaryIntro.textContent = `${summary.publicationsFound ?? 0} publicações encontradas · ${summary.publicationsInspected ?? 0} inspecionadas · ${summary.stories ?? 0} Stories. Os quantitativos abaixo mostram o que o sistema avaliou para a execução; não são ações realizadas.`;
   preliminaryMetrics.replaceChildren();
-
-  const labels = {
-    like: "Curtidas",
-    saveToCollection: "Salvamentos na coleção",
-    comment: "Comentários em publicações",
-    shareToGroup: "Envios ao grupo coletivo",
-    completionReaction: "Reações de conclusão no grupo de origem",
-    commentStory: "Comentários públicos em Stories",
-    shareStoryToGroup: "Envios de Stories ao grupo coletivo"
-  };
+  const labels = {like:"Curtidas",saveToCollection:"Salvamentos",comment:"Comentários em publicações",shareToGroup:"Envios ao grupo coletivo",completionReaction:"Reações no grupo de origem",commentStory:"Comentários em Stories",shareStoryToGroup:"Envios de Stories"};
   const totals = summary.actionTotals || {};
   const order = ["like","saveToCollection","comment","shareToGroup","completionReaction","commentStory","shareStoryToGroup"];
   for (const key of order) {
     const value = totals[key];
     if (!value) continue;
-    const row = document.createElement("article");
-    row.className = "result";
-    const title = document.createElement("strong");
-    title.textContent = labels[key] || key;
-    const count = document.createElement("p");
-    count.textContent = `${value.total} ocorrência(s) analisada(s) · ${value.simulated} apta(s) no plano · ${value.candidate || 0} aguardando pré-requisitos · ${value.done} já concluída(s) · ${value.dispensed || 0} dispensada(s) · ${value.waiting || 0} aguardando etapa(s) · ${value.blocked} bloqueada(s) · ${value.unverified} não verificada(s)`;
-    row.append(title,count);
-    preliminaryMetrics.append(row);
+    const tile = document.createElement("article");
+    tile.className = "metric-tile";
+    const label = document.createElement("span");
+    label.className = "metric-label";
+    label.textContent = labels[key] || key;
+    const number = document.createElement("strong");
+    number.className = "metric-number";
+    number.textContent = String(value.total ?? 0);
+    const detail = document.createElement("small");
+    detail.className = "metric-detail";
+    detail.textContent = `${value.simulated ?? 0} aptas · ${value.done ?? 0} concluídas · ${value.blocked ?? 0} bloqueadas · ${value.unverified ?? 0} não verificadas`;
+    tile.append(label, number, detail);
+    preliminaryMetrics.append(tile);
   }
-
   const note = document.createElement("p");
   note.className = "hint";
   note.textContent = `Coleção “${request.collectionName || "não informada"}” · Grupo coletivo “${request.destinationGroupName || "não informado"}” · ${summary.savedCollectionInventoryAvailable ? "Inventário da coleção confirmado" : "Inventário da coleção indisponível"}.`;
@@ -125,7 +120,7 @@ function render(items) {
     head.append(status,type,date,link); card.append(head);
 
     const details=document.createElement("details"); details.className="publication-details";
-    details.open = mode.value === "test";
+    details.open = false;
     const summary=document.createElement("summary"); summary.textContent="Ver análise completa e todas as etapas"; details.append(summary);
 
     const instruction=document.createElement("p");
