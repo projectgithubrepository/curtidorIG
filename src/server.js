@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { openInstagram, collectGroupPosts, inspectPost } from "./instagram.js";
+import { openInstagram, collectGroupPosts, inspectPost, inspectSavedCollection, unsaveSavedCollectionItem } from "./instagram.js";
 import { createComment } from "./comments.js";
 import { appendHistory, getTaskState, getRecentComments, readHistory } from "./history.js";
 import { mergeTaskState, taskStateLabel } from "./group-state.js";
@@ -19,6 +19,8 @@ let results = [];
 let progress = { total: 0, done: 0, current: "", message: "Pronto." };
 let diagnosticReport = null;
 let diagnosticLog = [];
+let cleanupResults = [];
+let cleanupProgress = { total: 0, done: 0, current: "", mode: "test", collectionName: "", message: "Nenhuma limpeza iniciada." };
 
 function logDiagnostic(level, message, details = {}) {
   diagnosticLog.push({
@@ -128,6 +130,7 @@ app.get("/api/status", (_req, res) => res.json({
   progress
 }));
 app.get("/api/results", (_req, res) => res.json({ results }));
+app.get("/api/cleanup-results", (_req, res) => res.json({ results: cleanupResults, progress: cleanupProgress }));
 app.get("/api/history", (_req, res) => res.type("text/csv; charset=utf-8").send(readHistory()));
 
 app.post("/api/confirm-action", (req, res) => {
@@ -189,6 +192,42 @@ app.post("/api/confirm-action", (req, res) => {
   res.json({ ok: true, taskState, status: item.status });
 });
 
+
+app.post("/api/cleanup", async (req, res) => {
+  if (running) return res.status(409).json({ error: "Já existe uma operação em andamento." });
+  const collectionName = String(req.body.collectionName ?? "").trim();
+  const mode = String(req.body.mode ?? "test").toLowerCase();
+  const confirmed = req.body.confirm === true;
+  if (!collectionName) return res.status(400).json({ error: "Informe o nome exato da coleção dos Salvos." });
+  if (!["test", "automatic"].includes(mode)) return res.status(400).json({ error: "Modo inválido. Use TESTE ou AUTOMÁTICO." });
+  if (mode === "automatic" && !confirmed) return res.status(400).json({ error: "A limpeza automática exige confirmação explícita." });
+  running = true; stopRequested = false; cleanupResults = [];
+  cleanupProgress = { total: 0, done: 0, current: collectionName, mode, collectionName, message: "Abrindo os Salvos..." };
+  res.json({ ok: true, message: mode === "test" ? "Teste iniciado: nenhuma publicação será alterada." : "Limpeza automática iniciada, item por item." });
+  (async () => {
+    try {
+      const context = await getInstagramContext();
+      const page = context.pages()[0] || await context.newPage();
+      const collection = await inspectSavedCollection(page, collectionName);
+      cleanupProgress.total = collection.items.length;
+      cleanupProgress.message = `${collection.items.length} publicações encontradas em “${collectionName}”.`;
+      for (const [index, item] of collection.items.entries()) {
+        if (stopRequested) break;
+        cleanupProgress.current = item.url;
+        if (mode === "test") cleanupResults.push({ ...item, status: "salva na coleção — seria dessalva individualmente; teste não altera nada" });
+        else {
+          const result = await unsaveSavedCollectionItem(page, item.url);
+          cleanupResults.push({ ...item, ...result });
+          if (!result.status.startsWith("dessalvada") && !result.status.startsWith("já dessalva")) { cleanupProgress.message = "Processo interrompido por segurança: " + result.status; break; }
+        }
+        cleanupProgress.done = index + 1;
+        cleanupProgress.message = `${cleanupProgress.done} de ${cleanupProgress.total} itens verificados.`;
+      }
+      cleanupProgress.message = stopRequested ? "Limpeza interrompida pelo usuário." : mode === "test" ? `Teste concluído: ${cleanupResults.length} itens listados. Nenhum salvamento foi alterado.` : `Limpeza finalizada: ${cleanupResults.filter(item => item.status.startsWith("dessalvada") || item.status.startsWith("já dessalva")).length} itens verificados.`;
+    } catch (error) { cleanupProgress.message = error.message; }
+    finally { running = false; cleanupProgress.current = ""; }
+  })();
+});
 
 app.post("/api/connect", async (_req, res) => {
   try {
