@@ -556,15 +556,30 @@ export async function inspectSavedCollection(page, collectionName) {
       const rect = anchor.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;
     })
-    .map(anchor => ({
-      href: anchor.href,
-      text: (anchor.innerText || "").trim(),
-      ariaLabel: (anchor.getAttribute("aria-label") || "").trim(),
-      title: (anchor.getAttribute("title") || "").trim(),
-      labels: [...anchor.querySelectorAll("[aria-label],[title],img[alt]")]
-        .flatMap(node => [node.getAttribute("aria-label"), node.getAttribute("title"), node.getAttribute("alt")])
-        .filter(Boolean)
-    })));
+    .map(anchor => {
+      // Em algumas versões do Instagram, o nome da coleção fica fora do
+      // próprio <a>, em um irmão ou no cartão que envolve a miniatura.
+      // Recolhe somente rótulos dos ancestrais próximos, sem usar o texto
+      // global da página, e mantém o href real do link dentro de Salvos.
+      const ancestorLabels = [];
+      for (let node = anchor, depth = 0; node && depth < 4; node = node.parentElement, depth++) {
+        if (node === document.body || node === document.documentElement) break;
+        const text = (node.innerText || "").trim();
+        if (text && text.length <= 500) ancestorLabels.push(text);
+        for (const child of node.querySelectorAll("[aria-label],[title],img[alt]")) {
+          for (const value of [child.getAttribute("aria-label"), child.getAttribute("title"), child.getAttribute("alt")]) {
+            if (value) ancestorLabels.push(value);
+          }
+        }
+      }
+      return {
+        href: anchor.href,
+        text: (anchor.innerText || "").trim(),
+        ariaLabel: (anchor.getAttribute("aria-label") || "").trim(),
+        title: (anchor.getAttribute("title") || "").trim(),
+        labels: [...new Set(ancestorLabels)]
+      };
+    }));
   const collectionHref = selectSavedCollectionHref(anchors, name, page.url());
   await page.goto(collectionHref, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1400);
