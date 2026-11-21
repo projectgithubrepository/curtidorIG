@@ -1070,7 +1070,6 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
   if (directMatch) {
     const expectedThreadId = directMatch[1];
     await page.goto(`https://www.instagram.com/direct/t/${expectedThreadId}/`, { waitUntil:"domcontentloaded", timeout:60000 });
-    await page.waitForTimeout(1400);
     if (page.url().includes("/accounts/login")) {
       return { verified:false, reason:"Instagram redirecionou para o login; grupo coletivo não foi verificado.", threadId:"" };
     }
@@ -1078,13 +1077,28 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
     if (openedThreadId !== expectedThreadId) {
       return { verified:false, reason:`A URL direta não abriu a conversa esperada. ID solicitado: ${expectedThreadId}; ID aberto: ${openedThreadId || "não identificado"}.`, threadId:openedThreadId };
     }
-    const headerEvidence = await page.locator("main header, [role='main'] header, main [role='heading'], main h1").evaluateAll(nodes =>
-      nodes.filter(node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; })
-        .map(node => (node.innerText || "").trim()).filter(Boolean)
-    ).catch(() => []);
-    groupName = headerEvidence.flatMap(value => value.split(/\r?\n/)).map(value => value.trim())
-      .find(value => value && value.length < 120 && !/^(instagram|mensagens|messages|detalhes|details)$/i.test(value)) || "";
-    if (!groupName) return { verified:false, reason:"A conversa abriu, mas não foi possível ler seu nome no cabeçalho. Inventário e envios bloqueados.", threadId:openedThreadId, headerEvidence:headerEvidence.slice(0,5) };
+    // O cabeçalho do Direct pode ser hidratado depois da navegação. Esperar
+    // alguns ciclos e consultar também controles acessíveis do cabeçalho evita
+    // falso negativo por leitura prematura, sem inferir o nome pela URL.
+    let headerEvidence = [];
+    for (let attempt = 0; attempt < 7 && !groupName; attempt++) {
+      headerEvidence = await page.locator(
+        "main header, [role='main'] header, main [role='heading'], main h1, main header [role='button'], main header button"
+      ).evaluateAll(nodes =>
+        nodes.filter(node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; })
+          .map(node => [node.innerText, node.getAttribute("aria-label"), node.getAttribute("title")].filter(Boolean).join("\n").trim())
+          .filter(Boolean)
+      ).catch(() => []);
+      groupName = headerEvidence.flatMap(value => value.split(/\r?\n/)).map(value => value.trim())
+        .find(value => value && value.length < 120 && !/^(instagram|mensagens|messages|detalhes|details|audio|video|ligar|call|search)$/i.test(value)) || "";
+      if (!groupName) await page.waitForTimeout(700);
+    }
+    if (!groupName) return {
+      verified:false,
+      reason:"A URL abriu a conversa correta, mas o nome não apareceu nos elementos acessíveis do cabeçalho após aguardar a renderização. Inventário e envios bloqueados.",
+      threadId:openedThreadId,
+      headerEvidence:headerEvidence.slice(0,8)
+    };
   }
   const threadId = page.url().match(/\/direct\/t\/(\d+)/)?.[1] || "";
   if (!threadId) return { verified:false, reason:`A conversa “${groupName}” abriu, mas o ID da conversa não foi confirmado.`, threadId:"", sharedUrls:[], sharedInventoryComplete:false };
