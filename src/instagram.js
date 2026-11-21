@@ -203,7 +203,7 @@ async function scrollToOlderMessages(page) {
   return { progressed, before, after, usedWheelFallback };
 }
 
-function addNetworkMessages(records, { groupThreadId, startDate, endDate, found, fallback, milestones }) {
+export function addNetworkMessages(records, { groupThreadId, startDate, endDate, found, fallback, milestones }) {
   let accepted = 0;
   let unknownDateCandidates = 0;
   let rejectedThread = 0;
