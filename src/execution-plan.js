@@ -21,6 +21,7 @@ export function buildExecutionPlan({
   taskState = {},
   comment = "",
   collectionName = "",
+  destinationGroupName = "grupo de envios",
   completionEmoji = "🌸",
   mode = "test",
   instructions = {},
@@ -43,7 +44,7 @@ export function buildExecutionPlan({
     { action: "like", label: "Curtir", alreadyDone: state.liked, eligible: true, required: true },
     { action: "saveToCollection", label: `Salvar na coleção “${collectionName || "Curtido"}”`, alreadyDone: state.saved && state.savedFolderVerified, eligible: Boolean(collectionName), required: true },
     { action: "comment", label: "Comentar", alreadyDone: state.commented, eligible: policy.comment !== "forbidden" && isValidComment(comment), required: policy.comment !== "forbidden", policy: policy.comment },
-    { action: "shareToGroup", label: "Enviar para o grupo de destino", alreadyDone: state.sharedToGroup, eligible: !state.shareAttempted || state.sharedToGroup, required: true, policy: "required" },
+    { action: "shareToGroup", label: `Enviar para o grupo coletivo “${destinationGroupName || "grupo de envios"}”`, alreadyDone: state.sharedToGroup, eligible: !state.shareAttempted || state.sharedToGroup, required: true, policy: "required" },
     { action: "completionReaction", label: `Reagir à mensagem original com ${completionEmoji}`, alreadyDone: state.groupCheck, eligible: true, required: true, requiresAllPrevious: true }
   ];
   const requiredStepsDone = plan.slice(0, 4).every(item => !item.required || item.alreadyDone);
