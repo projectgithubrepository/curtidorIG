@@ -50,3 +50,13 @@ test("classifies HTTP errors with their response status", () => {
     selectors: {}
   }), error => error.inspectionDiagnostics.reason === "http-error" && /404/.test(error.message));
 });
+
+test("blocks planning when Instagram redirects a requested post to different content", () => {
+  assert.throws(() => interpretPostSnapshot({
+    requestedUrl:"https://www.instagram.com/p/REQUESTED123",
+    url:"https://www.instagram.com/p/OTHERPOST456/",
+    httpStatus:200,
+    bodyText:"Publicação diferente",
+    selectors:{article:true}
+  }), error => error.inspectionDiagnostics.reason === "content-redirect");
+});
