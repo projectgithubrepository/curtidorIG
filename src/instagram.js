@@ -650,7 +650,7 @@ export async function executeComment(page, url, comment) {
   return { commented: true, status: "comentário publicado e verificado" };
 }
 
-export async function executeShareToGroup(page, url, destinationGroupName) {
+export async function executeShareToGroup(page, url, destinationGroupName, onBeforeSend = async () => {}) {
   const groupName = String(destinationGroupName || "").trim();
   if (!groupName) throw new Error("Informe o nome exato do grupo coletivo de envios.");
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
@@ -669,6 +669,7 @@ export async function executeShareToGroup(page, url, destinationGroupName) {
   await page.waitForTimeout(400);
   const send = dialog.getByRole("button", { name: /enviar|send|compartilhar/i }).last();
   if (!(await send.count())) throw new Error("Botão de envio não identificado.");
+  await onBeforeSend();
   await send.click();
   await page.waitForTimeout(1200);
   const confirmation = await page.locator("body").innerText();
