@@ -13,6 +13,7 @@ const counter = document.querySelector("#counter");
 const current = document.querySelector("#current");
 const bar = document.querySelector("#bar");
 const results = document.querySelector("#results");
+let lastResultsSignature = "";
 
 const connect = document.querySelector("#connect");
 const copyDiagnostic = document.querySelector("#copyDiagnostic");
@@ -79,6 +80,7 @@ function render(items) {
     head.append(status,type,date,link); card.append(head);
 
     const details=document.createElement("details"); details.className="publication-details";
+    details.open = mode.value === "test";
     const summary=document.createElement("summary"); summary.textContent="Ver análise completa e todas as etapas"; details.append(summary);
 
     const instruction=document.createElement("p");
@@ -265,7 +267,10 @@ async function refresh() {
     state.textContent=data.running?"Coletando":(data.connected?"Instagram conectado":"Pronto"); if (p.message) message.textContent=p.message;
     counter.textContent=`${p.done} de ${p.total} itens avaliados`;
     current.textContent=p.current||""; bar.style.width=p.total?`${Math.min(100,p.done/p.total*100)}%`:"0%";
-    start.disabled=data.running; stop.disabled=!data.running; render(r.results||[]);
+    start.disabled=data.running; stop.disabled=!data.running;
+    const resultItems=r.results||[];
+    const resultSignature=JSON.stringify(resultItems);
+    if(resultSignature!==lastResultsSignature){ render(resultItems); lastResultsSignature=resultSignature; }
     cleanupMessage.textContent = cleanup.progress?.message || "Nenhuma limpeza iniciada.";
     cleanupCounter.textContent = cleanup.progress ? `${cleanup.progress.done} de ${cleanup.progress.total} itens processados` : "";
     cleanupStop.disabled = !data.running || !cleanup.progress?.total;
