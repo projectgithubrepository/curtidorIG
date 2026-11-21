@@ -712,7 +712,7 @@ export async function inspectSavedCollection(page, collectionNameOrUrl) {
         .map(node => (node.innerText || "").trim()).filter(value => value && value.length < 180)
     ).catch(() => []);
     const slugLabel = decodeURIComponent(expectedSlug).replace(/[-_]+/g," ").trim();
-    const collectionName = headingTexts.flatMap(value => value.split("\\n")).map(value => value.trim())
+    const collectionName = headingTexts.flatMap(value => value.split("\n")).map(value => value.trim())
       .find(value => value && !/^salvos$|^saved$|^coleções$|^collections$/i.test(value) && value.length < 100) || slugLabel;
     let stableRounds = 0, previousCount = 0;
     for (let round=0; round<80 && stableRounds<5; round++) {
@@ -725,8 +725,8 @@ export async function inspectSavedCollection(page, collectionNameOrUrl) {
       const map = new Map();
       for (const anchor of anchors) { try {
         const url = new URL(anchor.href);
-        if (!/^\\/(p|reel|tv)\\//.test(url.pathname)) continue;
-        const clean = url.origin + url.pathname.replace(/\\/$/,"");
+        if (!["/p/","/reel/","/tv/"].some(prefix => url.pathname.startsWith(prefix))) continue;
+        const clean = url.origin + url.pathname.replace(/\/$/,"");
         if (!map.has(clean)) map.set(clean,{url:clean,contentType:url.pathname.includes("/reel/")?"reel":"feed"});
       } catch {} }
       return [...map.values()];
@@ -1037,7 +1037,7 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
         .map(node => (node.innerText || "").trim()).filter(Boolean)
     ).catch(() => []);
     const normalized = value => String(value || "").normalize("NFKC").replace(/[\s\u200B-\u200D\uFEFF]+/g," ").trim().toLocaleLowerCase();
-    groupName = headerEvidence.flatMap(value => value.split(/\\r?\\n/)).map(value => value.trim())
+    groupName = headerEvidence.flatMap(value => value.split(/\r?\n/)).map(value => value.trim())
       .find(value => value && value.length < 120 && !/^(instagram|mensagens|messages|detalhes|details)$/i.test(value)) || "";
     if (!groupName) return { verified:false, reason:"A conversa abriu, mas não foi possível ler seu nome no cabeçalho. Inventário e envios bloqueados.", threadId:openedThreadId, headerEvidence:headerEvidence.slice(0,5) };
   } else {
