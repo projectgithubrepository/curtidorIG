@@ -528,8 +528,8 @@ app.post("/api/start", async (req, res) => {
         else if (/^já concluída/.test(action.status)) bucket.done++;
         else if (/^dispensada/.test(action.status)) bucket.dispensed++;
         else if (/^aguardando/.test(action.status)) bucket.waiting++;
+        else if (action.testMode?.candidate) bucket.candidate++;
         else bucket.unclassified++;
-        if (action.testMode?.candidate) bucket.candidate++;
       }
       const preliminaryLines = Object.entries(actionTotals).map(([key,value]) =>
         `- ${actionLabels[key] || key}: ${value.total} previstas | ${value.simulated} aptas no TESTE | ${value.candidate} candidatas | ${value.waiting} aguardando etapas | ${value.unverified} não verificadas | ${value.blocked} bloqueadas | ${value.done} já concluídas | ${value.unclassified} sem classificação`
