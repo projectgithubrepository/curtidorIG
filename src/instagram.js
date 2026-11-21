@@ -632,7 +632,8 @@ export function getGroupShareState(url, inventory = {}) {
     } catch { return String(value || ""); }
   };
   if ((inventory.sharedUrls || []).some(value => canonical(value) === canonical(url))) return "already-shared";
-  return inventory.inventoryComplete === true ? "not-shared" : "unknown";
+  const complete = inventory.inventoryComplete === true || inventory.sharedInventoryComplete === true;
+  return complete ? "not-shared" : "unknown";
 }
 
 export async function inspectPost(page, url) {
@@ -1253,6 +1254,7 @@ async function verifyNewShareInDestination(page, url, groupInventory) {
 export async function executeShareToGroup(page, url, destinationGroupName, onBeforeSend = async () => {}, groupInventory = null) {
   const groupName = String(destinationGroupName || "").trim();
   if (!groupName) throw new Error("O nome do grupo não foi identificado a partir da URL informada.");
+  if (!groupInventory?.verified || !groupInventory?.sharedInventoryComplete || !groupInventory?.threadId) throw new Error("Grupo coletivo e inventário do histórico não foram confirmados; envio bloqueado.");
   if (getGroupShareState(url, groupInventory) === "unknown") throw new Error("Histórico do grupo coletivo não foi conferido integralmente; envio bloqueado para evitar duplicidade.");
   if (getGroupShareState(url, groupInventory) === "already-shared") {
     return { sharedToGroup:true, status:"publicação já encontrada no grupo coletivo — não reenviada" };
