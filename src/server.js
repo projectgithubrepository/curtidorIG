@@ -462,7 +462,16 @@ app.post("/api/start", async (req, res) => {
         if (stopRequested) break;
         const groupShareState = getGroupShareState(item.url, destinationGroupVerification);
         const alreadyInDestinationGroup = groupShareState === "already-shared";
-        const previousState = mergeTaskState(getTaskState(item.url, item.threadId, item.messageId, completionEmoji), { sharedToGroup: alreadyInDestinationGroup });
+        const historicalState = getTaskState(item.url, item.threadId, item.messageId, completionEmoji);
+        // O CSV é uma trilha histórica/proteção de tentativas, não prova do
+        // estado atual no Instagram. Somente a inspeção da sessão atual ou o
+        // inventário atual do destino pode marcar uma ação como concluída.
+        const previousState = {
+          liked:false, saved:false, savedFolderVerified:false, commented:false,
+          sharedToGroup:alreadyInDestinationGroup,
+          shareAttempted:Boolean(historicalState.shareAttempted && !alreadyInDestinationGroup),
+          commentForbidden:false, groupCheck:false, reactionEmoji:"", complete:false
+        };
         const instructions = interpretGroupInstructions(item.messageText || "");
         if (item.dateUnknown) {
           const reason = "A mensagem e o link foram extraídos, mas o Instagram não forneceu um timestamp válido. O item foi mantido como candidato, porém não pode ser atribuído com segurança ao período selecionado nem executado.";
@@ -489,9 +498,9 @@ app.post("/api/start", async (req, res) => {
           try {
             const story = await inspectStory(page, item.url);
             const commentForbidden = instructions.comment === "forbidden";
-            const commentAlreadyDone = Boolean(previousState.commented || story.alreadyCommented);
+            const commentAlreadyDone = Boolean(story.alreadyCommented);
             const shareState = getGroupShareState(item.url, destinationGroupVerification);
-            const shareAlreadyDone = Boolean(previousState.sharedToGroup || shareState === "already-shared");
+            const shareAlreadyDone = shareState === "already-shared";
             let taskState = mergeTaskState(previousState, {
               commented: commentAlreadyDone,
               commentForbidden,
@@ -557,7 +566,7 @@ app.post("/api/start", async (req, res) => {
               shareState === "unknown" || !destinationGroupVerification.verified || !destinationGroupVerification.sharedInventoryComplete
                 ? "não verificada — grupo coletivo ou inventário não confirmado"
                 : mode === "test" ? "simulada — nenhuma ação executada"
-                : actionLog.find(entry=>entry.action==="shareStory")?.status || "aguardando ação manual";
+                : actionLog.find(entry=>entry.action==="shareStoryToGroup")?.status || "aguardando ação manual";
             const storyRequiredDone = (taskState.commented || commentForbidden) && taskState.sharedToGroup;
             const reactionStatus = taskState.groupCheck ? "já concluída — não repetir" :
               !item.identityVerified ? "não verificada — mensagem original não identificada" :
