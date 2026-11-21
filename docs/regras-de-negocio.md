@@ -32,6 +32,15 @@ Não haverá campo para colar links manualmente como fluxo principal.
 
 **Definição do período:** o filtro considera a data em que a publicação foi compartilhada na conversa, não a data original em que o autor publicou o conteúdo no Instagram.
 
+### Limite e encerramento da varredura do histórico
+
+- Não existe teto fixo de mensagens, respostas de rede ou rodadas de rolagem para a coleta.
+- Continuar percorrendo o histórico até encontrar uma mensagem anterior à data inicial selecionada ou confirmar, após movimento real do painel correto, o início do histórico.
+- Não considerar um contêiner já posicionado em `scrollTop = 0` como prova de histórico completo se nenhuma rolagem real foi observada; isso pode indicar que o seletor escolheu o painel errado.
+- Se a rolagem não avançar por 8 tentativas consecutivas, interromper como **incompleta/travada**, preservar diagnóstico e não liberar execução automática. Esse mecanismo é proteção contra loop infinito, não um limite de mensagens.
+- A captura de rede deve continuar processando respostas além de 500; o relatório pode limitar apenas a quantidade de detalhes individuais exibidos, sem descartar mensagens capturadas.
+
+
 ## Referência administrativa posterior ao fechamento
 
 A mensagem administrativa com os totais de Feed/Reels e Stories é publicada depois do fechamento do período. Portanto, ela é um gabarito de conferência, não uma fonte necessária para executar a coleta.
