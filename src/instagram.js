@@ -496,42 +496,73 @@ export async function inspectPost(page, url) {
 }
 
 
-// Inspeciona uma coleção dos Salvos usando somente a interface visível do Instagram.
+export function isInstagramSavedUrl(value, base = "https://www.instagram.com/") {
+  try {
+    const url = new URL(value, base);
+    return /(^|\.)instagram\.com$/i.test(url.hostname) &&
+      url.pathname.split("/").filter(Boolean).some(segment => segment.toLowerCase() === "saved");
+  } catch { return false; }
+}
+
+export function selectSavedCollectionHref(anchors, collectionName, baseUrl) {
+  const wanted = String(collectionName || "").trim().toLocaleLowerCase();
+  if (!wanted) throw new Error("Informe o nome exato da coleção.");
+  const base = new URL(baseUrl);
+  if (!isInstagramSavedUrl(base.href)) throw new Error("A página atual não pertence à área Salvos do Instagram.");
+  const matches = (anchors || []).filter(anchor => {
+    if (String(anchor.text || "").trim().toLocaleLowerCase() !== wanted) return false;
+    try {
+      const url = new URL(anchor.href, base.href);
+      return url.origin === base.origin && isInstagramSavedUrl(url.href, base.href);
+    } catch { return false; }
+  });
+  const unique = [...new Map(matches.map(item => {
+    const url = new URL(item.href, base.href);
+    return [url.href, url.href];
+  })).values()];
+  if (unique.length !== 1) {
+    throw new Error(unique.length
+      ? "Há mais de um link compatível com essa coleção dentro de Salvos; navegação bloqueada por segurança."
+      : "Não encontrei um link inequívoco para a coleção \"" + collectionName + "\" dentro de Salvos. Nenhuma alteração foi feita.");
+  }
+  return unique[0];
+}
+
+// Inspeciona uma coleção dos Salvos. Nunca segue links que saiam dessa área.
 export async function inspectSavedCollection(page, collectionName) {
   const name = String(collectionName || "").trim();
   if (!name) throw new Error("Informe o nome exato da coleção que será usada como origem.");
   await page.goto("https://www.instagram.com/saved/", { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1800);
-  if (page.url().includes("/accounts/login")) throw new Error("Faça login no Instagram antes de acessar os Salvos.");
-  const collectionHref = await page.locator("a[href]").evaluateAll((anchors, wanted) => {
-    const normalize = value => (value || "").trim().toLocaleLowerCase();
-    const match = anchors.find(anchor => normalize(anchor.innerText) === normalize(wanted));
-    return match?.href || "";
-  }, name);
-  if (collectionHref) {
-    await page.goto(collectionHref, { waitUntil: "domcontentloaded", timeout: 60000 });
-  } else {
-    const collection = page.getByText(name, { exact: true }).first();
-    if (!(await collection.count())) throw new Error(`Não encontrei a coleção "${name}" nos Salvos. Nenhuma alteração foi feita.`);
-    await collection.click();
+  if (/\/accounts\/login/.test(page.url())) throw new Error("Faça login no Instagram antes de acessar os Salvos.");
+  if (!isInstagramSavedUrl(page.url())) {
+    throw new Error("O Instagram redirecionou para fora de Salvos (" + page.url() + "). Navegação e dessalvamento cancelados.");
   }
+  const anchors = await page.locator("main a[href]").evaluateAll(nodes => nodes.map(anchor => ({
+    href: anchor.href,
+    text: (anchor.innerText || anchor.getAttribute("aria-label") || "").trim()
+  })));
+  const collectionHref = selectSavedCollectionHref(anchors, name, page.url());
+  await page.goto(collectionHref, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1400);
-  // Carrega a coleção progressivamente até não surgirem novos itens (limite defensivo).
+  if (!isInstagramSavedUrl(page.url())) {
+    throw new Error("O link da coleção redirecionou para fora de Salvos (" + page.url() + "). Nenhuma publicação será processada.");
+  }
   let stableRounds = 0;
   let previousCount = 0;
   for (let round = 0; round < 80 && stableRounds < 5; round++) {
-    const count = await page.locator('a[href*="/p/"],a[href*="/reel/"],a[href*="/tv/"]').count();
+    const count = await page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]').count();
     stableRounds = count > previousCount ? 0 : stableRounds + 1;
     previousCount = count;
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await page.waitForTimeout(650);
   }
-  const items = await page.locator('a[href*="/p/"],a[href*="/reel/"],a[href*="/tv/"]').evaluateAll(anchors => {
+  const items = await page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]').evaluateAll(anchors => {
     const map = new Map();
     for (const anchor of anchors) {
       try {
         const url = new URL(anchor.href);
-        if (!/\/(p|reel|tv)\//.test(url.pathname)) continue;
+        if (!/^\/(p|reel|tv)\//.test(url.pathname)) continue;
         const clean = url.origin + url.pathname.replace(/\/$/, "");
         if (!map.has(clean)) map.set(clean, { url: clean, contentType: url.pathname.includes("/reel/") ? "reel" : "feed" });
       } catch {}
@@ -542,36 +573,50 @@ export async function inspectSavedCollection(page, collectionName) {
 }
 
 async function readSavedToggle(page) {
-  return page.locator("article,main,[role='dialog']").first().evaluate(root => {
-    const controls = [...root.querySelectorAll('button,[role="button"]')];
-    const labels = controls.map(node => [
-      node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText
-    ].filter(Boolean).join(" ")).join(" | ");
-    if (/remover dos salvos|remove from saved/i.test(labels)) return "saved";
-    if (/salvar|save/i.test(labels) && !/remover dos salvos|remove from saved/i.test(labels)) return "unsaved";
+  return page.locator("article,main,[role='dialog']").evaluateAll(roots => {
+    const controls = roots.flatMap(root => [...root.querySelectorAll('button,[role="button"]')]);
+    const labels = controls.filter(node => {
+      const rect = node.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }).map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ").trim()).filter(Boolean);
+    if (labels.some(label => /remover dos salvos|remove from saved|remove saved/i.test(label))) return "saved";
+    if (labels.some(label => /^(salvar|save|salvar publicação|save post)$/i.test(label))) return "unsaved";
     return "unknown";
-  }).catch(() => "unknown");
+  }).then(states => states.includes("saved") ? "saved" : states.includes("unsaved") ? "unsaved" : "unknown").catch(() => "unknown");
 }
 
 export async function unsaveSavedCollectionItem(page, url) {
-  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-  await page.waitForFunction(() => {
-    const root = document.querySelector("article,main,[role=dialog]");
-    const labels = [...(root?.querySelectorAll("button,[role=button]") || [])].map(node => [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText].filter(Boolean).join(" ")).join(" ");
-    return /remover dos salvos|remove from saved|salvar|save/i.test(labels);
-  }, null, { timeout: 10000 }).catch(() => {});
+  let target;
+  try { target = new URL(url); } catch { return { url, status: "bloqueada — URL inválida" }; }
+  if (!/^www\.?instagram\.com$/i.test(target.hostname) || !/^\/(p|reel|tv)\//.test(target.pathname)) {
+    return { url, status: "bloqueada — URL não é uma publicação válida do Instagram" };
+  }
+  await page.goto(target.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForTimeout(900);
+  if (/\/accounts\/login/.test(page.url())) return { url, status: "bloqueada — Instagram solicitou login" };
+  let current;
+  try { current = new URL(page.url()); } catch { return { url, status: "bloqueada — endereço final inválido" }; }
+  if (current.hostname !== target.hostname || current.pathname.replace(/\/$/, "") !== target.pathname.replace(/\/$/, "")) {
+    return { url, status: "bloqueada — Instagram redirecionou para outro endereço; nenhum clique realizado" };
+  }
   const before = await readSavedToggle(page);
   if (before === "unsaved") return { url, status: "já dessalva — nenhuma ação" };
-  if (before !== "saved") return { url, status: "bloqueada — não foi possível confirmar o estado salvo" };
-  const button = page.locator('article button[aria-label*="Remove from saved" i],article button[aria-label*="Remover dos salvos" i],main button[aria-label*="Remove from saved" i],main button[aria-label*="Remover dos salvos" i],[role="dialog"] button[aria-label*="Remove from saved" i],[role="dialog"] button[aria-label*="Remover dos salvos" i]').first();
-  if (!(await button.count())) return { url, status: "bloqueada — controle de dessalvar não identificado" };
-  await button.click();
-  await page.waitForTimeout(900);
+  if (before !== "saved") return { url, status: "bloqueada — não foi possível confirmar o estado salvo pelo controle do Instagram" };
+  const controls = page.locator("article button,article [role='button'],main button,main [role='button'],[role='dialog'] button,[role='dialog'] [role='button']");
+  const matches = [];
+  for (let index = 0; index < await controls.count(); index++) {
+    const control = controls.nth(index);
+    if (!(await control.isVisible().catch(() => false))) continue;
+    const label = await control.evaluate(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ").trim());
+    if (/remover dos salvos|remove from saved|remove saved/i.test(label)) matches.push(control);
+  }
+  if (matches.length !== 1) return { url, status: "bloqueada — controle explícito de remover dos salvos não identificado de forma única" };
+  await matches[0].click();
+  await page.waitForTimeout(1000);
   const after = await readSavedToggle(page);
   if (after !== "unsaved") return { url, status: "falha de verificação — estado após clique: " + after };
   return { url, status: "dessalvada e verificada" };
 }
-
 
 function visibleButton(page, patterns, root = "article,main,[role='dialog']") {
   const names = patterns.map(pattern => new RegExp(pattern, "i"));
