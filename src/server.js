@@ -341,8 +341,7 @@ app.post("/api/start", async (req, res) => {
             const story = await inspectStory(page, item.url);
             const comment = previousState.commented ? "" : createComment("", [...previous, ...results.map(r => r.comment).filter(Boolean)]);
             const storyPlan = [
-              { action:"commentStory", label:"Comentar publicamente no próprio Story", required:true, alreadyDone:Boolean(previousState.commented || story.alreadyCommented), eligible:story.publicCommentAvailable },
-              { action:"shareToGroup", label:`Enviar Story para o grupo coletivo “${destinationGroupName}”`, required:true, alreadyDone:Boolean(previousState.sharedToGroup), eligible:false }
+              { action:"commentStory", label:"Comentar publicamente no próprio Story", required:true, alreadyDone:Boolean(previousState.commented || story.alreadyCommented), eligible:story.publicCommentAvailable }
             ].map((entry,index) => {
               let status = entry.alreadyDone ? "já concluída — não repetir" :
                 entry.action==="commentStory" && !entry.eligible ? "bloqueada — comentários públicos indisponíveis neste Story" :
@@ -350,7 +349,7 @@ app.post("/api/start", async (req, res) => {
                 mode==="test" ? "simulada — nenhuma ação executada" :
                 entry.action==="shareToGroup" ? "bloqueada — fluxo específico de compartilhamento de Stories ainda não validado" :
                 "pronta para execução";
-              return {...entry,status,sequence:index+1,reason:entry.action==="shareToGroup" ? "Não usar resposta privada como substituto do compartilhamento do Story." : ""};
+              return {...entry,status,sequence:index+1,reason:entry.action==="commentStory" && !entry.eligible ? "O recurso de comentário público não está disponível neste Story; não enviar resposta privada." : ""};
             });
             const actionLog=[];
             let taskState=previousState;
