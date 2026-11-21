@@ -199,7 +199,7 @@ async function refresh() {
     const [sr,rr,cr]=await Promise.all([fetch("/api/status"),fetch("/api/results"),fetch("/api/cleanup-results")]);
     const data=await sr.json(), p=data.progress, r=await rr.json(), cleanup=await cr.json();
     state.textContent=data.running?"Coletando":(data.connected?"Instagram conectado":"Pronto"); if (p.message) message.textContent=p.message;
-    counter.textContent=`${p.done} de ${p.total} publicações processadas`;
+    counter.textContent=`${p.done} de ${p.total} itens avaliados`;
     current.textContent=p.current||""; bar.style.width=p.total?`${Math.min(100,p.done/p.total*100)}%`:"0%";
     start.disabled=data.running; stop.disabled=!data.running; render(r.results||[]);
     cleanupMessage.textContent = cleanup.progress?.message || "Nenhuma limpeza iniciada.";
