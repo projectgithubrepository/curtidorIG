@@ -147,7 +147,8 @@ A mensagem administrativa com os totais de Feed/Reels e Stories é publicada dep
 - Mensagens com link e identidade, mas sem timestamp, não podem ser descartadas. Mantê-las como candidatas com data desconhecida, informar a quantidade e não executar ações nelas até confirmar que pertencem ao período.
 - A quantidade de mensagens/pedidos não deve ser confundida com a quantidade de URLs únicas. Deduplicar URLs não pode apagar pedidos distintos identificados por message_id.
 - Normalizar texto administrativo e instruções com compatibilidade Unicode (NFKD), pois avisos do grupo podem usar letras matemáticas/itálicas estilizadas e ainda precisam ser reconhecidos.
-- Antes de classificar envios ao grupo coletivo como aptos, localizar a conversa pelo nome exato e confirmar que abriu uma conversa com ID. Se a coleta estiver incompleta ou o grupo de destino não for confirmado, cancelar a execução automática antes de qualquer ação.
+- Antes de classificar envios ao grupo coletivo como aptos, localizar a conversa pelo nome exato e confirmar que abriu uma conversa com ID.
+- Quando houver URL direta do grupo coletivo (`https://www.instagram.com/direct/t/ID/`), usá-la como localizador primário: abrir o ID informado, confirmar que o ID da conversa aberta corresponde ao ID da URL e validar o nome exato no cabeçalho. Só depois inventariar o histórico. Se ID ou nome não coincidirem, bloquear os envios; não recorrer silenciosamente a outra conversa. Se a coleta estiver incompleta ou o grupo de destino não for confirmado, cancelar a execução automática antes de qualquer ação.
 
 #### Diagnóstico obrigatório no relatório preliminar
 
