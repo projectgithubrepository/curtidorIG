@@ -43,7 +43,9 @@ function reportItem(item) {
     status: item.status || "",
     taskState: item.taskState || null,
     identityVerified: Boolean(item.identityVerified),
-    inspectionDiagnostics: item.inspectionDiagnostics || null
+    inspectionDiagnostics: item.inspectionDiagnostics || null,
+    plan: item.plan || [],
+    actionLog: item.actionLog || []
   };
 }
 
@@ -317,7 +319,7 @@ app.post("/api/start", async (req, res) => {
         }
         try {
           const inspection = await inspectPost(page, item.url);
-          let taskState = mergeTaskState(previousState, inspection.observedState);
+          let taskState = mergeTaskState(previousState, { ...inspection.observedState, commentForbidden: instructions.comment === "forbidden" });
           const comment = taskState.commented || instructions.comment === "forbidden" ? "" : createComment(inspection.caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
           const actionLog = [];
           if (mode === "automatic") {
