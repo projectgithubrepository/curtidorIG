@@ -1265,22 +1265,49 @@ export async function executeStoryComment(page, url, comment) {
   return {commented:true,status:"comentário público no Story publicado e verificado"};
 }
 
-export async function executeStoryShareToGroup(page, url, destinationGroupName, onBeforeSend=async()=>{}) {
+export async function executeStoryShareToGroup(page, url, destinationGroupName, destinationGroupUrl, onBeforeSend=async()=>{}, groupInventory=null) {
   const groupName=String(destinationGroupName||"").trim();
-  if(!groupName) throw new Error("Informe o grupo coletivo de destino.");
-  await page.goto(url,{waitUntil:"domcontentloaded",timeout:60000}); await page.waitForTimeout(1000);
-  const share=page.getByRole("button",{name:/compartilhar|share|enviar/i}).last();
-  if(!(await share.count())) throw new Error("Controle de compartilhamento do Story não identificado.");
-  await share.click(); await page.waitForTimeout(700);
+  const destinationUrl=String(destinationGroupUrl||"").trim();
+  const match=destinationUrl.match(/^https:\/\/www\.instagram\.com\/direct\/t\/(\d+)\/?(?:[?#].*)?$/i);
+  if(!groupName || !match) throw new Error("Grupo coletivo ou URL direta de destino não informado.");
+  if(!groupInventory?.verified || !groupInventory?.sharedInventoryComplete || groupInventory.threadId!==match[1]) {
+    throw new Error("Grupo coletivo e inventário do histórico não foram confirmados; compartilhamento de Story bloqueado.");
+  }
+  const currentState=getGroupShareState(url,groupInventory);
+  if(currentState==="already-shared") return {sharedToGroup:true,status:"Story já encontrado no grupo coletivo — não reenviado"};
+  if(currentState!=="not-shared") throw new Error("Não foi possível comprovar se o Story já está no grupo coletivo; envio bloqueado para evitar duplicidade.");
+  let requested;
+  try { requested=new URL(url); } catch { throw new Error("URL do Story inválida."); }
+  if(requested.hostname!=="www.instagram.com" || !/^\/stories\/[^/]+\/\d+\/?$/.test(requested.pathname)) throw new Error("O endereço informado não é um Story canônico do Instagram.");
+  await page.goto(requested.href,{waitUntil:"domcontentloaded",timeout:60000});
+  await page.waitForTimeout(1000);
+  if(/\/accounts\/login/.test(page.url())) throw new Error("Instagram solicitou login antes do compartilhamento do Story.");
+  let opened;
+  try { opened=new URL(page.url()); } catch { throw new Error("O Instagram abriu um endereço inválido para o Story."); }
+  if(opened.origin!==requested.origin || opened.pathname.replace(/\/$/,"")!==requested.pathname.replace(/\/$/,"")) throw new Error("O Instagram redirecionou para outro conteúdo; Story não compartilhado.");
+  const share=await uniqueButton(page,["compartilhar|share|enviar"],"main,[role='dialog']");
+  await share.click();
+  await page.waitForTimeout(700);
   const dialog=page.getByRole("dialog").last();
+  if(!(await dialog.count()) || !(await dialog.isVisible().catch(()=>false))) throw new Error("Janela de compartilhamento do Story não abriu.");
   const search=dialog.locator('input,[role="combobox"]').first();
   if(!(await search.count())) throw new Error("Busca de destinatários do Story não identificada.");
-  await search.fill(groupName); await page.waitForTimeout(900);
+  await search.fill(groupName);
+  await page.waitForTimeout(900);
   const target=dialog.getByText(groupName,{exact:true});
-  if(await target.count()!==1) throw new Error("Grupo coletivo não identificado de forma única.");
-  await target.click(); await page.waitForTimeout(300);
+  if(await target.count()!==1) throw new Error("Grupo coletivo não identificado de forma única na lista de destinatários.");
+  await target.click();
+  await page.waitForTimeout(300);
   const send=dialog.getByRole("button",{name:/enviar|send|compartilhar/i}).last();
-  if(!(await send.count())) throw new Error("Botão de envio do Story não identificado.");
-  await onBeforeSend(); await send.click(); await page.waitForTimeout(1000);
-  return {sharedToGroup:true,status:"Story enviado ao grupo coletivo; confirmação visual deve ser conferida"};
+  if(!(await send.count()) || !(await send.isVisible().catch(()=>false))) throw new Error("Botão de envio do Story não identificado.");
+  await onBeforeSend();
+  await send.click();
+  await page.waitForTimeout(1000);
+  // A confirmação visual isolada pode pertencer a outro envio. Reabrir o
+  // destino e exigir que o Story apareça no histórico antes de registrar sucesso.
+  const refreshed=await inspectDestinationGroup(page,destinationUrl);
+  if(!refreshed.verified || !refreshed.sharedInventoryComplete || getGroupShareState(url,refreshed)!=="already-shared") {
+    throw new Error("O envio foi solicitado, mas o Story não apareceu no inventário atualizado do grupo. A tentativa permanece registrada e não será repetida automaticamente.");
+  }
+  return {sharedToGroup:true,status:"Story localizado no histórico atualizado do grupo coletivo"};
 }
