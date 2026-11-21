@@ -711,7 +711,8 @@ export async function inspectSavedCollection(page, collectionNameOrUrl) {
       nodes.filter(node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; })
         .map(node => (node.innerText || "").trim()).filter(value => value && value.length < 180)
     ).catch(() => []);
-    const slugLabel = decodeURIComponent(expectedSlug).replace(/[-_]+/g," ").trim();
+    const slugWords = decodeURIComponent(expectedSlug).replace(/[-_]+/g," ").trim();
+    const slugLabel = slugWords ? slugWords[0].toLocaleUpperCase() + slugWords.slice(1) : slugWords;
     const collectionName = headingTexts.flatMap(value => value.split("\n")).map(value => value.trim())
       .find(value => value && !/^salvos$|^saved$|^coleções$|^collections$/i.test(value) && value.length < 100) || slugLabel;
     let stableRounds = 0, previousCount = 0;
@@ -1018,8 +1019,8 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
   const suppliedUrl = String(destinationGroupUrl || "").trim();
   let groupName = "";
   const directMatch = suppliedUrl.match(/^https:\/\/www\.instagram\.com\/direct\/t\/(\d+)\/?(?:[?#].*)?$/i);
-  if (suppliedUrl && !directMatch) {
-    return { verified:false, reason:"URL direta do grupo inválida. Use https://www.instagram.com/direct/t/ID/.", threadId:"" };
+  if (!directMatch) {
+    return { verified:false, reason:"Informe a URL direta da conversa no formato https://www.instagram.com/direct/t/ID/.", threadId:"" };
   }
   if (directMatch) {
     const expectedThreadId = directMatch[1];
@@ -1040,31 +1041,6 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
     groupName = headerEvidence.flatMap(value => value.split(/\r?\n/)).map(value => value.trim())
       .find(value => value && value.length < 120 && !/^(instagram|mensagens|messages|detalhes|details)$/i.test(value)) || "";
     if (!groupName) return { verified:false, reason:"A conversa abriu, mas não foi possível ler seu nome no cabeçalho. Inventário e envios bloqueados.", threadId:openedThreadId, headerEvidence:headerEvidence.slice(0,5) };
-  } else {
-    await page.goto("https://www.instagram.com/direct/inbox/", { waitUntil:"domcontentloaded", timeout:60000 });
-    await page.waitForTimeout(1200);
-    if (page.url().includes("/accounts/login")) {
-      return { verified:false, reason:"Instagram redirecionou para o login; grupo coletivo não foi verificado.", threadId:"" };
-    }
-    const search = page.getByPlaceholder(/pesquisar|search/i).first();
-    if (!(await search.count())) {
-      return { verified:false, reason:"Campo de busca de conversas não foi localizado.", threadId:"" };
-    }
-    await search.fill(groupName);
-    await page.waitForTimeout(1500);
-    const exact = page.getByText(groupName, { exact:true });
-    const count = await exact.count();
-    if (count !== 1) {
-      return {
-        verified:false,
-        reason:count === 0
-          ? `Nenhuma conversa com o nome exato “${groupName}” foi encontrada.`
-          : `Foram encontrados ${count} resultados com o mesmo nome; destino ambíguo.`,
-        threadId:""
-      };
-    }
-    await exact.first().click();
-    await page.waitForTimeout(1000);
   }
   const threadId = page.url().match(/\/direct\/t\/(\d+)/)?.[1] || "";
   if (!threadId) return { verified:false, reason:`A conversa “${groupName}” abriu, mas o ID da conversa não foi confirmado.`, threadId:"", sharedUrls:[], sharedInventoryComplete:false };
