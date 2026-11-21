@@ -55,7 +55,7 @@ export function buildExecutionPlan({
     else if (item.action === "shareToGroup" && state.shareAttempted && !state.sharedToGroup) { status = "bloqueada"; reason = "Tentativa anterior sem confirmação; verifique o grupo para evitar envio duplicado."; }
     else if (item.action === "saveToCollection" && state.saved && !state.savedFolderVerified) {
       status = "bloqueada";
-      reason = "A publicação já está salva, mas não foi confirmada dentro da coleção escolhida; não alternar o salvamento.";
+      reason = "A publicação já está salva fora da coleção confirmada (ou sua inclusão não foi comprovada); não alternar o salvamento.";
     } else if (mode === "test" && !item.alreadyDone && item.action === "like" && stateKnown.liked === false) {
       status = "não verificada — controle de curtida não identificado";
       reason = "O Instagram não apresentou um controle reconhecível para confirmar se a publicação já está curtida.";
