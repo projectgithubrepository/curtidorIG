@@ -431,3 +431,32 @@ test("recognizes Story media markers nested under generic XMA and versioned shar
   await capture.stop();
   assert.deepEqual(capture.records()[0].urls, ["https://www.instagram.com/stories/story.creator/390000000000000043"]);
 });
+
+test("extracts deeply nested Story media using additional Instagram media type markers", async () => {
+  const page = new EventEmitter();
+  const capture = createInstagramNetworkCapture(page);
+  let media = {
+    media_id: "390000000000000044_17890000000000000",
+    user_info: { username: "story.deep" },
+    media_product_type: "story",
+    code: "DEEPCODE44"
+  };
+  for (let index = 0; index < 12; index++) media = { payload_layer: media };
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql",
+    status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({
+      postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: { thread_id: "1783131735658148" } }),
+      url: () => "https://www.instagram.com/api/graphql"
+    }),
+    json: async () => ({ data: { thread: { items: [{
+      message_id: "story-deeply-nested",
+      timestamp_ms: 1795021200000,
+      sender: { username: "member" },
+      content: { story_attachment_v2: media }
+    }] } } })
+  });
+  await capture.stop();
+  assert.deepEqual(capture.records()[0].urls, ["https://www.instagram.com/stories/story.deep/390000000000000044"]);
+});
