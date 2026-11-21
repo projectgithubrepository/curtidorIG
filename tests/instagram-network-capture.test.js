@@ -483,3 +483,32 @@ test("preserves distinct 64-bit numeric Story IDs from raw GraphQL JSON", async 
   assert.equal(new Set(urls).size, 20);
   assert.equal(capture.summary().uniqueStoryUrls, 20);
 });
+
+
+test("does not confuse the Direct message id with the nested Story media id", async () => {
+  const page = new EventEmitter();
+  const capture = createInstagramNetworkCapture(page);
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql",
+    status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({
+      postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: { thread_id: "1783131735658148" } }),
+      url: () => "https://www.instagram.com/api/graphql"
+    }),
+    text: async () => JSON.stringify({ data: { thread: { items: [{
+      id: "178900000000000099",
+      timestamp_ms: 1795021200000,
+      sender: { username: "member" },
+      content: { story_share: { media: {
+        pk: "390000000000000099",
+        user: { username: "story.owner" },
+        product_type: "story"
+      } } }
+    }] } } })
+  });
+  await capture.stop();
+  assert.deepEqual(capture.records()[0].urls, [
+    "https://www.instagram.com/stories/story.owner/390000000000000099"
+  ]);
+});

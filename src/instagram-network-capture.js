@@ -148,17 +148,28 @@ function storyIdentity(value, depth = 0, seen = new WeakSet()) {
   if (!value || typeof value !== "object" || depth > 20 || seen.has(value)) return { username: "", storyId: "" };
   seen.add(value);
   const username = String(value.username ?? value.user?.username ?? value.user_info?.username ?? value.owner?.username ?? value.author?.username ?? "");
-  const candidates = [value.story_id, value.story_pk, value.story_media_id, value.pk, value.media_id, value.mediaId, value.id];
-  const rawId = candidates.find(item => item != null && /^\d+(?:_\d+)?$/.test(String(item)));
-  let storyId = rawId == null ? "" : String(rawId).split("_")[0];
+  // IDs genéricos no objeto da mensagem (por exemplo, message.id) NÃO são
+  // IDs de Story. Priorize sempre os campos específicos e procure primeiro
+  // o objeto de mídia aninhado antes de aceitar pk/media_id/id.
+  const explicit = [value.story_id, value.story_pk, value.story_media_id]
+    .find(item => item != null && /^\d+(?:_\d+)?$/.test(String(item)));
   let nested = { username: "", storyId: "" };
   for (const child of Object.values(value)) {
     if (child && typeof child === "object") {
-      nested = storyIdentity(child, depth + 1, seen);
-      if (nested.username && nested.storyId) break;
+      const candidate = storyIdentity(child, depth + 1, seen);
+      if (candidate.username && candidate.storyId) {
+        nested = candidate;
+        break;
+      }
     }
   }
-  return { username: username || nested.username, storyId: storyId || nested.storyId };
+  if (explicit != null) return { username: username || nested.username, storyId: String(explicit).split("_")[0] };
+  if (nested.username && nested.storyId) return nested;
+  const mediaId = [value.pk, value.media_id, value.mediaId, value.id]
+    .find(item => item != null && /^\d+(?:_\d+)?$/.test(String(item)));
+  // Só aceite IDs genéricos quando o próprio nó identifica o dono da mídia.
+  if (username && mediaId != null) return { username, storyId: String(mediaId).split("_")[0] };
+  return { username: username || nested.username, storyId: "" };
 }
 
 function collectStoryUrls(value, output, seen = new WeakSet(), depth = 0, storyContext = false) {
