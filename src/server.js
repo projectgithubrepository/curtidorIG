@@ -66,12 +66,16 @@ app.get("/api/diagnostic-log", (_req, res) => {
   );
   const errorLines = (report.log || []).filter(item => item.level === "ERROR" || item.level === "WARN").slice(-5)
     .map(item => `- [${item.level}] ${item.message}`);
-  const inspectionLines = (report.publications || []).filter(item => item.inspectionDiagnostics).slice(0, 12)
+  const inspectionLines = (report.publications || []).filter(item => item.inspectionDiagnostics).slice(0, 40)
     .map(item => {
       const detail = item.inspectionDiagnostics;
       const selectors = detail.selectors || {};
-      return `- ${item.url || "URL não informada"} | motivo: ${detail.reason || "não classificado"} | HTTP: ${detail.httpStatus ?? "?"} | artigo: ${selectors.article ? "sim" : "não"} | main: ${selectors.main ? "sim" : "não"} | diálogo: ${selectors.dialog ? "sim" : "não"} | mídia: ${detail.detectedMedia ? "sim" : "não"} | URL final: ${detail.finalUrl || "?"}`;
+      return `- ${item.url || "URL não informada"} | legenda: ${detail.captionAvailable === false ? "não legível" : "disponível"} | motivo: ${detail.reason || "ok"} | HTTP: ${detail.httpStatus ?? "?"} | artigo: ${selectors.article ? "sim" : "não"} | main: ${selectors.main ? "sim" : "não"} | diálogo: ${selectors.dialog ? "sim" : "não"} | mídia: ${detail.detectedMedia ? "sim" : "não"} | URL final: ${detail.finalUrl || "?"}`;
     });
+  const planLines = (report.publications || []).slice(0, 40).map(item => {
+    const actions = (item.plan || []).map(action => `${action.label}: ${action.status}${action.reason ? " (" + action.reason + ")" : ""}`).join(" | ");
+    return `- ${item.url || "URL não informada"} | ${item.status || "sem status"} | ${actions || "planejamento indisponível"}`;
+  });
   const page = report.pageDiagnostics || {};
   const scroll = report.scrollDiagnostics || {};
   const scrollLines = scroll.historyRounds !== undefined ? [
@@ -90,6 +94,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     `Grupo: ${report.request?.groupName || "não informado"} | Período: ${report.request?.startDate || "?"} a ${report.request?.endDate || "?"}`,
     `Coleção de destino: ${report.request?.collectionName || "não informada"}`,
     `Publicações: ${summary.publicationsFound ?? report.publications?.length ?? 0} | Feed/Reels: ${summary.feedsAndReels ?? "?"} | Stories: ${summary.stories ?? "?"} | Marcos administrativos: ${summary.administrativeMilestones ?? "?"} | Sem data: ${summary.itemsWithoutDate ?? "?"}`,
+    ...(report.request?.mode === "test" ? [`PLANO DE TESTE: ${summary.publicationsInspected ?? 0} itens processados | ${summary.inspectionFailures ?? 0} inspeções interrompidas | ${summary.captionUnavailable ?? 0} sem legenda legível | ${summary.storiesBlocked ?? 0} Stories bloqueadas | ${summary.plannedActions ?? 0} etapas planejadas | Inventário da coleção: ${summary.savedCollectionInventoryAvailable ? "confirmado" : "indisponível"}`] : []),
     "",
     "CAPTURA DE REDE",
     `Respostas: ${network.capturedResponses ?? 0} | Lidas: ${network.parsedResponses ?? 0} | Não interpretadas: ${network.unparsedResponses ?? 0}`,
@@ -103,6 +108,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     ...(page.instagramLinks !== undefined ? ["", `PÁGINA: ${page.instagramLinks} links Instagram / ${page.anchors ?? "?"} links totais / ${page.messageNodes ?? "?"} nós de mensagem`] : []),
     ...scrollLines,
     ...(inspectionLines.length ? ["", "INSPEÇÃO DAS PUBLICAÇÕES:", ...inspectionLines] : []),
+    ...(planLines.length ? ["", "PLANO INDIVIDUAL POR PUBLICAÇÃO:", ...planLines] : []),
     ...(errorLines.length ? ["", "ERROS/AVISOS:", ...errorLines] : []),
     "",
     `Gerado: ${report.generatedAt || new Date().toISOString()}`,
@@ -419,6 +425,7 @@ app.post("/api/start", async (req, res) => {
         ? ` Captura de rede: ${finalNetwork.capturedResponses} respostas, ${finalNetwork.messageLikeObjects} objetos de mensagem; reações ${finalNetwork.hasReactionFields ? "detectadas" : "não detectadas"}.`
         : "";
       const inspectionFailures = results.filter(item => item.status === "inspeção não concluída — ações não verificadas").length;
+      const captionUnavailable = results.filter(item => item.inspectionDiagnostics?.captionAvailable === false).length;
       const storiesBlocked = results.filter(item => item.contentType === "story").length;
       const plannedActions = results.reduce((sum,item) => sum + (item.plan?.length || 0), 0);
       progress.message = mode === "test"
@@ -442,6 +449,7 @@ app.post("/api/start", async (req, res) => {
           feedsAndReels: collected.filter(item => item.contentType !== "story").length,
           itemsWithoutDate: collected.filter(item => item.dateUnknown).length,
           inspectionFailures,
+          captionUnavailable,
           storiesBlocked,
           plannedActions,
           savedCollectionInventoryAvailable
