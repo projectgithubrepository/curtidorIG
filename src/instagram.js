@@ -226,30 +226,41 @@ export function addNetworkMessages(records, { groupThreadId, startDate, endDate,
   const storyUrlsRejectedIdentity = new Set();
   const storyUrlsRejectedAdministrative = new Set();
   const storyUrlsRejectedOutsideDate = new Set();
+  const storyReasons = new Map();
+  const acceptedStoryUrls = new Set();
+  const markStoryReason = (urls, reason) => {
+    for (const url of urls) {
+      if (!storyReasons.has(url)) storyReasons.set(url, new Set());
+      storyReasons.get(url).add(reason);
+    }
+  };
   for (const record of records) {
     const recordStories = (record.urls || []).filter(url => /\/stories\//i.test(url));
     for (const url of recordStories) storyUrlsObserved.add(url);
     if (!groupThreadId || !record.threadId) {
       for (const url of recordStories) storyUrlsRejectedUnscoped.add(url);
+      markStoryReason(recordStories,"rejectedWithoutThread");
       rejectedUnscoped++;
       continue;
     }
     if (record.threadId !== groupThreadId) {
       for (const url of recordStories) storyUrlsRejectedThread.add(url);
+      markStoryReason(recordStories,"rejectedOtherThread");
       rejectedThread++;
       continue;
     }
-    if (!record.messageId) { for (const url of recordStories) storyUrlsRejectedIdentity.add(url); rejectedIdentity++; continue; }
+    if (!record.messageId) { for (const url of recordStories) storyUrlsRejectedIdentity.add(url); markStoryReason(recordStories,"rejectedWithoutMessageId"); rejectedIdentity++; continue; }
     const text = record.text || "";
     if (text && isAdministrativeMessage(text)) {
       const marker = parseAdministrativeMilestone(text);
       if (marker) milestones.set(record.messageId, { ...marker, messageId: record.messageId, sharedAt: record.timestamp });
       for (const url of recordStories) storyUrlsRejectedAdministrative.add(url);
+      markStoryReason(recordStories,"rejectedAdministrativeMessage");
       continue;
     }
     for (const url of record.urls || []) {
       const date = dateInRange(record.timestamp, startDate, endDate);
-      if (date.known && !date.inRange) { if (/\/stories\//i.test(url)) storyUrlsRejectedOutsideDate.add(url); continue; }
+      if (date.known && !date.inRange) { if (/\/stories\//i.test(url)) { storyUrlsRejectedOutsideDate.add(url); markStoryReason([url],"rejectedOutsideDateRange"); } continue; }
       const item = {
         url,
         messageId: String(record.messageId),
@@ -273,7 +284,7 @@ export function addNetworkMessages(records, { groupThreadId, startDate, endDate,
         found.delete(url);
         found.set(identityKey, { ...previous, ...item, sharedAt: date.iso, dateUnknown: false, collectionMode: "network-date" });
         accepted++;
-        if (/\/stories\//i.test(url)) storyUrlsAccepted.add(url);
+        if (/\/stories\//i.test(url)) { storyUrlsAccepted.add(url); acceptedStoryUrls.add(url); markStoryReason([url],"acceptedInDateRange"); }
       } else {
         const previous = fallback.get(identityKey) || found.get(identityKey) || found.get(url) || {};
         const merged = { ...previous, ...item, dateUnknown: true, collectionMode: "network-date-unknown" };
@@ -287,21 +298,38 @@ export function addNetworkMessages(records, { groupThreadId, startDate, endDate,
         else if (found.has(identityKey)) found.set(identityKey, merged);
         else fallback.set(identityKey, merged);
         unknownDateCandidates++;
-        if (/\/stories\//i.test(url)) storyUrlsUnknownDate.add(url);
+        if (/\/stories\//i.test(url)) { storyUrlsUnknownDate.add(url); markStoryReason([url],"pendingDateVerification"); }
       }
     }
   }
-  return { accepted, unknownDateCandidates, rejectedThread, rejectedUnscoped, rejectedIdentity,
-    storyCollection: {
-      uniqueNetworkStoryUrls: storyUrlsObserved.size,
-      acceptedInDateRange: storyUrlsAccepted.size,
-      pendingDateVerification: storyUrlsUnknownDate.size,
-      rejectedOtherThread: storyUrlsRejectedThread.size,
-      rejectedWithoutThread: storyUrlsRejectedUnscoped.size,
-      rejectedWithoutMessageId: storyUrlsRejectedIdentity.size,
-      rejectedAdministrativeMessage: storyUrlsRejectedAdministrative.size,
-      rejectedOutsideDateRange: storyUrlsRejectedOutsideDate.size
+  // Classificação exclusiva por URL: uma mesma URL pode aparecer em várias
+  // respostas incrementais ou mensagens; se ao menos uma ocorrência válida a
+  // vincular à conversa/data, ela não deve ser contada também como descartada.
+  const storyCounts = {
+    uniqueNetworkStoryUrls:storyUrlsObserved.size,
+    acceptedInDateRange:0,
+    pendingDateVerification:0,
+    rejectedOtherThread:0,
+    rejectedWithoutThread:0,
+    rejectedWithoutMessageId:0,
+    rejectedAdministrativeMessage:0,
+    rejectedOutsideDateRange:0
+  };
+  const rejectionPriority = [
+    "rejectedOtherThread","rejectedWithoutThread","rejectedWithoutMessageId",
+    "rejectedAdministrativeMessage","rejectedOutsideDateRange"
+  ];
+  for (const reasons of storyReasons.values()) {
+    if (reasons.has("acceptedInDateRange")) storyCounts.acceptedInDateRange++;
+    else if (reasons.has("pendingDateVerification")) storyCounts.pendingDateVerification++;
+    else {
+      const rejection = rejectionPriority.find(reason=>reasons.has(reason));
+      if (rejection) storyCounts[rejection]++;
     }
+  }
+  return { accepted, unknownDateCandidates, rejectedThread, rejectedUnscoped, rejectedIdentity,
+    acceptedStoryUrls:[...acceptedStoryUrls],
+    storyCollection:storyCounts
   };
 }
 
@@ -442,6 +470,9 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
 
   const milestoneList = [...milestones.values()];
   historyBoundaryReached = historyBoundaryReached || dateBoundaryReached;
+  const finalStoryItems = [...found.values(),...fallback.values()].filter(item=>item.contentType==="story");
+  const finalUniqueStoryUrls = new Set(finalStoryItems.map(item=>item.url));
+  const acceptedStoryUrlsMissingFromFinal = (networkMerge.acceptedStoryUrls||[]).filter(url=>!finalUniqueStoryUrls.has(url)).length;
   const collectionDiagnostics = {
     historyRounds,
     scrollProgressRounds,
@@ -455,7 +486,12 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     stoppedByUser: Boolean(shouldStop()),
     visibleItems: found.size,
     unknownDateCandidates: fallback.size,
-    storyNetwork: networkMerge.storyCollection,
+    storyNetwork: {
+      ...networkMerge.storyCollection,
+      finalStoryItems:finalStoryItems.length,
+      finalUniqueStoryUrls:finalUniqueStoryUrls.size,
+      acceptedNetworkUrlsMissingFromFinal:acceptedStoryUrlsMissingFromFinal
+    },
   };
   // Não descartar silenciosamente mensagens com link e identidade, mas sem timestamp.
   // Elas seguem para inspeção como candidatas com data desconhecida e não entram na contagem
