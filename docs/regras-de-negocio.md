@@ -32,6 +32,17 @@ Não haverá campo para colar links manualmente como fluxo principal.
 
 **Definição do período:** o filtro considera a data em que a publicação foi compartilhada na conversa, não a data original em que o autor publicou o conteúdo no Instagram.
 
+## Referência administrativa posterior ao fechamento
+
+A mensagem administrativa com os totais de Feed/Reels e Stories é publicada depois do fechamento do período. Portanto, ela é um gabarito de conferência, não uma fonte necessária para executar a coleta.
+
+- A coleta deve localizar as mensagens e publicações do período por conta própria, sem aguardar ou exigir a mensagem administrativa.
+- A ausência da mensagem administrativa não pode impedir a coleta nem tornar o resultado incompleto por si só.
+- Quando o aviso posterior estiver disponível, interpretar os totais correspondentes à data selecionada e comparar Feed/Reels e Stories separadamente.
+- Nunca reutilizar automaticamente metas de outra data nem manter quantitativos de referência fixos no código.
+- Se não houver aviso correspondente, exibir a cobertura coletada e indicar que a conferência administrativa não está disponível.
+- No teste histórico de 18/11, os valores 66 Feed/Reels e 34 Stories são apenas o gabarito posterior para validar a coleta independente.
+
 ## Regras de ações por pedido
 
 Cada link deve ser associado ao texto do pedido da mensagem do grupo. As ações são decididas por publicação:
