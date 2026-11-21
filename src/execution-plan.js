@@ -57,15 +57,18 @@ export function buildExecutionPlan({
     else if (item.action === "saveToCollection" && state.saved && !state.savedFolderVerified) {
       status = "bloqueada";
       reason = "A publicação já está salva fora da coleção confirmada (ou sua inclusão não foi comprovada); não alternar o salvamento.";
-    } else if (mode === "test" && !item.alreadyDone && item.action === "like" && stateKnown.liked === false) {
-      status = "não verificada — controle de curtida não identificado";
-      reason = "O Instagram não apresentou um controle reconhecível para confirmar se a publicação já está curtida.";
-    } else if (mode === "test" && !item.alreadyDone && item.action === "saveToCollection" && stateKnown.saveToCollection === false) {
-      status = "não verificada — estado da coleção indisponível";
-      reason = "Não foi possível conferir o estado salvo e a presença na coleção de destino.";
-    } else if (mode === "test" && !item.alreadyDone && item.action === "comment" && stateKnown.commented === false) {
-      status = "não verificada — comentários do usuário não identificados";
-      reason = "Não foi possível confirmar se já existe um comentário deste perfil; evite duplicidade.";
+    } else if (mode === "test" && !item.alreadyDone && item.action === "like" && stateKnown.liked !== true) {
+      status = "não verificada — estado da curtida desconhecido";
+      reason = stateKnown.reasons?.liked || "Controle de curtida não identificado; não é possível afirmar se já está curtida.";
+    } else if (mode === "test" && !item.alreadyDone && item.action === "saveToCollection" && (stateKnown.saved !== true || stateKnown.collectionMembership !== true)) {
+      status = "não verificada — salvamento/coleção não comprovados";
+      reason = stateKnown.reasons?.saveToCollection || "O estado do botão Salvar e a presença na coleção de destino precisam ser verificados separadamente.";
+    } else if (mode === "test" && !item.alreadyDone && item.action === "comment" && stateKnown.commented !== true) {
+      status = "não verificada — comentário anterior não confirmado";
+      reason = stateKnown.reasons?.commented || "O perfil do usuário não foi identificado com segurança ou os comentários visíveis não permitem confirmar se já comentou.";
+    } else if (mode === "test" && !item.alreadyDone && item.action === "shareToGroup" && stateKnown.destinationGroupVerified !== true) {
+      status = "não verificada — grupo coletivo não validado";
+      reason = stateKnown.reasons?.shareToGroup || "O grupo coletivo não foi localizado e confirmado; não é possível classificar o envio como apto.";
     } else if (!item.eligible) {
       status = "bloqueada";
       reason = item.action === "saveToCollection" ? "Informe a coleção obrigatória de destino." : "O comentário precisa ter pelo menos duas palavras e um emoji.";
