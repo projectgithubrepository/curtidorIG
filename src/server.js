@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { openInstagram, collectGroupPosts, inspectPost, inspectStory, inspectSavedCollection, unsaveSavedCollectionItem, executeLike, executeSaveToCollection, executeComment, executeStoryComment, executeShareToGroup, executeCompletionReaction } from "./instagram.js";
 import { createComment } from "./comments.js";
 import { appendHistory, getTaskState, getRecentComments, readHistory } from "./history.js";
-import { mergeTaskState, taskStateLabel } from "./group-state.js";
+import { mergeTaskState, taskStateLabel, administrativeTargetsForRange } from "./group-state.js";
 import { buildExecutionPlan, interpretGroupInstructions } from "./execution-plan.js";
 
 // Keep Direct network diagnostics metadata-only.
@@ -41,6 +41,7 @@ function reportItem(item) {
     sharedAt: item.sharedAt || "",
     dateUnknown: Boolean(item.dateUnknown),
     collectionMode: item.collectionMode || "",
+    collectionDiagnostics: item.collectionDiagnostics || null,
     status: item.status || "",
     taskState: item.taskState || null,
     caption: item.caption || "",
@@ -115,6 +116,8 @@ app.get("/api/diagnostic-log", (_req, res) => {
     `Grupo: ${report.request?.groupName || "não informado"} | Período: ${report.request?.startDate || "?"} a ${report.request?.endDate || "?"}`,
     `Coleção de destino: ${report.request?.collectionName || "não informada"}`,
     `Publicações: ${summary.publicationsFound ?? report.publications?.length ?? 0} | Feed/Reels: ${summary.feedsAndReels ?? "?"} | Stories: ${summary.stories ?? "?"} | Marcos administrativos: ${summary.administrativeMilestones ?? "?"} | Sem data: ${summary.itemsWithoutDate ?? "?"}`,
+    ...(summary.collectionCoverage?.available ? [`COBERTURA DA DATA: Feed ${summary.collectionCoverage.actualFeed}/${summary.collectionCoverage.expectedFeed}; Stories ${summary.collectionCoverage.actualStories}/${summary.collectionCoverage.expectedStories}; total ${summary.collectionCoverage.actualTotal}/${summary.collectionCoverage.expectedTotal}; ${summary.collectionCoverage.matches ? "contagens conferem" : "DIVERGÊNCIA — coleta incompleta ou excedente"}`] : []),
+    ...(summary.collectionDiagnostics ? [`VARREDURA: ${summary.collectionDiagnostics.historyRounds} rodadas; limite atingido=${summary.collectionDiagnostics.scanLimitReached ? "sim" : "não"}; limite estável=${summary.collectionDiagnostics.stableBoundaryReached ? "sim" : "não"}; contêiner encontrado=${summary.collectionDiagnostics.scrollTargetFound ? "sim" : "não"}`] : []),
     ...(report.request?.mode === "test" ? ["", "RESUMO PRELIMINAR — AÇÕES POR TIPO", ...(Object.entries(summary.actionTotals || {}).map(([key,value]) => `- ${({like:"Curtidas",saveToCollection:"Salvamentos na coleção",comment:"Comentários",shareToGroup:"Envios ao grupo coletivo",completionReaction:"Reações na mensagem original",commentStory:"Comentários públicos em Stories",shareStoryToGroup:"Envios de Stories ao grupo coletivo"})[key] || key}: ${value.total} previstas | ${value.simulated} simuladas aptas | ${value.unverified} não verificadas | ${value.blocked} bloqueadas | ${value.done} já concluídas`)), "", `PLANO DE TESTE: ${summary.publicationsInspected ?? 0} itens processados | ${summary.inspectionFailures ?? 0} inspeções interrompidas | ${summary.captionUnavailable ?? 0} sem legenda legível | ${summary.storiesBlocked ?? 0} Stories com etapas bloqueadas/não verificadas | ${summary.mappedActions ?? 0} ações simuladas/aptas, mas NÃO EXECUTADAS | ${summary.candidateActions ?? 0} candidatas aguardando verificação/pré-requisitos | ${summary.alreadyDoneActions ?? 0} já concluídas | ${summary.blockedActions ?? 0} bloqueadas | ${summary.unverifiedActions ?? 0} estados não verificados | ${summary.plannedActions ?? 0} etapas no plano | Inventário da coleção: ${summary.savedCollectionInventoryAvailable ? "confirmado" : "indisponível"}`] : []),
     "",
     "CAPTURA DE REDE",
@@ -343,6 +346,32 @@ app.post("/api/start", async (req, res) => {
       progress.total = collected.length;
       const withoutDate = collected.filter(item => item.dateUnknown).length;
       const withoutIdentity = collected.filter(item => !item.identityVerified).length;
+      const administrativeMilestones = collected.flatMap(item => item.administrativeMilestones || []);
+      const administrativeTarget = administrativeTargetsForRange(administrativeMilestones, startDate, endDate);
+      const actualFeedForDate = collected.filter(item => !item.dateUnknown && item.contentType !== "story").length;
+      const actualStoriesForDate = collected.filter(item => !item.dateUnknown && item.contentType === "story").length;
+      const collectionCoverage = administrativeTarget ? {
+        available: true,
+        targetDate: administrativeTarget.date,
+        expectedFeed: administrativeTarget.feedCount,
+        expectedStories: administrativeTarget.storiesCount,
+        expectedTotal: administrativeTarget.totalCount,
+        actualFeed: actualFeedForDate,
+        actualStories: actualStoriesForDate,
+        actualTotal: actualFeedForDate + actualStoriesForDate,
+        missingFeed: administrativeTarget.feedCount == null ? null : Math.max(0, administrativeTarget.feedCount - actualFeedForDate),
+        missingStories: administrativeTarget.storiesCount == null ? null : Math.max(0, administrativeTarget.storiesCount - actualStoriesForDate),
+        excessFeed: administrativeTarget.feedCount == null ? null : Math.max(0, actualFeedForDate - administrativeTarget.feedCount),
+        excessStories: administrativeTarget.storiesCount == null ? null : Math.max(0, actualStoriesForDate - administrativeTarget.storiesCount),
+        matches: (administrativeTarget.feedCount == null || actualFeedForDate === administrativeTarget.feedCount) &&
+          (administrativeTarget.storiesCount == null || actualStoriesForDate === administrativeTarget.storiesCount)
+      } : { available: false };
+      const collectionDiagnostics = collected[0]?.collectionDiagnostics || null;
+      const collectionScanComplete = Boolean(collectionDiagnostics?.stableBoundaryReached &&
+        collectionDiagnostics?.scrollTargetFound && !collectionDiagnostics?.scanLimitReached &&
+        !collectionDiagnostics?.stoppedByUser);
+      const collectionIncomplete = !collectionScanComplete || withoutDate > 0 ||
+        (collectionCoverage.available && !collectionCoverage.matches);
       const usedFallback = collected.some(item => item.collectionMode === "last-300-fallback");
       const milestoneCount = new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size;
       const network = collected[0]?.networkDiagnostics;
@@ -542,9 +571,9 @@ app.post("/api/start", async (req, res) => {
       const simulatedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^simulada/.test(action.status)).length, 0);
       const blockedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^bloqueada/.test(action.status)).length, 0);
       const unverifiedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^não verificada/.test(action.status)).length, 0);
-      const testIncomplete = mode === "test" && (inspectionFailures > 0 || captionUnavailable > 0 || unverifiedActions > 0 || blockedActions > 0 || storiesBlocked > 0 || !savedCollectionInventoryAvailable);
+      const testIncomplete = mode === "test" && (inspectionFailures > 0 || captionUnavailable > 0 || unverifiedActions > 0 || blockedActions > 0 || storiesBlocked > 0 || !savedCollectionInventoryAvailable || collectionIncomplete);
       progress.message = mode === "test"
-        ? `TESTE ${testIncomplete ? "PARCIAL" : "CONCLUÍDO"}: ${inspectedFeedReels}/${collected.length} itens analisados; ${mappedActions} ações simuladas e aptas à execução automática, mas NÃO EXECUTADAS; ${candidateActions} candidatas aguardando verificação/pré-requisitos; ${alreadyDoneActions} já concluídas; ${blockedActions} bloqueadas; ${unverifiedActions} estados não verificados; ${storiesBlocked} Stories com etapas bloqueadas ou não verificadas; ${inspectionFailures} inspeções interrompidas; ${captionUnavailable} sem legenda legível; ${plannedActions} etapas no plano. Nenhuma ação foi executada.`
+        ? `TESTE ${testIncomplete ? "PARCIAL" : "CONCLUÍDO"}: ${inspectedFeedReels}/${collected.length} itens analisados; ${collectionCoverage.available ? `cobertura da administração: Feed ${actualFeedForDate}/${collectionCoverage.expectedFeed}, Stories ${actualStoriesForDate}/${collectionCoverage.expectedStories}; ` : ""}${withoutDate} candidatos sem data incluídos;  ${mappedActions} ações simuladas e aptas à execução automática, mas NÃO EXECUTADAS; ${candidateActions} candidatas aguardando verificação/pré-requisitos; ${alreadyDoneActions} já concluídas; ${blockedActions} bloqueadas; ${unverifiedActions} estados não verificados; ${storiesBlocked} Stories com etapas bloqueadas ou não verificadas; ${inspectionFailures} inspeções interrompidas; ${captionUnavailable} sem legenda legível; ${plannedActions} etapas no plano. Nenhuma ação foi executada.`
         : mode === "manual" ? `Coleta concluída: ${results.length} itens preparados para execução manual.`
         : `Execução automática finalizada: ${results.length} itens analisados. Consulte o resultado de cada ação.`;
       logDiagnostic("INFO", "Coleta concluída", { listed: results.length, inspectionFailures, captionUnavailable, unverifiedActions, savedCollectionInventoryAvailable, networkResponses: network?.capturedResponses ?? 0 });
@@ -559,7 +588,12 @@ app.post("/api/start", async (req, res) => {
         summary: {
           publicationsFound: collected.length,
           publicationsInspected: inspectedFeedReels,
-          administrativeMilestones: new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size,
+          administrativeMilestones: new Set(administrativeMilestones.map(marker => marker.text)).size,
+          administrativeTarget,
+          collectionCoverage,
+          collectionDiagnostics,
+          collectionScanComplete,
+          collectionIncomplete,
           stories: collected.filter(item => item.contentType === "story").length,
           feedsAndReels: collected.filter(item => item.contentType !== "story").length,
           itemsWithoutDate: collected.filter(item => item.dateUnknown).length,
