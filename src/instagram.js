@@ -580,8 +580,22 @@ export async function inspectPost(page, url) {
 export function isInstagramSavedUrl(value, base = "https://www.instagram.com/") {
   try {
     const url = new URL(value, base);
-    return /(^|\.)instagram\.com$/i.test(url.hostname) &&
-      url.pathname.split("/").filter(Boolean).some(segment => segment.toLowerCase() === "saved");
+    const segments = url.pathname.split("/").filter(Boolean).map(segment => segment.toLowerCase());
+    return /(^|\\.)instagram\\.com$/i.test(url.hostname) && segments[0] === "saved";
+  } catch { return false; }
+}
+
+// /saved/ é somente a área geral. A coleção exige uma rota própria,
+// com o identificador da pasta após /saved/collections/ (ou /collection/).
+export function isInstagramSavedCollectionUrl(value, base = "https://www.instagram.com/") {
+  try {
+    const url = new URL(value, base);
+    const segments = url.pathname.split("/").filter(Boolean);
+    return /(^|\\.)instagram\\.com$/i.test(url.hostname) &&
+      segments.length >= 3 &&
+      segments[0].toLowerCase() === "saved" &&
+      /^(collections?|collection)$/i.test(segments[1]) &&
+      Boolean(segments[2]);
   } catch { return false; }
 }
 
@@ -605,7 +619,7 @@ export function selectSavedCollectionHref(anchors, collectionName, baseUrl) {
     if (!labels.some(label => savedCollectionLabelMatches(label, wanted))) return false;
     try {
       const url = new URL(anchor.href, base.href);
-      return url.origin === base.origin && isInstagramSavedUrl(url.href, base.href);
+      return url.origin === base.origin && isInstagramSavedCollectionUrl(url.href, base.href);
     } catch { return false; }
   });
   const unique = [...new Map(matches.map(item => {
@@ -708,8 +722,8 @@ export async function inspectSavedCollection(page, collectionName) {
   }
   await page.goto(collectionHref, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1400);
-  if (!isInstagramSavedUrl(page.url())) {
-    throw new Error("O link da coleção redirecionou para fora de Salvos (" + page.url() + "). Nenhuma publicação será processada.");
+  if (!isInstagramSavedCollectionUrl(page.url())) {
+    throw new Error("O link da coleção não abriu uma rota específica de coleção (" + page.url() + "). A página geral /saved/ não será aceita como pasta. Nenhuma publicação será processada.");
   }
   let stableRounds = 0;
   let previousCount = 0;
