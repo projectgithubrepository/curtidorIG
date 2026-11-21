@@ -463,7 +463,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
       // Só confirma o início quando o contêiner de mensagens está no topo.
       // Falta de movimento fora do topo não encerra a varredura: o diagnóstico
       // permanece incompleto até o limite global, em vez de declarar fim do histórico.
-      if (didReachHistoryStart(scroll.after, scroll.progressed) || (!scroll.progressed && scroll.before?.found && isAtHistoryStart(scroll.before))) {
+      if (didReachHistoryStart(scroll.after, scroll.progressed)) {
         historyBoundaryReached = true;
         break;
       }
@@ -1252,7 +1252,7 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
     for (let round = 0; round < 150 && stalledRounds < MAX_STALLED_SCROLL_ROUNDS; round++) {
       for (const item of await readVisiblePostLinks(page)) sharedUrls.add(item.url);
       const scroll = await scrollToOlderMessages(page);
-      if (didReachHistoryStart(scroll.after, scroll.progressed) || (!scroll.progressed && scroll.before?.found && isAtHistoryStart(scroll.before))) {
+      if (didReachHistoryStart(scroll.after, scroll.progressed)) {
         sharedInventoryComplete = true;
         for (const item of await readVisiblePostLinks(page)) sharedUrls.add(item.url);
         break;
