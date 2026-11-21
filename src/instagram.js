@@ -668,8 +668,8 @@ export async function inspectSavedCollection(page, collectionName) {
     const target = normalize(targetName);
     const found = [];
     for (const node of nodes) {
-      const text = (node.innerText || node.textContent || "").trim();
-      if (!text || !text.split(/[\\r\\n]+/).some(line => normalize(line) === target)) continue;
+      const text = (node.children.length ? [...node.childNodes].filter(child => child.nodeType === 3).map(child => child.textContent).join(" ") : node.textContent || "").trim();
+      if (!text || normalize(text) !== target) continue;
       for (let parent = node, depth = 0; parent && depth < 8; parent = parent.parentElement, depth++) {
         const links = [...parent.querySelectorAll("a[href]")].filter(anchor => {
           try { const url = new URL(anchor.href, location.href); return url.origin === location.origin && url.pathname.split("/").some(part => part.toLowerCase() === "saved"); } catch { return false; }
