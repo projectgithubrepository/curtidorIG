@@ -487,6 +487,7 @@ app.post("/api/start", async (req, res) => {
             collectionInventoryAvailable: Boolean(savedCollectionInventoryAvailable),
             commented: inspection.stateKnown?.commented === true,
             destinationGroupVerified: destinationGroupVerification.verified,
+            messageIdentityVerified: Boolean(item.identityVerified && item.threadId && item.messageId),
             reasons: {
               liked: inspection.stateKnown?.liked
                 ? "Controle identificado; estado atual: " + (inspection.observedState.liked ? "já curtida" : "não curtida") + "."
@@ -503,7 +504,8 @@ app.post("/api/start", async (req, res) => {
                   ? "Perfil @" + inspection.inspectionDiagnostics.stateVerification.identifiedUsername + " identificado; " + (inspection.observedState.commented ? "comentário encontrado entre os comentários visíveis." : "nenhum comentário correspondente encontrado entre os comentários visíveis; conteúdo não carregado pode não ter sido examinado.")
                   : "Perfil identificado; comentários visíveis examinados.")
                 : (inspection.inspectionDiagnostics?.stateVerification?.commentInspectionReason || "Perfil do usuário não identificado; não foi possível verificar comentários anteriores."),
-              shareToGroup: destinationGroupVerification.reason
+              shareToGroup: destinationGroupVerification.reason,
+              messageIdentityVerified: item.identityVerified && item.threadId && item.messageId ? "ID e conversa de origem confirmados." : "ID da mensagem original ou ID da conversa não foi capturado; a reação não pode ser vinculada ao pedido correto."
             }
           };
           const actionLog = [];
@@ -575,7 +577,8 @@ app.post("/api/start", async (req, res) => {
             saved:inspection.observedState.saved, savedKnown:Boolean(inspection.stateKnown?.saved),
             collectionMembershipKnown:Boolean(savedCollectionInventoryAvailable), collectionMembership:stateKnown.collectionMembership,
             commented:inspection.observedState.commented, commentedKnown:Boolean(inspection.stateKnown?.commented),
-            destinationGroupVerified:stateKnown.destinationGroupVerified, destinationGroupReason:destinationGroupVerification.reason, reasons:stateKnown.reasons,
+            destinationGroupVerified:stateKnown.destinationGroupVerified, destinationGroupReason:destinationGroupVerification.reason,
+            messageIdentityVerified:stateKnown.messageIdentityVerified, reasons:stateKnown.reasons,
             controlCount:inspection.observedState.controlCount || 0, controlLabels:inspection.observedState.controlLabels || "",
             diagnostics:inspection.inspectionDiagnostics?.stateVerification || null
           }, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
