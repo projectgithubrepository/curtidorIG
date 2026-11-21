@@ -977,7 +977,7 @@ export async function inspectDestinationGroup(page, destinationGroupName, destin
   const groupName = String(destinationGroupName || "").trim();
   if (!groupName) return { verified:false, reason:"Nome do grupo coletivo não informado.", threadId:"" };
   const suppliedUrl = String(destinationGroupUrl || "").trim();
-  const directMatch = suppliedUrl.match(/^https:\/\/www\\.instagram\\.com\/direct\/t\/(\d+)\/?(?:[?#].*)?$/i);
+  const directMatch = suppliedUrl.match(/^https:\/\/www\.instagram\.com\/direct\/t\/(\d+)\/?(?:[?#].*)?$/i);
   if (suppliedUrl && !directMatch) {
     return { verified:false, reason:"URL direta do grupo inválida. Use https://www.instagram.com/direct/t/ID/.", threadId:"" };
   }
@@ -996,9 +996,9 @@ export async function inspectDestinationGroup(page, destinationGroupName, destin
       nodes.filter(node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; })
         .map(node => (node.innerText || "").trim()).filter(Boolean)
     ).catch(() => []);
-    const normalized = value => String(value || "").normalize("NFKC").replace(/[\\s\\u200B-\\u200D\\uFEFF]+/g," ").trim().toLocaleLowerCase();
+    const normalized = value => String(value || "").normalize("NFKC").replace(/[\s\u200B-\u200D\uFEFF]+/g," ").trim().toLocaleLowerCase();
     const expectedName = normalized(groupName);
-    const nameConfirmed = headerEvidence.some(value => normalized(value).split("\\n").some(line => normalized(line) === expectedName));
+    const nameConfirmed = headerEvidence.some(value => normalized(value).split("\n").some(line => normalized(line) === expectedName));
     if (!nameConfirmed) {
       return { verified:false, reason:`A conversa de ID ${expectedThreadId} abriu, mas o cabeçalho não confirmou o nome exato “${groupName}”. Inventário e envios bloqueados.`, threadId:openedThreadId, headerEvidence:headerEvidence.slice(0,5) };
     }
