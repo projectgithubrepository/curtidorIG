@@ -1033,11 +1033,10 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
     if (openedThreadId !== expectedThreadId) {
       return { verified:false, reason:`A URL direta não abriu a conversa esperada. ID solicitado: ${expectedThreadId}; ID aberto: ${openedThreadId || "não identificado"}.`, threadId:openedThreadId };
     }
-    const headerEvidence = await page.locator("main header").evaluateAll(nodes =>
+    const headerEvidence = await page.locator("main header, [role='main'] header, main [role='heading'], main h1").evaluateAll(nodes =>
       nodes.filter(node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; })
         .map(node => (node.innerText || "").trim()).filter(Boolean)
     ).catch(() => []);
-    const normalized = value => String(value || "").normalize("NFKC").replace(/[\s\u200B-\u200D\uFEFF]+/g," ").trim().toLocaleLowerCase();
     groupName = headerEvidence.flatMap(value => value.split(/\r?\n/)).map(value => value.trim())
       .find(value => value && value.length < 120 && !/^(instagram|mensagens|messages|detalhes|details)$/i.test(value)) || "";
     if (!groupName) return { verified:false, reason:"A conversa abriu, mas não foi possível ler seu nome no cabeçalho. Inventário e envios bloqueados.", threadId:openedThreadId, headerEvidence:headerEvidence.slice(0,5) };
