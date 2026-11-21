@@ -1067,7 +1067,10 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
   const count = await candidates.count();
   if (count !== 1) throw new Error("Mensagem original não localizada de forma única; reação bloqueada.");
   const message = candidates.first();
-  const existingReaction = await message.locator("button,[role=button]").evaluateAll(nodes => nodes.some(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ").includes(emoji)), emoji).catch(() => false);
+  const existingReaction = await message.locator('button,[role="button"],[aria-label],[title],img[alt],[data-emoji]').evaluateAll((nodes, targetEmoji) => nodes.some(node => [
+    node.getAttribute("aria-label"), node.getAttribute("title"), node.getAttribute("alt"),
+    node.getAttribute("data-emoji"), node.innerText
+  ].filter(Boolean).join(" ").includes(targetEmoji)), emoji).catch(() => false);
   if (existingReaction) return { groupCheck:true, status:`reação ${emoji} já presente — não repetida` };
   await message.hover();
   const reaction = message.locator('button[aria-label*="reagir" i],button[aria-label*="reação" i],button[aria-label*="reaction" i],button[aria-label*="emoji" i],[role="button"][aria-label*="reagir" i],[role="button"][aria-label*="reação" i],[role="button"][aria-label*="reaction" i]').first();
@@ -1079,7 +1082,10 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
   if (!(await emojiButton.count())) throw new Error(`Emoji ${emoji} não encontrado no seletor de reações.`);
   await emojiButton.click();
   await page.waitForTimeout(700);
-  const reactionPresent = await message.locator("button,[role=button]").evaluateAll(nodes => nodes.some(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ").includes(emoji)), emoji).catch(() => false);
+  const reactionPresent = await message.locator('button,[role="button"],[aria-label],[title],img[alt],[data-emoji]').evaluateAll((nodes, targetEmoji) => nodes.some(node => [
+    node.getAttribute("aria-label"), node.getAttribute("title"), node.getAttribute("alt"),
+    node.getAttribute("data-emoji"), node.innerText
+  ].filter(Boolean).join(" ").includes(targetEmoji)), emoji).catch(() => false);
   if (!reactionPresent) throw new Error("A reação não pôde ser verificada na mensagem original.");
   return { groupCheck: true, status: `reação ${emoji} aplicada e verificada na mensagem original` };
 }
