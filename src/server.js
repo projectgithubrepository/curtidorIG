@@ -329,8 +329,9 @@ app.post("/api/stop", (_req, res) => {
 app.post("/api/start", async (req, res) => {
   if (running) return res.status(409).json({ error: "Já existe uma coleta em andamento." });
   const groupName = String(req.body.groupName ?? "").trim();
-  const collectionName = String(req.body.collectionName ?? "").trim();
-  const destinationGroupName = String(req.body.destinationGroupName ?? "").trim();
+  let collectionName = "";
+  const collectionUrl = String(req.body.collectionUrl ?? "").trim();
+  let destinationGroupName = "";
   const destinationGroupUrl = String(req.body.destinationGroupUrl ?? "").trim();
   const mode = String(req.body.mode ?? "test").toLowerCase();
   const completionEmoji = String(req.body.completionEmoji ?? "🌸").trim() || "🌸";
@@ -338,12 +339,12 @@ app.post("/api/start", async (req, res) => {
   const startDate = String(req.body.startDate ?? "");
   const endDate = String(req.body.endDate ?? "");
   if (!groupName) return res.status(400).json({ error: "Informe o nome exato do grupo do Instagram." });
-  if (!collectionName) return res.status(400).json({ error: "Informe o nome exato da coleção semanal de destino." });
+  if (!collectionUrl) return res.status(400).json({ error: "Informe a URL direta da coleção de Salvos." });
+  if (!/^https:\/\/www\.instagram\.com\/[^/]+\/saved\/[^/]+\/\d+\/?(?:[?#].*)?$/i.test(collectionUrl)) return res.status(400).json({ error: "URL da coleção inválida. Use a URL específica da pasta em /usuario/saved/slug/ID/." });
   if (!["test","automatic","manual"].includes(mode)) return res.status(400).json({ error: "Modo inválido." });
   if (mode === "automatic" && !confirmed) return res.status(400).json({ error: "A execução automática exige confirmação explícita." });
-  if (mode === "automatic" && !destinationGroupName) return res.status(400).json({ error: "Informe o nome exato do grupo coletivo de envios." });
   if (mode === "test" || mode === "automatic") {
-    if (!destinationGroupUrl) return res.status(400).json({ error: "Informe a URL direta da conversa do grupo coletivo (https://www.instagram.com/direct/t/ID/). Isso evita selecionar um grupo errado pela busca." });
+    if (!destinationGroupUrl) return res.status(400).json({ error: "Informe a URL direta da conversa do grupo coletivo (https://www.instagram.com/direct/t/ID/)." });
     if (!/^https:\/\/www\.instagram\.com\/direct\/t\/\d+\/?(?:[?#].*)?$/i.test(destinationGroupUrl)) return res.status(400).json({ error: "URL do grupo inválida. Informe a URL direta do Instagram no formato https://www.instagram.com/direct/t/ID/." });
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
@@ -378,7 +379,8 @@ app.post("/api/start", async (req, res) => {
       if (mode === "automatic" || mode === "test") {
         progress.message = `Conferindo a coleção “${collectionName}” para validar o destino do salvamento...`;
         try {
-          const savedCollection = await inspectSavedCollection(page, collectionName);
+          const savedCollection = await inspectSavedCollection(page, collectionUrl);
+          collectionName = savedCollection.collectionName;
           savedCollectionUrls = new Set(savedCollection.items.map(item => new URL(item.url).pathname.replace(/\/$/, "")));
           savedCollectionInventoryAvailable = true;
           savedCollectionInventoryError = "";
@@ -392,7 +394,8 @@ app.post("/api/start", async (req, res) => {
       let destinationGroupVerification = { verified:false, reason:"Grupo coletivo não verificado nesta execução.", threadId:"" };
       if (mode === "test" || mode === "automatic") {
         try {
-          destinationGroupVerification = await inspectDestinationGroup(page, destinationGroupName, destinationGroupUrl);
+          destinationGroupVerification = await inspectDestinationGroup(page, destinationGroupUrl);
+          destinationGroupName = destinationGroupVerification.groupName || "";
           logDiagnostic(destinationGroupVerification.verified ? "INFO" : "WARN", "Verificação do grupo coletivo", destinationGroupVerification);
         } catch (error) {
           destinationGroupVerification = { verified:false, reason:"Falha ao verificar grupo coletivo: " + error.message, threadId:"" };
