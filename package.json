@@ -10,7 +10,7 @@
     "dev": "node --watch src/server.js",
     "desktop": "electron .",
     "dist:mac": "electron-builder --mac dmg --publish never",
-    "test": "node --check src/server.js && node --check src/instagram.js && node --check src/execution-plan.js && node --check public/app.js && node --test",
+    "test": "node --check src/server.js && node --check src/instagram.js && node --check src/instagram-network-capture.js && node --check src/group-state.js && node --check src/execution-plan.js && node --check public/app.js && node --test",
     "dist:win": "electron-builder --win nsis --x64 --publish never"
   },
   "dependencies": {
