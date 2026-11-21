@@ -357,7 +357,7 @@ app.post("/api/start", async (req, res) => {
   diagnosticLog = [];
   diagnosticReport = null;
   const startedAt = new Date().toISOString();
-  logDiagnostic("INFO", "Coleta iniciada", { groupName, startDate, endDate, mode, destinationGroupName, destinationGroupUrl, collectionName });
+  logDiagnostic("INFO", "Coleta iniciada", { groupName, startDate, endDate, mode, destinationGroupUrl, collectionUrl });
   progress = { total: 0, done: 0, current: groupName, message: "Abrindo o Instagram..." };
   res.json({ ok: true, message: mode === "automatic" ? "Coleta e execução automática iniciadas. Cada ação será verificada." : mode === "manual" ? "Coleta iniciada em modo manual." : "Teste iniciado: nenhuma ação será executada no Instagram." });
 
@@ -384,7 +384,7 @@ app.post("/api/start", async (req, res) => {
           savedCollectionUrls = new Set(savedCollection.items.map(item => new URL(item.url).pathname.replace(/\/$/, "")));
           savedCollectionInventoryAvailable = true;
           savedCollectionInventoryError = "";
-          logDiagnostic("INFO", "Coleção de destino localizada e inventariada", { collectionName, existingItems: savedCollectionUrls.size, mode });
+          logDiagnostic("INFO", "Coleção de destino localizada e inventariada", { collectionName, collectionUrl: savedCollection.collectionUrl, collectionId: savedCollection.collectionId, existingItems: savedCollectionUrls.size, mode });
         } catch (error) {
           savedCollectionInventoryError = error.message || String(error);
           logDiagnostic(mode === "test" ? "WARN" : "ERROR", "Não foi possível inventariar a coleção de destino", { collectionName, mode, error: savedCollectionInventoryError });
