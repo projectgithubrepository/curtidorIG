@@ -508,6 +508,12 @@ function normalizeSavedCollectionLabel(value) {
   return String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/\\s+/g, " ").trim().toLocaleLowerCase();
 }
 
+function savedCollectionLabelMatches(value, wanted) {
+  const raw = String(value || "");
+  return raw.split(/[\\r\\n]+/).some(line => normalizeSavedCollectionLabel(line) === wanted) ||
+    normalizeSavedCollectionLabel(raw) === wanted;
+}
+
 export function selectSavedCollectionHref(anchors, collectionName, baseUrl) {
   const wanted = normalizeSavedCollectionLabel(collectionName);
   if (!wanted) throw new Error("Informe o nome exato da coleção.");
@@ -515,7 +521,7 @@ export function selectSavedCollectionHref(anchors, collectionName, baseUrl) {
   if (!isInstagramSavedUrl(base.href)) throw new Error("A página atual não pertence à área Salvos do Instagram.");
   const matches = (anchors || []).filter(anchor => {
     const labels = [anchor.text, anchor.ariaLabel, anchor.title, ...(Array.isArray(anchor.labels) ? anchor.labels : [])];
-    if (!labels.some(label => normalizeSavedCollectionLabel(label) === wanted)) return false;
+    if (!labels.some(label => savedCollectionLabelMatches(label, wanted))) return false;
     try {
       const url = new URL(anchor.href, base.href);
       return url.origin === base.origin && isInstagramSavedUrl(url.href, base.href);
