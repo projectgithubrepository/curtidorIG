@@ -557,3 +557,148 @@ export async function unsaveSavedCollectionItem(page, url) {
   if (after !== "unsaved") return { url, status: "falha de verificação — estado após clique: " + after };
   return { url, status: "dessalvada e verificada" };
 }
+
+
+function visibleButton(page, patterns, root = "article,main,[role='dialog']") {
+  const names = patterns.map(pattern => new RegExp(pattern, "i"));
+  return page.locator(root).first().locator("button,[role='button']").filter({
+    has: page.locator("*")
+  }).evaluateAll((nodes, regexSources) => {
+    const visible = nodes.filter(node => {
+      const rect = node.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+    return visible.map(node => ({
+      label: [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText].filter(Boolean).join(" ").trim()
+    })).filter(item => regexSources.some(source => new RegExp(source, "i").test(item.label)));
+  }, names.map(regex => regex.source));
+}
+
+async function uniqueButton(page, patterns, root = "article,main,[role='dialog']") {
+  const candidates = await visibleButton(page, patterns, root);
+  if (candidates.length !== 1) throw new Error(candidates.length ? "Mais de um controle corresponde à ação; execução bloqueada." : "Controle da ação não encontrado; execução bloqueada.");
+  const escaped = candidates[0].label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return page.locator(root).first().getByRole("button", { name: new RegExp(escaped, "i") }).first();
+}
+
+export async function executeLike(page, url) {
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForTimeout(1200);
+  const state = await readSavedToggle(page);
+  const liked = await page.locator("article,main,[role='dialog']").first().evaluate(root => {
+    const labels = [...root.querySelectorAll("button,[role=button]")].map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" ");
+    return /descurtir|unlike/i.test(labels);
+  }).catch(() => false);
+  if (liked) return { liked: true, status: "já curtida — não repetida" };
+  const button = await uniqueButton(page, ["curtir", "like"]);
+  await button.click();
+  await page.waitForTimeout(700);
+  const verified = await page.locator("article,main,[role='dialog']").first().evaluate(root => [...root.querySelectorAll("button,[role=button]")].some(node => /descurtir|unlike/i.test([node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" "))));
+  if (!verified) throw new Error("A curtida não pôde ser verificada após o clique.");
+  return { liked: true, status: "curtida verificada" };
+}
+
+export async function executeSaveToCollection(page, url, collectionName) {
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForTimeout(1200);
+  const root = page.locator("article,main,[role='dialog']").first();
+  const labels = await root.locator("button,[role='button']").evaluateAll(nodes => nodes.map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" | "));
+  const isSaved = /remover dos salvos|remove from saved/i.test(labels);
+  if (isSaved) {
+    const savedControl = root.locator('button[aria-label*="Remove from saved" i],button[aria-label*="Remover dos salvos" i],[role="button"][aria-label*="Remove from saved" i],[role="button"][aria-label*="Remover dos salvos" i]').first();
+    if (await savedControl.count()) await savedControl.click();
+  } else {
+    const saveControl = await uniqueButton(page, ["^salvar$", "^save$"]);
+    await saveControl.click();
+  }
+  await page.waitForTimeout(700);
+  const dialog = page.getByRole("dialog").last();
+  const dialogVisible = await dialog.count() && await dialog.isVisible().catch(() => false);
+  if (dialogVisible) {
+    const collection = dialog.getByText(collectionName, { exact: true });
+    if (!(await collection.count())) throw new Error(`A publicação está salva, mas a coleção “${collectionName}” não foi localizada no seletor. Pasta não confirmada.`);
+    await collection.click();
+    await page.waitForTimeout(500);
+    const save = dialog.getByRole("button", { name: /concluir|done|salvar|save/i }).last();
+    if (await save.count()) await save.click();
+  }
+  await page.waitForTimeout(800);
+  const finalLabels = await root.locator("button,[role='button']").evaluateAll(nodes => nodes.map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" | ")).catch(() => "");
+  if (!/remover dos salvos|remove from saved/i.test(finalLabels)) throw new Error("O Instagram não confirmou que a publicação ficou salva.");
+  // A confirmação da coleção depende de o seletor ter exibido e aceitado o nome exato.
+  if (!dialogVisible) throw new Error("O salvamento global foi detectado, mas a coleção específica não pôde ser verificada.");
+  return { saved: true, savedFolderVerified: true, status: "salva na coleção e verificada" };
+}
+
+export async function executeComment(page, url, comment) {
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForTimeout(1000);
+  const text = String(comment || "").trim();
+  const words = text.match(/[\p{L}\p{N}]+/gu) || [];
+  if (words.length < 2 || !/\p{Extended_Pictographic}/u.test(text)) throw new Error("Comentário bloqueado: precisa ter pelo menos duas palavras e um emoji.");
+  const boxes = page.locator('textarea,[contenteditable="true"][role="textbox"],[contenteditable="true"]');
+  const count = await boxes.count();
+  let editor = null;
+  for (let i=0;i<count;i++) if (await boxes.nth(i).isVisible().catch(()=>false)) { editor=boxes.nth(i); break; }
+  if (!editor) throw new Error("Campo de comentário não identificado.");
+  await editor.fill(text);
+  const post = page.getByRole("button", { name: /publicar|postar|send|enviar/i }).last();
+  if (!(await post.count())) throw new Error("Botão de publicar comentário não identificado.");
+  await post.click();
+  await page.waitForTimeout(900);
+  const body = await page.locator("article,main").first().innerText().catch(() => "");
+  if (!body.includes(text)) throw new Error("O comentário não apareceu na publicação após o envio.");
+  return { commented: true, status: "comentário publicado e verificado" };
+}
+
+export async function executeShareToGroup(page, url, destinationGroupName) {
+  const groupName = String(destinationGroupName || "").trim();
+  if (!groupName) throw new Error("Informe o nome exato do grupo coletivo de envios.");
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForTimeout(1000);
+  const share = await uniqueButton(page, ["compartilhar publicação", "share post", "^compartilhar$", "^share$"]);
+  await share.click();
+  await page.waitForTimeout(700);
+  const dialog = page.getByRole("dialog").last();
+  const search = dialog.locator('input,[role="combobox"],textarea').first();
+  if (!(await search.count())) throw new Error("Busca de destinatários do compartilhamento não identificada.");
+  await search.fill(groupName);
+  await page.waitForTimeout(1000);
+  const target = dialog.getByText(groupName, { exact: true });
+  if (await target.count() !== 1) throw new Error("O grupo coletivo não foi identificado de forma única na lista de destinatários.");
+  await target.click();
+  await page.waitForTimeout(400);
+  const send = dialog.getByRole("button", { name: /enviar|send|compartilhar/i }).last();
+  if (!(await send.count())) throw new Error("Botão de envio não identificado.");
+  await send.click();
+  await page.waitForTimeout(1200);
+  const confirmation = await page.locator("body").innerText();
+  if (!/enviado|enviada|sent|compartilhado|shared/i.test(confirmation)) throw new Error("O Instagram não exibiu confirmação de envio; estado não registrado.");
+  return { sharedToGroup: true, status: "enviado ao grupo coletivo e confirmado" };
+}
+
+export async function executeCompletionReaction(page, item, emoji = "🌸") {
+  if (!item?.threadId || !item?.messageId || !item?.identityVerified || !item?.messageText) {
+    throw new Error("Reação bloqueada: não há identidade e texto suficientes da mensagem original.");
+  }
+  await page.goto(`https://www.instagram.com/direct/t/${encodeURIComponent(item.threadId)}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForTimeout(1200);
+  const excerpt = String(item.messageText).trim().slice(0, 100);
+  const candidates = page.locator('[role="row"],[role="listitem"],[data-testid*="message"],[data-testid*="Message"]').filter({ hasText: excerpt });
+  const count = await candidates.count();
+  if (count !== 1) throw new Error("Mensagem original não localizada de forma única; reação bloqueada.");
+  const message = candidates.first();
+  await message.hover();
+  const reaction = message.locator('button[aria-label*="reagir" i],button[aria-label*="reaction" i],button[aria-label*="emoji" i],[role="button"][aria-label*="reagir" i],[role="button"][aria-label*="reaction" i]').first();
+  if (!(await reaction.count())) throw new Error("Controle de reação da mensagem não identificado.");
+  await reaction.click();
+  await page.waitForTimeout(400);
+  const picker = page.locator('[role="dialog"],[role="menu"]').last();
+  const emojiButton = picker.getByRole("button", { name: new RegExp(emoji.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first();
+  if (!(await emojiButton.count())) throw new Error(`Emoji ${emoji} não encontrado no seletor de reações.`);
+  await emojiButton.click();
+  await page.waitForTimeout(700);
+  const reactionPresent = await message.getByText(emoji, { exact: true }).count();
+  if (!reactionPresent) throw new Error("A reação não pôde ser verificada na mensagem original.");
+  return { groupCheck: true, status: `reação ${emoji} aplicada e verificada na mensagem original` };
+}
