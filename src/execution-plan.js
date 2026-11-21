@@ -54,9 +54,12 @@ export function buildExecutionPlan({
     if (item.alreadyDone) status = "já concluída — não repetir";
     else if (item.action === "comment" && item.policy === "forbidden") status = "dispensada — pedido explícito para não comentar";
     else if (item.action === "shareToGroup" && state.shareAttempted && !state.sharedToGroup) { status = "bloqueada"; reason = "Tentativa anterior sem confirmação; verifique o grupo para evitar envio duplicado."; }
-    else if (item.action === "saveToCollection" && state.saved && !state.savedFolderVerified) {
-      status = "bloqueada";
-      reason = "A publicação já está salva fora da coleção confirmada (ou sua inclusão não foi comprovada); não alternar o salvamento.";
+    else if (item.action === "saveToCollection" && state.saved && !state.savedFolderVerified && stateKnown.collectionInventoryAvailable !== true) {
+      status = "não verificada — coleção de destino não conferida";
+      reason = stateKnown.reasons?.saveToCollection || "A publicação aparece como salva, mas o inventário da coleção escolhida não foi carregado; não é possível confirmar a pasta.";
+    } else if (item.action === "saveToCollection" && state.saved && !state.savedFolderVerified) {
+      status = "bloqueada — publicação salva fora da coleção confirmada";
+      reason = stateKnown.reasons?.saveToCollection || "A publicação já está salva, mas sua presença na coleção escolhida não foi comprovada; não alternar o salvamento.";
     } else if (mode === "test" && !item.alreadyDone && item.action === "like" && stateKnown.liked !== true) {
       status = "não verificada — estado da curtida desconhecido";
       reason = stateKnown.reasons?.liked || "Controle de curtida não identificado; não é possível afirmar se já está curtida.";
