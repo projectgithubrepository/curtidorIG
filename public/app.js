@@ -24,6 +24,7 @@ const copyDiagnostic = document.querySelector("#copyDiagnostic");
 const copyDiagnosticSummary = document.querySelector("#copyDiagnosticSummary");
 const diagnosticCopyStatus = document.querySelector("#diagnosticCopyStatus");
 const downloadDiagnostic = document.querySelector("#downloadDiagnostic");
+const downloadDiagnosticSummary = document.querySelector("#downloadDiagnosticSummary");
 
 copyDiagnosticSummary.addEventListener("click", async () => {
   try {
@@ -363,6 +364,8 @@ async function refresh() {
     copyDiagnosticSummary.disabled = data.running || !data.hasDiagnostic;
     downloadDiagnostic.style.pointerEvents = copyDiagnostic.disabled ? "none" : "auto";
     downloadDiagnostic.style.opacity = copyDiagnostic.disabled ? "0.5" : "1";
+    downloadDiagnosticSummary.style.pointerEvents = copyDiagnosticSummary.disabled ? "none" : "auto";
+    downloadDiagnosticSummary.style.opacity = copyDiagnosticSummary.disabled ? "0.5" : "1";
   } catch {}
 }
 setInterval(refresh,1500); refresh();
