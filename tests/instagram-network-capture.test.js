@@ -283,3 +283,57 @@ test("continues parsing network responses beyond the former 500-response ceiling
   assert.equal(summary.responseDetails.length, 500);
   assert.equal(summary.responseDetailsTruncated, 20);
 });
+
+test("extracts Stories from nested XMA story media structures", async () => {
+  const page = new EventEmitter();
+  const capture = createInstagramNetworkCapture(page);
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql",
+    status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({
+      postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: { thread_id: "1783131735658148" } }),
+      url: () => "https://www.instagram.com/api/graphql"
+    }),
+    json: async () => ({ data: { thread: { items: [{
+      message_id: "story-xma-1",
+      timestamp_ms: 1795021200000,
+      sender: { username: "member" },
+      content: { xma: { layout: { story: { media: {
+        pk: "390000000000000034",
+        user: { username: "story.creator" },
+        product_type: "story"
+      } } } } }
+    }] } } })
+  });
+  await capture.stop();
+  const [record] = capture.records();
+  assert.deepEqual(record.urls, ["https://www.instagram.com/stories/story.creator/390000000000000034"]);
+});
+
+test("does not truncate more than twelve Story links in a single message", async () => {
+  const page = new EventEmitter();
+  const capture = createInstagramNetworkCapture(page);
+  const stories = Array.from({ length: 20 }, (_, index) => ({
+    story_id: String(390000000000000100 + index),
+    user: { username: "story.creator" },
+    product_type: "story"
+  }));
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql",
+    status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({
+      postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: { thread_id: "1783131735658148" } }),
+      url: () => "https://www.instagram.com/api/graphql"
+    }),
+    json: async () => ({ data: { thread: { items: [{
+      message_id: "story-batch-20",
+      timestamp_ms: 1795021200000,
+      sender: { username: "member" },
+      content: { story_items: stories }
+    }] } } })
+  });
+  await capture.stop();
+  assert.equal(capture.records()[0].urls.length, 20);
+});
