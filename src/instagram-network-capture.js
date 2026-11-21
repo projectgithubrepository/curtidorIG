@@ -2,6 +2,38 @@ const MAX_DIAGNOSTIC_RESPONSES = 500;
 const MAX_DEPTH = 40;
 const URL_PATTERN = /(?:https?:\/\/(?:www\.)?instagram\.com)?\/(?:p|reel|tv|stories)\/[A-Za-z0-9._-]+(?:\/[^\s"'<>]*)?/gi;
 
+function parseJsonPreservingLargeIntegers(raw) {
+  const source = String(raw || "");
+  let output = "";
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < source.length;) {
+    const char = source[index];
+    if (inString) {
+      output += char;
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      index++;
+      continue;
+    }
+    if (char === '"') { inString = true; output += char; index++; continue; }
+    if (char === "-" || /[0-9]/.test(char)) {
+      const match = source.slice(index).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/);
+      if (match) {
+        const token = match[0];
+        const integerDigits = /^-?\d+$/.test(token) ? token.replace(/^-/, "") : "";
+        output += integerDigits.length > 15 ? JSON.stringify(token) : token;
+        index += token.length;
+        continue;
+      }
+    }
+    output += char;
+    index++;
+  }
+  return JSON.parse(output);
+}
+
 function requestBody(request) {
   try { return request.postDataJSON(); } catch {}
   try {
@@ -313,9 +345,9 @@ export function createInstagramNetworkCapture(page) {
       try {
         // Playwright emits the frame payload itself (string or Buffer),
         // not an event object containing a .payload property.
-        if (typeof data === "string") payload = JSON.parse(data);
-        else if (Buffer.isBuffer(data)) payload = JSON.parse(data.toString("utf8"));
-        else if (data && typeof data.toString === "function") payload = JSON.parse(data.toString());
+        if (typeof data === "string") payload = parseJsonPreservingLargeIntegers(data);
+        else if (Buffer.isBuffer(data)) payload = parseJsonPreservingLargeIntegers(data.toString("utf8"));
+        else if (data && typeof data.toString === "function") payload = parseJsonPreservingLargeIntegers(data.toString());
         else throw new Error("unsupported websocket frame");
       } catch {
         websocketStats.unparsedFrames++;
@@ -375,7 +407,11 @@ export function createInstagramNetworkCapture(page) {
     };
     const task = (async () => {
       try {
-        const payload = await response.json();
+        let payload;
+        if (typeof response.text === "function") {
+          try { payload = parseJsonPreservingLargeIntegers(await response.text()); }
+          catch { payload = await response.json(); }
+        } else payload = await response.json();
         entry.payload = extractPayload(payload, context);
         mergeRecords(entry.payload.records, context);
       } catch { entry.parseError = true; }
