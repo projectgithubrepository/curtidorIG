@@ -148,6 +148,27 @@ async function readConversationScrollState(page, move = false) {
   }, move);
 }
 
+async function readOldestVisibleMessageDate(page) {
+  const values = await page.locator("time[datetime],time[title],time[aria-label]").evaluateAll(nodes =>
+    nodes.map(node => node.getAttribute("datetime") || node.getAttribute("title") || node.getAttribute("aria-label") || "")
+      .filter(Boolean)
+  ).catch(() => []);
+  const days = values.map(value => new Date(value)).filter(date => !Number.isNaN(date.getTime()))
+    .map(date => [date.getFullYear(), String(date.getMonth()+1).padStart(2,"0"), String(date.getDate()).padStart(2,"0")].join("-"))
+    .sort();
+  return days[0] || "";
+}
+
+function isAtHistoryStart(state) {
+  if (!state) return false;
+  const top = Number(state.scrollTop) || 0;
+  const maxDistance = Math.max(0, Number(state.scrollHeight) - Number(state.clientHeight));
+  if (state.flexDirection === "column-reverse" || top < 0) {
+    return maxDistance > 0 && Math.abs(top) >= maxDistance - 8;
+  }
+  return top <= 8;
+}
+
 async function scrollToOlderMessages(page) {
   const before = await readConversationScrollState(page, true);
   await page.waitForTimeout(900);
@@ -280,6 +301,8 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   let wheelFallbackRounds = 0;
   let lastScrollState = null;
   let scrollTargetFound = false;
+  let dateBoundaryReached = false;
+  let oldestVisibleDate = "";
 
   // Não interrompe a varredura só porque ainda não encontrou links:
   // conversas longas podem começar com dezenas de mensagens administrativas.
@@ -291,6 +314,11 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     for (const item of batch) {
       const date = dateInRange(item.sharedAt, startDate, endDate);
       if (date.known && date.inRange) found.set(item.url, { ...item, sharedAt: date.iso, dateUnknown: false, collectionMode: "date" });
+    }
+    oldestVisibleDate = await readOldestVisibleMessageDate(page) || oldestVisibleDate;
+    if (oldestVisibleDate && oldestVisibleDate < startDate) {
+      dateBoundaryReached = true;
+      break;
     }
 
     const scroll = await scrollToOlderMessages(page);
@@ -339,14 +367,17 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   }
 
   const milestoneList = [...milestones.values()];
+  const historyBoundaryReached = dateBoundaryReached || isAtHistoryStart(lastScrollState?.after);
   const collectionDiagnostics = {
     historyRounds,
     scrollProgressRounds,
     stalledRounds: noScrollProgressRounds,
     wheelFallbackRounds,
     scrollTargetFound,
-    stableBoundaryReached: noScrollProgressRounds >= 6,
-    scanLimitReached: historyRounds >= 70 && !shouldStop(),
+    stableBoundaryReached: historyBoundaryReached,
+    dateBoundaryReached,
+    oldestVisibleDate,
+    scanLimitReached: historyRounds >= 70 && !historyBoundaryReached && !shouldStop(),
     stoppedByUser: Boolean(shouldStop()),
     visibleItems: found.size,
     unknownDateCandidates: fallback.size
