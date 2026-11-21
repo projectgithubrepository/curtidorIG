@@ -439,40 +439,44 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   // Não interrompe a varredura só porque ainda não encontrou links:
   // conversas longas podem começar com dezenas de mensagens administrativas.
   // Continua subindo até detectar o topo/ausência real de carregamento do histórico.
-  while (!shouldStop() && !dateBoundaryReached && !historyBoundaryReached && !historyStalled) {
-    historyRounds++;
-    for (const marker of await readVisibleAdministrativeMilestones(page)) milestones.set(marker.text, marker);
-    const batch = await readVisiblePostLinks(page);
-    for (const item of batch) {
-      const date = dateInRange(item.sharedAt, startDate, endDate);
-      if (date.known && date.inRange) found.set(item.url, { ...item, sharedAt: date.iso, dateUnknown: false, collectionMode: "date" });
+  try {
+    while (!shouldStop() && !dateBoundaryReached && !historyBoundaryReached && !historyStalled) {
+      historyRounds++;
+      for (const marker of await readVisibleAdministrativeMilestones(page)) milestones.set(marker.text, marker);
+      const batch = await readVisiblePostLinks(page);
+      for (const item of batch) {
+        const date = dateInRange(item.sharedAt, startDate, endDate);
+        if (date.known && date.inRange) found.set(item.url, { ...item, sharedAt: date.iso, dateUnknown: false, collectionMode: "date" });
+      }
+      oldestVisibleDate = await readOldestVisibleMessageDate(page) || oldestVisibleDate;
+      if (oldestVisibleDate && oldestVisibleDate < startDate) {
+        dateBoundaryReached = true;
+        break;
+      }
+  
+      const scroll = await scrollToOlderMessages(page);
+      lastScrollState = { before: scroll.before, after: scroll.after };
+      scrollTargetFound ||= Boolean(scroll.before?.found);
+      if (scroll.usedWheelFallback) wheelFallbackRounds++;
+      noScrollProgressRounds = scroll.progressed ? 0 : noScrollProgressRounds + 1;
+      if (scroll.progressed) scrollProgressRounds++;
+      // Só confirma o início quando o contêiner de mensagens está no topo.
+      // Falta de movimento fora do topo não encerra a varredura: o diagnóstico
+      // permanece incompleto até o limite global, em vez de declarar fim do histórico.
+      if (didReachHistoryStart(scroll.after, scroll.progressed) || (!scroll.progressed && scroll.before?.found && isAtHistoryStart(scroll.before))) {
+        historyBoundaryReached = true;
+        break;
+      }
+      if (noScrollProgressRounds >= MAX_STALLED_SCROLL_ROUNDS) {
+        historyStalled = true;
+        break;
+      }
     }
-    oldestVisibleDate = await readOldestVisibleMessageDate(page) || oldestVisibleDate;
-    if (oldestVisibleDate && oldestVisibleDate < startDate) {
-      dateBoundaryReached = true;
-      break;
-    }
-
-    const scroll = await scrollToOlderMessages(page);
-    lastScrollState = { before: scroll.before, after: scroll.after };
-    scrollTargetFound ||= Boolean(scroll.before?.found);
-    if (scroll.usedWheelFallback) wheelFallbackRounds++;
-    noScrollProgressRounds = scroll.progressed ? 0 : noScrollProgressRounds + 1;
-    if (scroll.progressed) scrollProgressRounds++;
-    // Só confirma o início quando o contêiner de mensagens está no topo.
-    // Falta de movimento fora do topo não encerra a varredura: o diagnóstico
-    // permanece incompleto até o limite global, em vez de declarar fim do histórico.
-    if (didReachHistoryStart(scroll.after, scroll.progressed) || (!scroll.progressed && scroll.before?.found && isAtHistoryStart(scroll.before))) {
-      historyBoundaryReached = true;
-      break;
-    }
-    if (noScrollProgressRounds >= MAX_STALLED_SCROLL_ROUNDS) {
-      historyStalled = true;
-      break;
-    }
+  
+  
+  } finally {
+    await networkCapture.stop();
   }
-
-  await networkCapture.stop();
   const networkRecords = networkCapture.records();
   const networkDiagnostics = networkCapture.summary();
   const networkMerge = addNetworkMessages(networkRecords, {
