@@ -224,8 +224,13 @@ function collectMediaCodes(value, output, seen = new WeakSet(), depth = 0, insid
 
 function isMessageObject(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const id = value.message_id ?? value.mid ?? value.item_id;
-  if (id == null) return false;
+  const hasExplicitMessageId = value.message_id != null || value.mid != null || value.item_id != null;
+  // Algumas respostas do Direct usam apenas "id" para a mensagem.
+  // Não confundir com IDs de mídia: exige remetente, timestamp e conteúdo.
+  const hasSafeGenericMessageId = value.id != null && Boolean(value.sender) &&
+    (value.timestamp_ms != null || value.timestamp != null || value.created_at != null) &&
+    (value.content != null || value.message != null || value.text_body != null || value.text != null);
+  if (!hasExplicitMessageId && !hasSafeGenericMessageId) return false;
   return Boolean(value.sender || value.timestamp_ms != null || value.timestamp != null ||
     value.created_at != null || value.text_body != null || value.content || value.message);
 }
@@ -278,7 +283,7 @@ function extractPayload(payload, context = {}) {
     if (value.share || value.media || value.media_share || value.xma || value.slide_messages) sharedMediaObjects++;
 
     if (isMessageObject(value)) {
-      const id = String(value.message_id ?? value.mid ?? value.item_id);
+      const id = String(value.message_id ?? value.mid ?? value.item_id ?? value.id);
       messageIds.add(id);
       const urls = [];
       collectUrls(value, urls);
