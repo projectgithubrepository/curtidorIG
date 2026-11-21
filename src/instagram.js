@@ -577,25 +577,45 @@ export async function inspectPost(page, url) {
 }
 
 
-export function isInstagramSavedUrl(value, base = "https://www.instagram.com/") {
+export function extractInstagramUsernameFromProfileHref(value, base = "https://www.instagram.com/") {
   try {
     const url = new URL(value, base);
-    const segments = url.pathname.split("/").filter(Boolean).map(segment => segment.toLowerCase());
-    return /(^|\\.)instagram\\.com$/i.test(url.hostname) && segments[0] === "saved";
-  } catch { return false; }
+    if (!/(^|\\.)instagram\\.com$/i.test(url.hostname)) return "";
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts.length !== 1) return "";
+    const reserved = new Set(["accounts", "direct", "explore", "reels", "stories", "p", "reel", "tv", "saved"]);
+    return reserved.has(parts[0].toLowerCase()) ? "" : parts[0];
+  } catch { return ""; }
 }
 
-// /saved/ é somente a área geral. A coleção exige uma rota própria,
-// com o identificador da pasta após /saved/collections/ (ou /collection/).
-export function isInstagramSavedCollectionUrl(value, base = "https://www.instagram.com/") {
+export function buildInstagramSavedUrl(username) {
+  const account = String(username || "").trim().replace(/^@/, "");
+  if (!/^[a-zA-Z0-9._]{1,30}$/.test(account)) throw new Error("Não foi possível identificar o usuário da conta autenticada do Instagram.");
+  return "https://www.instagram.com/" + encodeURIComponent(account) + "/saved/";
+}
+
+export function isInstagramSavedUrl(value, base = "https://www.instagram.com/") {
   try {
     const url = new URL(value, base);
     const segments = url.pathname.split("/").filter(Boolean);
     return /(^|\\.)instagram\\.com$/i.test(url.hostname) &&
-      segments.length >= 3 &&
-      segments[0].toLowerCase() === "saved" &&
-      /^(collections?|collection)$/i.test(segments[1]) &&
-      Boolean(segments[2]);
+      segments.length >= 2 &&
+      segments[segments.length - 1].toLowerCase() === "saved" &&
+      Boolean(extractInstagramUsernameFromProfileHref("/" + segments[0] + "/", base));
+  } catch { return false; }
+}
+
+// As coleções do Instagram são apresentadas dentro da área /{usuario}/saved/.
+// O nome exato do cartão/link, e não um ID de rota inventado, identifica a pasta.
+export function isInstagramSavedCollectionUrl(value, base = "https://www.instagram.com/") {
+  try {
+    const url = new URL(value, base);
+    const baseUrl = new URL(base);
+    const savedParts = url.pathname.split("/").filter(Boolean);
+    const baseParts = baseUrl.pathname.split("/").filter(Boolean);
+    return url.origin === baseUrl.origin &&
+      isInstagramSavedUrl(url.href, baseUrl.href) &&
+      savedParts[0]?.toLowerCase() === baseParts[0]?.toLowerCase();
   } catch { return false; }
 }
 
@@ -638,7 +658,33 @@ export function selectSavedCollectionHref(anchors, collectionName, baseUrl) {
 export async function inspectSavedCollection(page, collectionName) {
   const name = String(collectionName || "").trim();
   if (!name) throw new Error("Informe o nome exato da coleção que será usada como origem.");
-  await page.goto("https://www.instagram.com/saved/", { waitUntil: "domcontentloaded", timeout: 60000 });
+  // Descobre o perfil da sessão autenticada pela navegação do próprio Instagram.
+  // Não fixa username de exemplo nem assume /saved/ sem o segmento do perfil.
+  const profileLink = page.locator('a[href^="/"]').filter({ has: page.locator('img') });
+  const profileCandidates = await page.locator('a[href^="/"]').evaluateAll(nodes => nodes
+    .map(anchor => ({
+      href: anchor.getAttribute("href") || "",
+      label: [anchor.getAttribute("aria-label"), anchor.getAttribute("title"), anchor.innerText].filter(Boolean).join(" ")
+    }))
+    .filter(item => /perfil|profile/i.test(item.label)));
+  let username = "";
+  for (const candidate of profileCandidates) {
+    username = extractInstagramUsernameFromProfileHref(candidate.href);
+    if (username) break;
+  }
+  if (!username) {
+    const avatarCandidates = await profileLink.evaluateAll(nodes => nodes.map(anchor => ({
+      href: anchor.getAttribute("href") || "",
+      alt: [...anchor.querySelectorAll("img")].map(img => img.alt || "").join(" ")
+    })));
+    for (const candidate of avatarCandidates) {
+      username = extractInstagramUsernameFromProfileHref(candidate.href);
+      if (username) break;
+    }
+  }
+  if (!username) throw new Error("Não consegui identificar com segurança o usuário da sessão autenticada para abrir /{usuario}/saved/. Nenhuma coleção foi selecionada.");
+  const savedUrl = buildInstagramSavedUrl(username);
+  await page.goto(savedUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1800);
   if (/\/accounts\/login/.test(page.url())) throw new Error("Faça login no Instagram antes de acessar os Salvos.");
   if (!isInstagramSavedUrl(page.url())) {
@@ -701,7 +747,7 @@ export async function inspectSavedCollection(page, collectionName) {
       if (!text || normalize(text) !== target) continue;
       for (let parent = node, depth = 0; parent && depth < 8; parent = parent.parentElement, depth++) {
         const links = [...parent.querySelectorAll("a[href]")].filter(anchor => {
-          try { const url = new URL(anchor.href, location.href); return url.origin === location.origin && /\/saved(?:\/|$)/i.test(url.pathname); } catch { return false; }
+          try { const url = new URL(anchor.href, location.href); return url.origin === location.origin && isInstagramSavedCollectionUrl(url.href, location.href); } catch { return false; }
         });
         const uniqueLinks = [...new Map(links.map(anchor => [anchor.href, anchor])).values()];
         if (uniqueLinks.length === 1) {
