@@ -259,3 +259,27 @@ test("keeps distinct Story IDs from the same Instagram profile", async () => {
     "https://www.instagram.com/stories/member.name/390000000000000002"
   ]);
 });
+
+
+test("continues parsing network responses beyond the former 500-response ceiling", async () => {
+  const page = new EventEmitter();
+  const capture = createInstagramNetworkCapture(page);
+  for (let index = 0; index < 520; index++) {
+    page.emit("response", {
+      url: () => "https://www.instagram.com/api/graphql",
+      status: () => 200,
+      headers: () => ({ "content-type": "application/json" }),
+      request: () => ({
+        postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: { thread_id: "1783131735658148" } }),
+        url: () => "https://www.instagram.com/api/graphql"
+      }),
+      json: async () => ({ data: { thread: { items: [] } } })
+    });
+  }
+  await capture.stop();
+  const summary = capture.summary();
+  assert.equal(summary.capturedResponses, 520);
+  assert.equal(summary.parsedResponses, 520);
+  assert.equal(summary.responseDetails.length, 500);
+  assert.equal(summary.responseDetailsTruncated, 20);
+});
