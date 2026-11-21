@@ -15,7 +15,7 @@ test("recognizes administrative group notices and extracts date and counts", () 
 test("completion state is monotonic and never clears a completed action", () => {
   const previous = { saved: true, savedFolderVerified: true, liked: true, commented: false, sharedToGroup: true, groupCheck: true };
   const next = mergeTaskState(previous, { commented: true, liked: false });
-  assert.deepEqual(next, { saved: true, savedFolderVerified: true, liked: true, commented: true, sharedToGroup: true, commentForbidden: false, groupCheck: true, complete: true });
+  assert.deepEqual(next, { saved: true, savedFolderVerified: true, liked: true, commented: true, sharedToGroup: true, shareAttempted: false, commentForbidden: false, groupCheck: true, complete: true });
   assert.match(taskStateLabel(next), /fluxo completo/);
 });
 
@@ -27,4 +27,11 @@ test("ordinary shared-post text is not treated as an administrative notice", () 
 test("emoji in message text never counts as a reaction on the exact group message", () => {
   assert.equal(hasGroupCheck("Publicação concluída ✅"), false);
   assert.equal(hasGroupCheck({ reactions: [{ emoji: "✅" }] }), false);
+});
+
+test("an uncertain send attempt remains blocked instead of being retried", () => {
+  const state = mergeTaskState({}, { shareAttempted:true });
+  assert.equal(state.sharedToGroup, false);
+  assert.equal(state.shareAttempted, true);
+  assert.match(taskStateLabel(state), /verificar envio/);
 });
