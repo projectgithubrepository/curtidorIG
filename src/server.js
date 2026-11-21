@@ -36,6 +36,7 @@ function logDiagnostic(level, message, details = {}) {
 function reportItem(item) {
   return {
     url: item.url || "",
+    requestText: item.messageText || "",
     contentType: item.contentType || "",
     sharedAt: item.sharedAt || "",
     dateUnknown: Boolean(item.dateUnknown),
@@ -91,7 +92,8 @@ app.get("/api/diagnostic-log", (_req, res) => {
       `Regra: comentário ${item.instructionSummary?.comment === "forbidden" ? "proibido" : "obrigatório"}; envio ao grupo coletivo obrigatório`,
       `Legenda/conteúdo: ${item.caption?.trim() || "não disponível"}`,
       `Comentário preparado: ${item.comment || "não preparado"} | Origem: ${item.commentSource || "não informada"}`,
-      `Estado verificado: curtida=${item.stateVerification?.liked ?? "?"}; coleção=${item.stateVerification?.saveToCollection ?? "?"}; comentário=${item.stateVerification?.commented ?? "?"}`,
+      `Pedido original no grupo: ${item.requestText?.trim() || "texto do pedido não capturado"}`,
+      `Estado atual: curtida=${item.stateVerification?.likedKnown ? (item.stateVerification.liked ? "sim" : "não") : "não verificado"}; coleção=${item.stateVerification?.savedKnown ? (item.stateVerification.saved ? "sim" : "não") : "não verificada"}; comentário anterior=${item.stateVerification?.commentedKnown ? (item.stateVerification.commented ? "sim" : "não") : "não verificado"}`,
       ...actions
     ].join("\n");
   });
@@ -113,7 +115,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     `Grupo: ${report.request?.groupName || "não informado"} | Período: ${report.request?.startDate || "?"} a ${report.request?.endDate || "?"}`,
     `Coleção de destino: ${report.request?.collectionName || "não informada"}`,
     `Publicações: ${summary.publicationsFound ?? report.publications?.length ?? 0} | Feed/Reels: ${summary.feedsAndReels ?? "?"} | Stories: ${summary.stories ?? "?"} | Marcos administrativos: ${summary.administrativeMilestones ?? "?"} | Sem data: ${summary.itemsWithoutDate ?? "?"}`,
-    ...(report.request?.mode === "test" ? [`PLANO DE TESTE: ${summary.publicationsInspected ?? 0} itens processados | ${summary.inspectionFailures ?? 0} inspeções interrompidas | ${summary.captionUnavailable ?? 0} sem legenda legível | ${summary.storiesBlocked ?? 0} Stories com etapas bloqueadas/não verificadas | ${summary.mappedActions ?? 0} ações simuladas/aptas, mas NÃO EXECUTADAS | ${summary.candidateActions ?? 0} candidatas aguardando verificação/pré-requisitos | ${summary.alreadyDoneActions ?? 0} já concluídas | ${summary.blockedActions ?? 0} bloqueadas | ${summary.unverifiedActions ?? 0} estados não verificados | ${summary.plannedActions ?? 0} etapas no plano | Inventário da coleção: ${summary.savedCollectionInventoryAvailable ? "confirmado" : "indisponível"}`] : []),
+    ...(report.request?.mode === "test" ? ["", "RESUMO PRELIMINAR — AÇÕES POR TIPO", ...(Object.entries(summary.actionTotals || {}).map(([key,value]) => `- ${({like:"Curtidas",saveToCollection:"Salvamentos na coleção",comment:"Comentários",shareToGroup:"Envios ao grupo coletivo",completionReaction:"Reações na mensagem original",commentStory:"Comentários públicos em Stories",shareStoryToGroup:"Envios de Stories ao grupo coletivo"})[key] || key}: ${value.total} previstas | ${value.simulated} simuladas aptas | ${value.unverified} não verificadas | ${value.blocked} bloqueadas | ${value.done} já concluídas`)), "", `PLANO DE TESTE: ${summary.publicationsInspected ?? 0} itens processados | ${summary.inspectionFailures ?? 0} inspeções interrompidas | ${summary.captionUnavailable ?? 0} sem legenda legível | ${summary.storiesBlocked ?? 0} Stories com etapas bloqueadas/não verificadas | ${summary.mappedActions ?? 0} ações simuladas/aptas, mas NÃO EXECUTADAS | ${summary.candidateActions ?? 0} candidatas aguardando verificação/pré-requisitos | ${summary.alreadyDoneActions ?? 0} já concluídas | ${summary.blockedActions ?? 0} bloqueadas | ${summary.unverifiedActions ?? 0} estados não verificados | ${summary.plannedActions ?? 0} etapas no plano | Inventário da coleção: ${summary.savedCollectionInventoryAvailable ? "confirmado" : "indisponível"}`] : []),
     "",
     "CAPTURA DE REDE",
     `Respostas: ${network.capturedResponses ?? 0} | Lidas: ${network.parsedResponses ?? 0} | Não interpretadas: ${network.unparsedResponses ?? 0}`,
@@ -457,7 +459,12 @@ app.post("/api/start", async (req, res) => {
               return entry;
             });
           }
-          const result = { ...item, caption:inspection.caption, comment, taskState, commentSource, instructionSummary:{comment:instructions.comment,shareToGroup:instructions.shareToGroup}, stateVerification:{ ...stateKnown, controlCount:inspection.observedState.controlCount || 0, controlLabels:inspection.observedState.controlLabels || "" }, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
+          const result = { ...item, caption:inspection.caption, comment, taskState, commentSource, instructionSummary:{comment:instructions.comment,shareToGroup:instructions.shareToGroup}, stateVerification:{
+            liked:inspection.observedState.liked, likedKnown:Boolean(inspection.stateKnown?.liked),
+            saved:inspection.observedState.saved, savedKnown:Boolean(inspection.stateKnown?.saved),
+            commented:inspection.observedState.commented, commentedKnown:Boolean(inspection.stateKnown?.commented),
+            controlCount:inspection.observedState.controlCount || 0, controlLabels:inspection.observedState.controlLabels || ""
+          }, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
           results.push(result);
           appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,completionEmoji,commentForbidden:instructions.comment==="forbidden",complete:taskState.complete,milestone:item.administrativeMilestones,detail:mode==="test"?"Simulação sem ações":"Planejamento e execução da publicação"});
         } catch (error) {
@@ -477,6 +484,26 @@ app.post("/api/start", async (req, res) => {
       const inspectionFailures = results.filter(item => item.status === "inspeção não concluída — ações não verificadas").length;
       const captionUnavailable = results.filter(item => item.inspectionDiagnostics?.captionAvailable === false).length;
       const storiesBlocked = results.filter(item => item.contentType === "story" && (item.plan || []).some(action => /^(bloqueada|não verificada)/.test(action.status))).length;
+      const actionLabels = {
+        like: "curtidas", saveToCollection: "salvamentos na coleção", comment: "comentários",
+        shareToGroup: "envios ao grupo coletivo", completionReaction: "reações na mensagem original",
+        commentStory: "comentários públicos em Stories", shareStoryToGroup: "envios de Stories ao grupo coletivo"
+      };
+      const actionTotals = {};
+      for (const item of results) for (const action of (item.plan || [])) {
+        const key = action.action;
+        if (!actionTotals[key]) actionTotals[key] = { total: 0, simulated: 0, unverified: 0, blocked: 0, done: 0, candidate: 0 };
+        const bucket = actionTotals[key];
+        bucket.total++;
+        if (/^simulada/.test(action.status)) bucket.simulated++;
+        else if (/^não verificada/.test(action.status)) bucket.unverified++;
+        else if (/^bloqueada/.test(action.status)) bucket.blocked++;
+        else if (/^já concluída/.test(action.status)) bucket.done++;
+        if (action.testMode?.candidate) bucket.candidate++;
+      }
+      const preliminaryLines = Object.entries(actionTotals).map(([key,value]) =>
+        `- ${actionLabels[key] || key}: ${value.total} previstas | ${value.simulated} simuladas aptas | ${value.unverified} não verificadas | ${value.blocked} bloqueadas | ${value.done} já concluídas`
+      );
       const plannedActions = results.reduce((sum,item) => sum + (item.plan?.length || 0), 0);
       const mappedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => action.testMode?.mapped).length, 0);
       const candidateActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => action.testMode?.candidate).length, 0);
@@ -510,6 +537,7 @@ app.post("/api/start", async (req, res) => {
           captionUnavailable,
           storiesBlocked,
           plannedActions,
+          actionTotals,
           mappedActions,
           candidateActions,
           alreadyDoneActions,
