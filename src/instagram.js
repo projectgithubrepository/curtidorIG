@@ -1169,7 +1169,7 @@ export async function executeSaveToCollection(page, url, collectionName, knownCo
     if (!knownCollectionUrls && await (async()=>{const collection=await inspectSavedCollection(page,collectionName);return collection.items.some(item=>savedCollectionKey(item.url)===key);})()) return { saved:true,savedFolderVerified:true,status:"já salva na coleção correta — não repetida" };
     throw new Error("A publicação já está salva, mas não aparece comprovadamente na coleção solicitada. Não vou alternar o estado de salvamento.");
   }
-  const saveControl = await uniqueButton(page, ["^salvar$", "^save$"]);
+  const saveControl = await uniqueButton(page, ["salvar|save|add to saved|adicionar aos salvos"]);
   await saveControl.click();
   await page.waitForTimeout(700);
   const dialog = page.getByRole("dialog").last();
@@ -1323,7 +1323,7 @@ export async function executeShareToGroup(page, url, destinationGroupName, onBef
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1000);
   if (!sameInstagramContentUrl(page.url(),url)) throw new Error("O Instagram não abriu a publicação solicitada; compartilhamento bloqueado.");
-  const share = await uniqueButton(page, ["compartilhar publicação", "share post", "^compartilhar$", "^share$"]);
+  const share = await uniqueButton(page, ["compartilhar|share"]);
   await share.click();
   await page.waitForTimeout(700);
   const dialog = page.getByRole("dialog").last();
