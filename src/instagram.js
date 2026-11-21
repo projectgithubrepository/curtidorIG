@@ -810,6 +810,39 @@ export async function executeComment(page, url, comment) {
   return { commented: true, status: "comentário publicado e verificado" };
 }
 
+export async function inspectDestinationGroup(page, destinationGroupName) {
+  const groupName = String(destinationGroupName || "").trim();
+  if (!groupName) return { verified:false, reason:"Nome do grupo coletivo não informado.", threadId:"" };
+  await page.goto("https://www.instagram.com/direct/inbox/", { waitUntil:"domcontentloaded", timeout:60000 });
+  await page.waitForTimeout(1200);
+  if (page.url().includes("/accounts/login")) {
+    return { verified:false, reason:"Instagram redirecionou para o login; grupo coletivo não foi verificado.", threadId:"" };
+  }
+  const search = page.getByPlaceholder(/pesquisar|search/i).first();
+  if (!(await search.count())) {
+    return { verified:false, reason:"Campo de busca de conversas não foi localizado.", threadId:"" };
+  }
+  await search.fill(groupName);
+  await page.waitForTimeout(1500);
+  const exact = page.getByText(groupName, { exact:true });
+  const count = await exact.count();
+  if (count !== 1) {
+    return {
+      verified:false,
+      reason:count === 0
+        ? `Nenhuma conversa com o nome exato “${groupName}” foi encontrada.`
+        : `Foram encontrados ${count} resultados com o mesmo nome; destino ambíguo.`,
+      threadId:""
+    };
+  }
+  await exact.first().click();
+  await page.waitForTimeout(1000);
+  const threadId = page.url().match(/\/direct\/t\/(\d+)/)?.[1] || "";
+  return threadId
+    ? { verified:true, reason:`Grupo “${groupName}” localizado e conversa aberta (ID confirmado).`, threadId }
+    : { verified:false, reason:`O resultado “${groupName}” abriu, mas o ID da conversa não foi confirmado.`, threadId:"" };
+}
+
 export async function executeShareToGroup(page, url, destinationGroupName, onBeforeSend = async () => {}) {
   const groupName = String(destinationGroupName || "").trim();
   if (!groupName) throw new Error("Informe o nome exato do grupo coletivo de envios.");
