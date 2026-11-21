@@ -532,7 +532,7 @@ app.post("/api/start", async (req, res) => {
         else bucket.unclassified++;
       }
       const preliminaryLines = Object.entries(actionTotals).map(([key,value]) =>
-        `- ${actionLabels[key] || key}: ${value.total} previstas | ${value.simulated} aptas no TESTE | ${value.candidate} candidatas | ${value.waiting} aguardando etapas | ${value.unverified} não verificadas | ${value.blocked} bloqueadas | ${value.done} já concluídas | ${value.unclassified} sem classificação`
+        `- ${actionLabels[key] || key}: ${value.total} previstas | ${value.simulated} aptas no TESTE | ${value.candidate} candidatas | ${value.waiting} aguardando etapas | ${value.dispensed} dispensadas | ${value.unverified} não verificadas | ${value.blocked} bloqueadas | ${value.done} já concluídas | ${value.unclassified} sem classificação`
       );
       const plannedActions = results.reduce((sum,item) => sum + (item.plan?.length || 0), 0);
       const mappedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => action.testMode?.mapped).length, 0);
