@@ -61,3 +61,28 @@ test("a known timestamp from the visible DOM is not overwritten by an empty netw
   assert.equal(item.dateUnknown, false);
   assert.equal(item.sharedAt, "2026-11-18T12:00:00.000Z");
 });
+
+
+test("reports exactly where network Story URLs are lost during collection", () => {
+  const found = new Map();
+  const fallback = new Map();
+  const args = options(found, fallback);
+  const stories = [
+    { messageId:"in-range", threadId, timestamp:"2026-11-18T14:00:00.000Z", urls:["https://www.instagram.com/stories/a/390000000000000001"] },
+    { messageId:"unknown-date", threadId, timestamp:"", urls:["https://www.instagram.com/stories/a/390000000000000002"] },
+    { messageId:"wrong-thread", threadId:"9999999999999999", timestamp:"2026-11-18T14:00:00.000Z", urls:["https://www.instagram.com/stories/a/390000000000000003"] },
+    { messageId:"outside-range", threadId, timestamp:"2026-11-17T14:00:00.000Z", urls:["https://www.instagram.com/stories/a/390000000000000004"] },
+    { messageId:"no-thread", threadId:"", timestamp:"2026-11-18T14:00:00.000Z", urls:["https://www.instagram.com/stories/a/390000000000000005"] }
+  ];
+  const result = addNetworkMessages(stories, args);
+  assert.deepEqual(result.storyCollection, {
+    uniqueNetworkStoryUrls:5,
+    acceptedInDateRange:1,
+    pendingDateVerification:1,
+    rejectedOtherThread:1,
+    rejectedWithoutThread:1,
+    rejectedWithoutMessageId:0,
+    rejectedAdministrativeMessage:0,
+    rejectedOutsideDateRange:1
+  });
+});
