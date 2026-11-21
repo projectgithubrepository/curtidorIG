@@ -79,7 +79,7 @@ export function createComment(caption, previousComments = []) {
     const seed=hash(String(previousComments.length));
     for (let i=0;i<fallbackCandidates.length;i++) {
       const candidate=fallbackCandidates[(seed+i)%fallbackCandidates.length];
-      if (countWords(candidate)>=2 && /\\p{Extended_Pictographic}/u.test(candidate) && !used.has(normalize(candidate))) return candidate;
+      if (countWords(candidate)>=2 && /\p{Extended_Pictographic}/u.test(candidate) && !used.has(normalize(candidate))) return candidate;
     }
     return "Obrigado por compartilhar e contribuir com o grupo! 👏";
   }
