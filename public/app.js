@@ -133,14 +133,65 @@ results.addEventListener("click", async event => {
   }
 });
 
+
+const cleanupCollection = document.querySelector("#cleanupCollection");
+const cleanupTest = document.querySelector("#cleanupTest");
+const cleanupAutomatic = document.querySelector("#cleanupAutomatic");
+const cleanupStop = document.querySelector("#cleanupStop");
+const cleanupMessage = document.querySelector("#cleanupMessage");
+const cleanupCounter = document.querySelector("#cleanupCounter");
+const cleanupResults = document.querySelector("#cleanupResults");
+
+async function startCleanup(mode) {
+  const collectionName = cleanupCollection.value.trim();
+  if (!collectionName) { window.alert("Informe o nome exato da coleção."); return; }
+  let confirm = false;
+  if (mode === "automatic") {
+    confirm = window.confirm("ATENÇÃO: cada publicação será aberta e dessalva individualmente. Isso remove o estado de salvo por completo, não apenas da coleção. A coleção e as publicações não serão apagadas. Deseja continuar?");
+    if (!confirm) return;
+  }
+  cleanupTest.disabled = true; cleanupAutomatic.disabled = true;
+  cleanupMessage.textContent = mode === "test" ? "Listando a coleção sem alterar nada..." : "Iniciando dessalvamento individual...";
+  try {
+    const response = await fetch("/api/cleanup", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ collectionName, mode, confirm }) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Não foi possível iniciar a limpeza.");
+    cleanupMessage.textContent = data.message;
+    cleanupStop.disabled = false;
+  } catch (error) {
+    cleanupMessage.textContent = error.message;
+    cleanupTest.disabled = false; cleanupAutomatic.disabled = false;
+  }
+}
+cleanupTest.addEventListener("click", () => startCleanup("test"));
+cleanupAutomatic.addEventListener("click", () => startCleanup("automatic"));
+cleanupStop.addEventListener("click", async () => { await fetch("/api/stop",{method:"POST"}); cleanupStop.disabled=true; cleanupMessage.textContent="Solicitando parada..."; });
+
+function renderCleanup(items) {
+  cleanupResults.replaceChildren();
+  if (!items.length) { const p=document.createElement("p"); p.className="muted"; p.textContent="Nenhum item listado ainda."; cleanupResults.append(p); return; }
+  for (const item of items) {
+    const card=document.createElement("article"); card.className="result";
+    const title=document.createElement("strong"); title.textContent=item.contentType === "reel" ? "Reel" : "Feed / carrossel";
+    const status=document.createElement("small"); status.textContent=item.status;
+    const link=document.createElement("a"); link.href=item.url; link.target="_blank"; link.rel="noreferrer"; link.textContent="Abrir publicação";
+    card.append(title,status,link); cleanupResults.append(card);
+  }
+}
+
 async function refresh() {
   try {
-    const [sr,rr]=await Promise.all([fetch("/api/status"),fetch("/api/results")]);
-    const data=await sr.json(), p=data.progress, r=await rr.json();
+    const [sr,rr,cr]=await Promise.all([fetch("/api/status"),fetch("/api/results"),fetch("/api/cleanup-results")]);
+    const data=await sr.json(), p=data.progress, r=await rr.json(), cleanup=await cr.json();
     state.textContent=data.running?"Coletando":(data.connected?"Instagram conectado":"Pronto"); if (p.message) message.textContent=p.message;
     counter.textContent=`${p.done} de ${p.total} publicações processadas`;
     current.textContent=p.current||""; bar.style.width=p.total?`${Math.min(100,p.done/p.total*100)}%`:"0%";
     start.disabled=data.running; stop.disabled=!data.running; render(r.results||[]);
+    cleanupMessage.textContent = cleanup.progress?.message || "Nenhuma limpeza iniciada.";
+    cleanupCounter.textContent = cleanup.progress ? `${cleanup.progress.done} de ${cleanup.progress.total} itens processados` : "";
+    cleanupStop.disabled = !data.running || !cleanup.progress?.total;
+    cleanupTest.disabled = data.running; cleanupAutomatic.disabled = data.running;
+    renderCleanup(cleanup.results || []);
     copyDiagnostic.disabled = data.running || !data.hasDiagnostic;
     downloadDiagnostic.style.pointerEvents = copyDiagnostic.disabled ? "none" : "auto";
     downloadDiagnostic.style.opacity = copyDiagnostic.disabled ? "0.5" : "1";
