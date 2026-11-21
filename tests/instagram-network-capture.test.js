@@ -337,3 +337,17 @@ test("does not truncate more than twelve Story links in a single message", async
   await capture.stop();
   assert.equal(capture.records()[0].urls.length, 20);
 });
+
+test("extracts Story identity from story_pk and user_info variants", async () => {
+  const page = new EventEmitter();
+  const capture = createInstagramNetworkCapture(page);
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql", status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({ postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: { thread_id: "1783131735658148" } }), url: () => "https://www.instagram.com/api/graphql" }),
+    json: async () => ({ data: { thread: { items: [{ message_id: "story-identity-variant", timestamp_ms: 1795021200000, sender: { username: "member" }, content: { story_share: { media: { story_pk: "390000000000000034", user_info: { username: "story.variant" } } } } }] } } })
+  });
+  await capture.stop();
+  assert.deepEqual(capture.records()[0].urls, ["https://www.instagram.com/stories/story.variant/390000000000000034"]);
+  assert.equal(capture.summary().storyUrlsExtracted, 1);
+});
