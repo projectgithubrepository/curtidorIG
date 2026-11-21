@@ -781,7 +781,7 @@ export function isInstagramSavedUrl(value, base = "https://www.instagram.com/") 
   try {
     const url = new URL(value, base);
     const segments = url.pathname.split("/").filter(Boolean);
-    return /(^|\.)instagram\.com$/i.test(url.hostname) &&
+    return /^(?:www\.)?instagram\.com$/i.test(url.hostname) &&
       segments.length >= 2 &&
       segments[1].toLowerCase() === "saved" &&
       Boolean(extractInstagramUsernameFromProfileHref("/" + segments[0] + "/", base));
