@@ -410,10 +410,11 @@ export function createInstagramNetworkCapture(page) {
         result.hasReactionFields ||= item.payload.hasReactionFields;
         result.hasShareFields ||= item.payload.hasShareFields;
         const key = item.operation || "unknown";
-        const current = byOperation.get(key) || { operation: key, responses: 0, messageLikeObjects: 0, sharedMediaObjects: 0 };
+        const current = byOperation.get(key) || { operation: key, responses: 0, messageLikeObjects: 0, sharedMediaObjects: 0, storyUrls: 0 };
         current.responses++;
         current.messageLikeObjects += item.payload.messageLikeObjects;
         current.sharedMediaObjects += item.payload.sharedMediaObjects;
+        current.storyUrls += item.payload.storyUrls;
         byOperation.set(key, current);
         return result;
       }, { messageLikeObjects: 0, sharedMediaObjects: 0, storyUrls: 0, hasMessageId: false, hasReactionFields: false, hasShareFields: false });
