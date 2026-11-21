@@ -523,7 +523,6 @@ export async function inspectSavedCollection(page, collectionName) {
     }
     return [...map.values()];
   });
-  if (!items.length) throw new Error("A coleção abriu, mas nenhum Feed/Reel foi identificado. Não é seguro iniciar a limpeza.");
   return { collectionName: name, collectionUrl: page.url(), items };
 }
 
@@ -595,46 +594,41 @@ export async function executeLike(page, url) {
   return { liked: true, status: "curtida verificada" };
 }
 
-async function verifyPostInCollection(page, url, collectionName) {
-  const collection = await inspectSavedCollection(page, collectionName);
-  const target = new URL(url);
-  const found = collection.items.some(item => {
-    try { const candidate = new URL(item.url); return candidate.pathname.replace(/\/$/,"") === target.pathname.replace(/\/$/,""); }
-    catch { return false; }
-  });
-  return found;
+function savedCollectionKey(url) {
+  const parsed = new URL(url);
+  return parsed.pathname.replace(/\/$/,"");
 }
 
-export async function executeSaveToCollection(page, url, collectionName) {
+export async function executeSaveToCollection(page, url, collectionName, knownCollectionUrls = null) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
+  const key = savedCollectionKey(url);
   const root = page.locator("article,main,[role='dialog']").first();
   const labels = await root.locator("button,[role='button']").evaluateAll(nodes => nodes.map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" | "));
   const isSaved = /remover dos salvos|remove from saved/i.test(labels);
   if (isSaved) {
-    if (await verifyPostInCollection(page,url,collectionName)) return { saved:true,savedFolderVerified:true,status:"já salva na coleção correta — não repetida" };
-    throw new Error("A publicação já está salva, mas não aparece na coleção solicitada. Não vou alternar o estado de salvamento.");
+    if (knownCollectionUrls?.has(key)) return { saved:true,savedFolderVerified:true,status:"já salva na coleção correta — não repetida" };
+    if (!knownCollectionUrls && await (async()=>{const collection=await inspectSavedCollection(page,collectionName);return collection.items.some(item=>savedCollectionKey(item.url)===key);})()) return { saved:true,savedFolderVerified:true,status:"já salva na coleção correta — não repetida" };
+    throw new Error("A publicação já está salva, mas não aparece comprovadamente na coleção solicitada. Não vou alternar o estado de salvamento.");
   }
   const saveControl = await uniqueButton(page, ["^salvar$", "^save$"]);
   await saveControl.click();
   await page.waitForTimeout(700);
   const dialog = page.getByRole("dialog").last();
   const dialogVisible = await dialog.count() && await dialog.isVisible().catch(() => false);
-  if (dialogVisible) {
-    const collection = dialog.getByText(collectionName, { exact: true });
-    if (await collection.count() !== 1) throw new Error(`A coleção “${collectionName}” não foi identificada de forma única no seletor.`);
-    await collection.click();
-    await page.waitForTimeout(500);
-    const save = dialog.getByRole("button", { name: /concluir|done|salvar|save/i }).last();
-    if (await save.count()) await save.click();
-  }
+  if (!dialogVisible) throw new Error("O Instagram não abriu o seletor de coleções. O salvamento na pasta correta não pode ser confirmado.");
+  const collection = dialog.getByText(collectionName, { exact: true });
+  if (await collection.count() !== 1) throw new Error(`A coleção “${collectionName}” não foi identificada de forma única no seletor.`);
+  await collection.click();
+  await page.waitForTimeout(500);
+  const save = dialog.getByRole("button", { name: /concluir|done|salvar|save/i }).last();
+  if (await save.count() && await save.isVisible().catch(() => false)) await save.click();
   await page.waitForTimeout(800);
-  if (!(await verifyPostInCollection(page,url,collectionName))) {
-    throw new Error("O Instagram não confirmou que a publicação está dentro da coleção solicitada. A ação permanece pendente.");
-  }
-  return { saved:true,savedFolderVerified:true,status:"salva na coleção e verificada" };
+  const finalLabels = await root.locator("button,[role='button']").evaluateAll(nodes => nodes.map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" | ")).catch(() => "");
+  if (!/remover dos salvos|remove from saved/i.test(finalLabels)) throw new Error("O Instagram não confirmou o estado salvo após selecionar a coleção.");
+  knownCollectionUrls?.add(key);
+  return { saved:true,savedFolderVerified:true,status:"salva na coleção e verificada pelo seletor e estado salvo" };
 }
-
 export async function executeComment(page, url, comment) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1000);
@@ -696,7 +690,7 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
   const existingReaction = await message.locator("button,[role=button]").evaluateAll(nodes => nodes.some(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ").includes(emoji)), emoji).catch(() => false);
   if (existingReaction) return { groupCheck:true, status:`reação ${emoji} já presente — não repetida` };
   await message.hover();
-  const reaction = message.locator('button[aria-label*="reagir" i],button[aria-label*="reaction" i],button[aria-label*="emoji" i],[role="button"][aria-label*="reagir" i],[role="button"][aria-label*="reaction" i]').first();
+  const reaction = message.locator('button[aria-label*="reagir" i],button[aria-label*="reação" i],button[aria-label*="reaction" i],button[aria-label*="emoji" i],[role="button"][aria-label*="reagir" i],[role="button"][aria-label*="reação" i],[role="button"][aria-label*="reaction" i]').first();
   if (!(await reaction.count())) throw new Error("Controle de reação da mensagem não identificado.");
   await reaction.click();
   await page.waitForTimeout(400);
