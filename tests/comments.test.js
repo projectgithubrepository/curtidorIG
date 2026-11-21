@@ -42,3 +42,19 @@ test("biblioteca oferece grande espaço combinatório", () => {
   assert.ok(stats.keywords>=100);
   assert.ok(stats.combinations>=1000);
 });
+
+
+test("gera comentário alternativo neutro quando a publicação não tem legenda", () => {
+  const result=createComment("");
+  assert.ok(result.trim().split(/\\s+/).length>=2);
+  assert.match(result,/\\p{Extended_Pictographic}/u);
+  assert.doesNotMatch(result,/receita|praia|treino|produto/i);
+});
+
+test("varia comentário alternativo para não repetir mensagens anteriores", () => {
+  const first=createComment("");
+  const second=createComment("",[first]);
+  assert.notEqual(first,second);
+  assert.ok(second.trim().split(/\\s+/).length>=2);
+  assert.match(second,/\\p{Extended_Pictographic}/u);
+});
