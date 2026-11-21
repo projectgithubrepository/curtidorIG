@@ -64,6 +64,10 @@ export function buildExecutionPlan({
     } else if (item.action === "saveToCollection" && state.saved && !state.savedFolderVerified) {
       status = "bloqueada — publicação salva fora da coleção confirmada";
       reason = stateKnown.reasons?.saveToCollection || "A publicação já está salva, mas sua presença na coleção escolhida não foi comprovada; não alternar o salvamento.";
+    } else if (mode === "test" && !item.alreadyDone && item.action === "saveToCollection" &&
+      stateKnown.savedStateKnown === true && stateKnown.saved === false && stateKnown.collectionInventoryAvailable === true && stateKnown.collectionMembership === true) {
+      status = "não verificada — botão e inventário da coleção estão divergentes";
+      reason = stateKnown.reasons?.saveToCollection || "A coleção contém a publicação, mas o botão Salvar indica que ela não está salva. Não clicar até reconciliar a divergência.";
     } else if (mode === "test" && !item.alreadyDone && item.action === "like" && stateKnown.liked !== true) {
       status = "não verificada — estado da curtida desconhecido";
       reason = stateKnown.reasons?.liked || "Controle de curtida não identificado; não é possível afirmar se já está curtida.";
