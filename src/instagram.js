@@ -595,6 +595,16 @@ export async function executeLike(page, url) {
   return { liked: true, status: "curtida verificada" };
 }
 
+async function verifyPostInCollection(page, url, collectionName) {
+  const collection = await inspectSavedCollection(page, collectionName);
+  const target = new URL(url);
+  const found = collection.items.some(item => {
+    try { const candidate = new URL(item.url); return candidate.pathname.replace(/\\/$/,"") === target.pathname.replace(/\\/$/,""); }
+    catch { return false; }
+  });
+  return found;
+}
+
 export async function executeSaveToCollection(page, url, collectionName) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
@@ -602,7 +612,8 @@ export async function executeSaveToCollection(page, url, collectionName) {
   const labels = await root.locator("button,[role='button']").evaluateAll(nodes => nodes.map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" | "));
   const isSaved = /remover dos salvos|remove from saved/i.test(labels);
   if (isSaved) {
-    throw new Error("A publicação já está salva, mas não foi possível comprovar que está na coleção solicitada. Não vou alternar o estado de salvamento.");
+    if (await verifyPostInCollection(page,url,collectionName)) return { saved:true,savedFolderVerified:true,status:"já salva na coleção correta — não repetida" };
+    throw new Error("A publicação já está salva, mas não aparece na coleção solicitada. Não vou alternar o estado de salvamento.");
   }
   const saveControl = await uniqueButton(page, ["^salvar$", "^save$"]);
   await saveControl.click();
@@ -611,18 +622,17 @@ export async function executeSaveToCollection(page, url, collectionName) {
   const dialogVisible = await dialog.count() && await dialog.isVisible().catch(() => false);
   if (dialogVisible) {
     const collection = dialog.getByText(collectionName, { exact: true });
-    if (!(await collection.count())) throw new Error(`A publicação está salva, mas a coleção “${collectionName}” não foi localizada no seletor. Pasta não confirmada.`);
+    if (await collection.count() !== 1) throw new Error(`A coleção “${collectionName}” não foi identificada de forma única no seletor.`);
     await collection.click();
     await page.waitForTimeout(500);
     const save = dialog.getByRole("button", { name: /concluir|done|salvar|save/i }).last();
     if (await save.count()) await save.click();
   }
   await page.waitForTimeout(800);
-  const finalLabels = await root.locator("button,[role='button']").evaluateAll(nodes => nodes.map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" | ")).catch(() => "");
-  if (!/remover dos salvos|remove from saved/i.test(finalLabels)) throw new Error("O Instagram não confirmou que a publicação ficou salva.");
-  // A confirmação da coleção depende de o seletor ter exibido e aceitado o nome exato.
-  if (!dialogVisible) throw new Error("O salvamento global foi detectado, mas a coleção específica não pôde ser verificada.");
-  return { saved: true, savedFolderVerified: true, status: "salva na coleção e verificada" };
+  if (!(await verifyPostInCollection(page,url,collectionName))) {
+    throw new Error("O Instagram não confirmou que a publicação está dentro da coleção solicitada. A ação permanece pendente.");
+  }
+  return { saved:true,savedFolderVerified:true,status:"salva na coleção e verificada" };
 }
 
 export async function executeComment(page, url, comment) {
