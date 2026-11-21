@@ -1230,7 +1230,7 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
   const networkRecords=networkCapture.records();
   for(const record of networkRecords){
     if(String(record.threadId||"")!==String(threadId))continue;
-    for(const url of record.urls||[]) if(/\\/stories\\/|\\/(?:p|reel|tv)\\//i.test(url)) sharedUrls.add(url);
+    for(const url of record.urls||[]) if(/\/stories\/|\/(?:p|reel|tv)\//i.test(url)) sharedUrls.add(url);
   }
   return {
     verified:true, groupName,
