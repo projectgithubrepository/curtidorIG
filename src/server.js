@@ -405,6 +405,7 @@ app.post("/api/start", async (req, res) => {
             liked: inspection.stateKnown?.liked === true,
             saved: inspection.stateKnown?.saved === true,
             collectionMembership: Boolean(savedCollectionInventoryAvailable && savedCollectionUrls?.has(collectionKey)),
+            collectionInventoryAvailable: Boolean(savedCollectionInventoryAvailable),
             commented: inspection.stateKnown?.commented === true,
             destinationGroupVerified: false,
             reasons: {
