@@ -96,7 +96,7 @@ function renderPreliminary(summary, request) {
     const title = document.createElement("strong");
     title.textContent = labels[key] || key;
     const count = document.createElement("p");
-    count.textContent = `${value.total} ocorrência(s) analisada(s) · ${value.simulated} apta(s) no plano · ${value.candidate || 0} aguardando pré-requisitos · ${value.done} já concluída(s) · ${value.blocked} bloqueada(s) · ${value.unverified} não verificada(s)`;
+    count.textContent = `${value.total} ocorrência(s) analisada(s) · ${value.simulated} apta(s) no plano · ${value.candidate || 0} aguardando pré-requisitos · ${value.done} já concluída(s) · ${value.dispensed || 0} dispensada(s) · ${value.waiting || 0} aguardando etapa(s) · ${value.blocked} bloqueada(s) · ${value.unverified} não verificada(s)`;
     row.append(title,count);
     preliminaryMetrics.append(row);
   }
