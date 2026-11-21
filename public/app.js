@@ -13,6 +13,10 @@ const counter = document.querySelector("#counter");
 const current = document.querySelector("#current");
 const bar = document.querySelector("#bar");
 const results = document.querySelector("#results");
+const preliminaryPanel = document.querySelector("#preliminaryPanel");
+const preliminaryMode = document.querySelector("#preliminaryMode");
+const preliminaryIntro = document.querySelector("#preliminaryIntro");
+const preliminaryMetrics = document.querySelector("#preliminaryMetrics");
 let lastResultsSignature = "";
 
 const connect = document.querySelector("#connect");
@@ -62,6 +66,47 @@ start.addEventListener("click", async () => {
   } catch (error) { message.textContent = error.message; start.disabled = false; }
 });
 stop.addEventListener("click", async () => { await fetch("/api/stop",{method:"POST"}); stop.disabled=true; message.textContent="Solicitando parada..."; });
+function renderPreliminary(summary, request) {
+  if (!summary || !request || request.mode !== "test") {
+    preliminaryPanel.hidden = true;
+    preliminaryMetrics.replaceChildren();
+    return;
+  }
+  preliminaryPanel.hidden = false;
+  preliminaryMode.textContent = "MODO TESTE — nenhuma ação executada";
+  preliminaryIntro.textContent = `${summary.publicationsFound ?? 0} publicações encontradas · ${summary.publicationsInspected ?? 0} inspecionadas · ${summary.stories ?? 0} Stories · ${summary.plannedActions ?? 0} etapas avaliadas. Os números abaixo são previsões do plano, não interações realizadas.`;
+  preliminaryMetrics.replaceChildren();
+
+  const labels = {
+    like: "Curtidas",
+    saveToCollection: "Salvamentos na coleção",
+    comment: "Comentários em publicações",
+    shareToGroup: "Envios ao grupo coletivo",
+    completionReaction: "Reações de conclusão no grupo de origem",
+    commentStory: "Comentários públicos em Stories",
+    shareStoryToGroup: "Envios de Stories ao grupo coletivo"
+  };
+  const totals = summary.actionTotals || {};
+  const order = ["like","saveToCollection","comment","shareToGroup","completionReaction","commentStory","shareStoryToGroup"];
+  for (const key of order) {
+    const value = totals[key];
+    if (!value) continue;
+    const row = document.createElement("article");
+    row.className = "result";
+    const title = document.createElement("strong");
+    title.textContent = labels[key] || key;
+    const count = document.createElement("p");
+    count.textContent = `${value.total} ocorrência(s) analisada(s) · ${value.simulated} apta(s) no plano · ${value.candidate || 0} aguardando pré-requisitos · ${value.done} já concluída(s) · ${value.blocked} bloqueada(s) · ${value.unverified} não verificada(s)`;
+    row.append(title,count);
+    preliminaryMetrics.append(row);
+  }
+
+  const note = document.createElement("p");
+  note.className = "hint";
+  note.textContent = `Coleção “${request.collectionName || "não informada"}” · Grupo coletivo “${request.destinationGroupName || "não informado"}” · ${summary.savedCollectionInventoryAvailable ? "Inventário da coleção confirmado" : "Inventário da coleção indisponível"}.`;
+  preliminaryMetrics.append(note);
+}
+
 function render(items) {
   results.replaceChildren();
   if (!items.length) {
@@ -85,6 +130,9 @@ function render(items) {
 
     const instruction=document.createElement("p");
     const policy=item.instructionSummary || {};
+    const originalRequest=document.createElement("p");
+    originalRequest.textContent="Pedido original no grupo: " + (item.messageText?.trim() || "texto do pedido não capturado");
+    details.append(originalRequest);
     instruction.textContent="Regra identificada na mensagem do grupo: " +
       (policy.comment === "forbidden" ? "não comentar (proibição explícita)" : "comentar") +
       "; enviar ao grupo coletivo: obrigatório.";
@@ -264,6 +312,7 @@ async function refresh() {
   try {
     const [sr,rr,cr]=await Promise.all([fetch("/api/status"),fetch("/api/results"),fetch("/api/cleanup-results")]);
     const data=await sr.json(), p=data.progress, r=await rr.json(), cleanup=await cr.json();
+    renderPreliminary(data.preliminarySummary, data.request);
     state.textContent=data.running?"Coletando":(data.connected?"Instagram conectado":"Pronto"); if (p.message) message.textContent=p.message;
     counter.textContent=`${p.done} de ${p.total} itens avaliados`;
     current.textContent=p.current||""; bar.style.width=p.total?`${Math.min(100,p.done/p.total*100)}%`:"0%";
