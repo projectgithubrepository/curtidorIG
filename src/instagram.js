@@ -74,6 +74,11 @@ async function readVisibleAdministrativeMilestones(page) {
   return texts.map(parseAdministrativeMilestone).filter(Boolean);
 }
 
+export function didScrollTowardOlderMessages(before, after) {
+  return Boolean(before?.found && after?.found &&
+    Number(after.scrollTop) < Number(before.scrollTop) - 2);
+}
+
 export function olderScrollPosition(currentTop, distance, flexDirection = "") {
   const top = Number(currentTop) || 0;
   const amount = Math.max(1, Number(distance) || 1);
@@ -186,8 +191,7 @@ async function scrollToOlderMessages(page) {
   // Só considerar avanço quando o contêiner realmente se deslocou na direção
   // do histórico antigo. Crescimento de scrollHeight/DOM pode ocorrer sem rolagem
   // e não comprova que mensagens anteriores foram alcançadas.
-  const moved = before.found && after.found &&
-    after.scrollTop < before.scrollTop - 2;
+  const moved = didScrollTowardOlderMessages(before, after);
   if (!moved) {
     const point = before.found
       ? { x: before.left + Math.round(before.width / 2), y: before.top + Math.round(before.height / 2) }
@@ -199,8 +203,7 @@ async function scrollToOlderMessages(page) {
     after = await readConversationScrollState(page, false);
   }
 
-  const progressed = before.found && after.found &&
-    after.scrollTop < before.scrollTop - 2;
+  const progressed = didScrollTowardOlderMessages(before, after);
   return { progressed, before, after, usedWheelFallback };
 }
 
