@@ -634,11 +634,15 @@ export async function inspectSavedCollection(page, collectionName) {
   // Abre essa aba antes de procurar o cartão, sem confundir o inventário geral com pastas.
   const collectionTab = page.getByRole("tab", { name: /^(coleções|collections)$/i }).first();
   const collectionButton = page.getByRole("button", { name: /^(coleções|collections)$/i }).first();
+  const collectionLink = page.getByRole("link", { name: /^(coleções|collections)$/i }).first();
   if (await collectionTab.count().catch(() => 0) && await collectionTab.isVisible().catch(() => false)) {
     await collectionTab.click();
     await page.waitForTimeout(900);
   } else if (await collectionButton.count().catch(() => 0) && await collectionButton.isVisible().catch(() => false)) {
     await collectionButton.click();
+    await page.waitForTimeout(900);
+  } else if (await collectionLink.count().catch(() => 0) && await collectionLink.isVisible().catch(() => false)) {
+    await collectionLink.click();
     await page.waitForTimeout(900);
   }
   // A interface do Instagram varia: o nome pode estar no texto de um filho,
