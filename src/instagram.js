@@ -461,37 +461,40 @@ export async function inspectPost(page, url) {
   });
 
   const rootSelector = snapshot.selectors.article ? "article" : snapshot.selectors.dialog ? '[role="dialog"]' : "main";
-  const observedState = await page.locator(rootSelector).first().evaluate(element => {
-    const controls = [...element.querySelectorAll('button,[role="button"]')];
-    const labels = controls.map(node =>
-      [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText].filter(Boolean).join(" ")
-    ).join(" ");
-    const profileLink = [...document.querySelectorAll("nav a[href],a[href]")].find(node =>
-      /perfil|profile/i.test([node.getAttribute("aria-label"), node.innerText].filter(Boolean).join(" "))
-    );
-    const username = (profileLink?.getAttribute("href") || "").split("/").filter(Boolean)[0] || "";
-    let commented = false;
-    if (username) commented = [...element.querySelectorAll("li")].some(item =>
-      [...item.querySelectorAll("a[href]")].some(link => link.getAttribute("href") === "/" + username + "/") &&
-      (item.innerText || "").trim().length > username.length
-    );
-    return {
-      liked: /descurtir|unlike/i.test(labels),
-      saved: /remover dos salvos|remove from saved/i.test(labels),
-      commented,
-      stateKnown: {
-        liked: /curtir|like|descurtir|unlike/i.test(labels),
-        saved: /salvar|save|remover dos salvos|remove from saved/i.test(labels),
-        commented: Boolean(username)
-      },
-      controlCount: controls.length,
-      controlLabels: labels.slice(0, 800)
-    };
-  }).catch(() => ({
-    liked: false, saved: false, commented: false,
-    stateKnown: { liked: false, saved: false, commented: false },
-    controlCount: 0, controlLabels: ""
-  }));
+  let observedState;
+  let stateReadError = "";
+  try {
+    observedState = await page.locator(rootSelector).first().evaluate(element => {
+      const controls = [...element.querySelectorAll('button,[role="button"]')];
+      const controlLabels = controls.map(node => [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText].filter(Boolean).join(" ").trim()).filter(Boolean);
+      const labels = controlLabels.join(" ");
+      const profileLinks = [...document.querySelectorAll("nav a[href],a[href]")].filter(node => /perfil|profile/i.test([node.getAttribute("aria-label"), node.innerText].filter(Boolean).join(" ")));
+      const usernames = [...new Set(profileLinks.map(node => (node.getAttribute("href") || "").split("/").filter(Boolean)[0]).filter(Boolean))];
+      const username = usernames.length === 1 ? usernames[0] : "";
+      const commentRows = [...element.querySelectorAll("li")];
+      const commented = username ? commentRows.some(item => [...item.querySelectorAll("a[href]")].some(link => link.getAttribute("href") === "/" + username + "/") && (item.innerText || "").trim().length > username.length) : false;
+      return {
+        liked: /descurtir|unlike/i.test(labels), saved: /remover dos salvos|remove from saved/i.test(labels), commented,
+        stateKnown: { liked: /curtir|like|descurtir|unlike/i.test(labels), saved: /salvar|save|remover dos salvos|remove from saved/i.test(labels), commented: Boolean(username) },
+        verificationDiagnostics: {
+          rootSelector, controlCount: controls.length, controlLabels: controlLabels.slice(0, 30),
+          likeControlFound: /curtir|like|descurtir|unlike/i.test(labels), saveControlFound: /salvar|save|remover dos salvos|remove from saved/i.test(labels),
+          profileLinkCount: profileLinks.length, identifiedUsername: username || null, commentRowsInspected: commentRows.length,
+          commentInspectionReason: username ? "Perfil identificado; somente comentários atualmente carregados foram examinados." : profileLinks.length > 1 ? "Mais de um link de perfil compatível; identidade ambígua." : "Link do perfil do usuário não identificado na página."
+        },
+        controlCount: controls.length, controlLabels: controlLabels.join(" | ").slice(0, 1600)
+      };
+    });
+  } catch (error) {
+    stateReadError = error.message || String(error);
+    observedState = { liked:false, saved:false, commented:false, stateKnown:{liked:false,saved:false,commented:false}, verificationDiagnostics:{rootSelector,readError:stateReadError,controlCount:0,controlLabels:[]}, controlCount:0, controlLabels:"" };
+  }
+  interpreted.diagnostics.stateVerification = {
+    ...(observedState.verificationDiagnostics || {}), stateReadError: stateReadError || null,
+    liked: observedState.stateKnown.liked ? (observedState.liked ? "já curtida" : "não curtida") : "desconhecido",
+    saved: observedState.stateKnown.saved ? (observedState.saved ? "salva" : "não salva") : "desconhecido",
+    commented: observedState.stateKnown.commented ? (observedState.commented ? "comentário encontrado nos comentários visíveis" : "não encontrado nos comentários visíveis") : "desconhecido"
+  };
   return { caption: interpreted.caption, observedState, stateKnown: observedState.stateKnown, inspectionDiagnostics: interpreted.diagnostics };
 }
 
