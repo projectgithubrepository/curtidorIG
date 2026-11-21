@@ -1136,7 +1136,11 @@ export async function executeLike(page, url) {
   const button = await uniqueButton(page, ["curtir", "like"]);
   await button.click();
   await page.waitForTimeout(700);
-  const verified = await page.locator("article,main,[role='dialog']").first().evaluate(root => [...root.querySelectorAll("button,[role=button]")].some(node => /descurtir|unlike/i.test([node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" "))));
+  const verified = await page.locator("article,main,[role='dialog']").first().evaluate(root => [...root.querySelectorAll("button,[role=button]")].some(node => {
+    const own=[node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,node.getAttribute("data-testid")];
+    const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")]);
+    return /descurtir|unlike/i.test([...own,...nested].filter(Boolean).join(" "));
+  }));
   if (!verified) throw new Error("A curtida não pôde ser verificada após o clique.");
   return { liked: true, status: "curtida verificada" };
 }
