@@ -115,8 +115,8 @@ function collectUrls(value, output, seen = new WeakSet(), depth = 0) {
 function storyIdentity(value, depth = 0, seen = new WeakSet()) {
   if (!value || typeof value !== "object" || depth > 8 || seen.has(value)) return { username: "", storyId: "" };
   seen.add(value);
-  const username = String(value.username ?? value.user?.username ?? value.owner?.username ?? value.author?.username ?? "");
-  const candidates = [value.story_id, value.pk, value.media_id, value.id];
+  const username = String(value.username ?? value.user?.username ?? value.user_info?.username ?? value.owner?.username ?? value.author?.username ?? "");
+  const candidates = [value.story_id, value.story_pk, value.story_media_id, value.pk, value.media_id, value.mediaId, value.id];
   const rawId = candidates.find(item => item != null && /^\d+(?:_\d+)?$/.test(String(item)));
   let storyId = rawId == null ? "" : String(rawId).split("_")[0];
   let nested = { username: "", storyId: "" };
@@ -262,7 +262,7 @@ function extractPayload(payload, context = {}) {
   visit(payload);
   return {
     records, structures, objectsVisited, messageLikeObjects: records.length,
-    distinctMessageIds: messageIds.size, sharedMediaObjects, hasReactionFields,
+    distinctMessageIds: messageIds.size, sharedMediaObjects, storyUrls: records.reduce((sum, record) => sum + record.urls.filter(url => /\\/stories\\//i.test(url)).length, 0), hasReactionFields,
     hasShareFields: [...keys].some(key => /^(share|media_share|xma|slide_messages)$/i.test(key)),
     hasPermalinkOrUrl: [...keys].some(key => /^(permalink|url|href)$/i.test(key)),
     hasMessageId: [...keys].some(key => /^(message_id|mid|item_id)$/i.test(key)),
@@ -277,7 +277,7 @@ export function createInstagramNetworkCapture(page) {
   const operations = new Set();
   let stopped = false;
   const pending = new Set();
-  const websocketStats = { connections: 0, frames: 0, parsedFrames: 0, unparsedFrames: 0, messageLikeObjects: 0, sharedMediaObjects: 0, hasMessageId: false, hasTextBody: false, hasTimestampMs: false, hasSender: false, hasReactionFields: false, hasShareFields: false, hasPermalinkOrUrl: false };
+  const websocketStats = { connections: 0, frames: 0, parsedFrames: 0, unparsedFrames: 0, messageLikeObjects: 0, sharedMediaObjects: 0, storyUrls: 0, hasMessageId: false, hasTextBody: false, hasTimestampMs: false, hasSender: false, hasReactionFields: false, hasShareFields: false, hasPermalinkOrUrl: false };
   const websocketOperations = new Set();
 
   const mergeRecords = (items, context = {}) => {
@@ -323,7 +323,7 @@ export function createInstagramNetworkCapture(page) {
       const activeThreadId = String(page.url?.() || "").match(/\/direct\/t\/(\d+)/)?.[1] || "";
       const extracted = extractPayload(payload, { threadId: activeThreadId, operation: "websocket" });
       websocketStats.messageLikeObjects += extracted.messageLikeObjects;
-      websocketStats.sharedMediaObjects += extracted.sharedMediaObjects;
+      websocketStats.sharedMediaObjects += extracted.sharedMediaObjects;\n      websocketStats.storyUrls += extracted.storyUrls;
       websocketStats.hasMessageId ||= extracted.hasMessageId;
       websocketStats.hasTextBody ||= extracted.hasTextBody;
       websocketStats.hasTimestampMs ||= extracted.hasTimestampMs;
@@ -397,7 +397,7 @@ export function createInstagramNetworkCapture(page) {
       const byOperation = new Map();
       const aggregate = parsed.reduce((result, item) => {
         result.messageLikeObjects += item.payload.messageLikeObjects;
-        result.sharedMediaObjects += item.payload.sharedMediaObjects;
+        result.sharedMediaObjects += item.payload.sharedMediaObjects;\n        result.storyUrls += item.payload.storyUrls;
         result.hasMessageId ||= item.payload.hasMessageId;
         result.hasReactionFields ||= item.payload.hasReactionFields;
         result.hasShareFields ||= item.payload.hasShareFields;
@@ -408,7 +408,7 @@ export function createInstagramNetworkCapture(page) {
         current.sharedMediaObjects += item.payload.sharedMediaObjects;
         byOperation.set(key, current);
         return result;
-      }, { messageLikeObjects: 0, sharedMediaObjects: 0, hasMessageId: false, hasReactionFields: false, hasShareFields: false });
+      }, { messageLikeObjects: 0, sharedMediaObjects: 0, storyUrls: 0, hasMessageId: false, hasReactionFields: false, hasShareFields: false });
       const allStructures = parsed.flatMap(item => item.payload.structures).slice(0, 12);
       return {
         capturedAt: new Date().toISOString(),
@@ -422,7 +422,7 @@ export function createInstagramNetworkCapture(page) {
         parsedWebSocketFrames: websocketStats.parsedFrames,
         unparsedWebSocketFrames: websocketStats.unparsedFrames,
         webSocketMessageLikeObjects: websocketStats.messageLikeObjects,
-        webSocketSharedMediaObjects: websocketStats.sharedMediaObjects,
+        webSocketSharedMediaObjects: websocketStats.sharedMediaObjects,\n        webSocketStoryUrls: websocketStats.storyUrls,\n        storyUrlsExtracted: aggregate.storyUrls + websocketStats.storyUrls,
         operationDetails: [...byOperation.values()].slice(0, 30),
         distinctMessageIds: recordsByKey.size,
         extractedShareUrls: [...recordsByKey.values()].reduce((sum, item) => sum + item.urls.length, 0),
@@ -444,7 +444,7 @@ export function createInstagramNetworkCapture(page) {
             objectsVisited: item.payload.objectsVisited,
             messageLikeObjects: item.payload.messageLikeObjects,
             distinctMessageIds: item.payload.distinctMessageIds,
-            sharedMediaObjects: item.payload.sharedMediaObjects,
+            sharedMediaObjects: item.payload.sharedMediaObjects,\n            storyUrls: item.payload.storyUrls,
             hasMessageId: item.payload.hasMessageId,
             hasTextBody: item.payload.hasTextBody,
             hasTimestampMs: item.payload.hasTimestampMs,
