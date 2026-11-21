@@ -125,7 +125,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     `Respostas: ${network.capturedResponses ?? 0} | Lidas: ${network.parsedResponses ?? 0} | Não interpretadas: ${network.unparsedResponses ?? 0}`,
     `WebSockets: ${network.websocketConnections ?? 0} conexão(ões), ${network.websocketFrames ?? 0} quadro(s), ${network.unparsedWebSocketFrames ?? 0} não interpretado(s)`,
     ...(network.websocketEndpoints?.length ? [`Canais WS: ${network.websocketEndpoints.join(", ")}`] : []),
-    `IDs de mensagens distintos: ${network.distinctMessageIds ?? 0} | Objetos de compartilhamento: ${network.sharedMediaObjects ?? 0}`,
+    `IDs de mensagens distintos: ${network.distinctMessageIds ?? 0} | Objetos de compartilhamento: ${network.sharedMediaObjects ?? 0} | URLs de Stories extraídas da rede: ${network.storyUrlsExtracted ?? 0} (WebSocket: ${network.webSocketStoryUrls ?? 0})`,
     `Campos: ID ${network.hasMessageId ? "sim" : "não"}; texto ${network.hasTextBody ? "sim" : "não"}; data/hora ${network.hasTimestampMs ? "sim" : "não"}; remetente ${network.hasSender ? "sim" : "não"}; reações ${network.hasReactionFields ? "sim" : "não"}; compartilhamentos ${network.hasShareFields ? "sim" : "não"}; URL ${network.hasPermalinkOrUrl ? "sim" : "não"}`,
     "Operações:",
     ...(operationLines.length ? operationLines : ["- Nenhuma operação identificada"]),
@@ -331,16 +331,16 @@ app.post("/api/start", async (req, res) => {
         networkResponses: collected[0]?.networkDiagnostics?.capturedResponses ?? 0
       });
       let savedCollectionUrls = null;
-      let savedCollectionInventoryAvailable = false;
+      let savedCollectionInventoryAvailable = false;\n      let savedCollectionInventoryError = "";
       if (mode === "automatic" || mode === "test") {
         progress.message = `Conferindo a coleção “${collectionName}” para validar o destino do salvamento...`;
         try {
           const savedCollection = await inspectSavedCollection(page, collectionName);
           savedCollectionUrls = new Set(savedCollection.items.map(item => new URL(item.url).pathname.replace(/\/$/, "")));
-          savedCollectionInventoryAvailable = true;
+          savedCollectionInventoryAvailable = true;\n          savedCollectionInventoryError = "";
           logDiagnostic("INFO", "Coleção de destino localizada e inventariada", { collectionName, existingItems: savedCollectionUrls.size, mode });
         } catch (error) {
-          logDiagnostic(mode === "test" ? "WARN" : "ERROR", "Não foi possível inventariar a coleção de destino", { collectionName, mode, error: error.message });
+          savedCollectionInventoryError = error.message || String(error);\n          logDiagnostic(mode === "test" ? "WARN" : "ERROR", "Não foi possível inventariar a coleção de destino", { collectionName, mode, error: savedCollectionInventoryError });
           if (mode === "automatic") throw error;
         }
       }
