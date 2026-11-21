@@ -368,16 +368,19 @@ app.post("/api/start", async (req, res) => {
         networkResponses: collected[0]?.networkDiagnostics?.capturedResponses ?? 0
       });
       let savedCollectionUrls = null;
-      let savedCollectionInventoryAvailable = false;\n      let savedCollectionInventoryError = "";
+      let savedCollectionInventoryAvailable = false;
+      let savedCollectionInventoryError = "";
       if (mode === "automatic" || mode === "test") {
         progress.message = `Conferindo a coleção “${collectionName}” para validar o destino do salvamento...`;
         try {
           const savedCollection = await inspectSavedCollection(page, collectionName);
           savedCollectionUrls = new Set(savedCollection.items.map(item => new URL(item.url).pathname.replace(/\/$/, "")));
-          savedCollectionInventoryAvailable = true;\n          savedCollectionInventoryError = "";
+          savedCollectionInventoryAvailable = true;
+          savedCollectionInventoryError = "";
           logDiagnostic("INFO", "Coleção de destino localizada e inventariada", { collectionName, existingItems: savedCollectionUrls.size, mode });
         } catch (error) {
-          savedCollectionInventoryError = error.message || String(error);\n          logDiagnostic(mode === "test" ? "WARN" : "ERROR", "Não foi possível inventariar a coleção de destino", { collectionName, mode, error: savedCollectionInventoryError });
+          savedCollectionInventoryError = error.message || String(error);
+          logDiagnostic(mode === "test" ? "WARN" : "ERROR", "Não foi possível inventariar a coleção de destino", { collectionName, mode, error: savedCollectionInventoryError });
           if (mode === "automatic") throw error;
         }
       }
