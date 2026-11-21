@@ -390,7 +390,7 @@ app.post("/api/start", async (req, res) => {
           logDiagnostic("ERROR", "Falha ao inspecionar publicação", { url:item.url,error:error.message,inspectionDiagnostics:error.inspectionDiagnostics||null });
           const result={...item,caption:"",comment:"",taskState:previousState,status:"não foi possível analisar",detail:error.message};
           results.push(result);
-          appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,status:"erro na análise",groupName,collectionName,sharedAt:item.sharedAt,detail:error.message});
+          appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,status:"erro na análise",groupName,collectionName,sharedAt:item.sharedAt,completionEmoji,detail:error.message});
         }
         progress.done++;
       }
