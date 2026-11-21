@@ -173,7 +173,7 @@ function collectMediaCodes(value, output, seen = new WeakSet(), depth = 0, insid
     }
   }
   for (const [key, child] of Object.entries(value)) {
-    const childIsStory = insideStory || /^(story|stories|story_share|shared_story|story_media|story_item|story_items|shared_story_media)$/i.test(key);
+    const childIsStory = insideStory || /story|stories/i.test(key);
     const childIsShare = insideShare || /^(share|media_share|xma|shared_media|media)$/i.test(key);
     collectMediaCodes(child, output, seen, depth + 1, childIsShare, childIsStory);
   }
