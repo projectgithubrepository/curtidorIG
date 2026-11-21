@@ -617,9 +617,24 @@ export async function inspectPost(page, url) {
   try {
     observedState = await page.locator(rootSelector).first().evaluate(element => {
       const controls = [...element.querySelectorAll('button,[role="button"]')];
-      const controlLabels = controls.map(node => [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText].filter(Boolean).join(" ").trim()).filter(Boolean);
+      // No Instagram atual, o rótulo acessível costuma estar no SVG interno,
+      // não no próprio botão. Ler ambos evita marcar todos os estados como
+      // desconhecidos quando o botão tem innerText vazio.
+      const controlLabels = controls.map(node => {
+        const own = [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText, node.getAttribute("data-testid")];
+        const nested = [...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child =>
+          [child.getAttribute("aria-label"), child.getAttribute("title"), child.getAttribute("data-testid")]
+        );
+        return [...own, ...nested].filter(Boolean).join(" ").trim();
+      }).filter(Boolean);
       const labels = controlLabels.join(" ");
-      const profileLinks = [...document.querySelectorAll("nav a[href],a[href]")].filter(node => /perfil|profile/i.test([node.getAttribute("aria-label"), node.innerText].filter(Boolean).join(" ")));
+      const profileLinks = [...document.querySelectorAll("nav a[href],a[href]")].filter(node => {
+        const accessible = [
+          node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText,
+          ...[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child => [child.getAttribute("aria-label"), child.getAttribute("title")])
+        ].filter(Boolean).join(" ");
+        return /perfil|profile/i.test(accessible);
+      });
       const usernames = [...new Set(profileLinks.map(node => (node.getAttribute("href") || "").split("/").filter(Boolean)[0]).filter(Boolean))];
       const username = usernames.length === 1 ? usernames[0] : "";
       const commentRows = [...element.querySelectorAll("li")].filter(item => item.querySelector("a[href]"));
