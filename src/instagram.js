@@ -695,7 +695,7 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
   if (!(await emojiButton.count())) throw new Error(`Emoji ${emoji} não encontrado no seletor de reações.`);
   await emojiButton.click();
   await page.waitForTimeout(700);
-  const reactionPresent = await message.getByText(emoji, { exact: true }).count();
+  const reactionPresent = await message.locator("button,[role=button]").evaluateAll(nodes => nodes.some(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ").includes(emoji)), emoji).catch(() => false);
   if (!reactionPresent) throw new Error("A reação não pôde ser verificada na mensagem original.");
   return { groupCheck: true, status: `reação ${emoji} aplicada e verificada na mensagem original` };
 }
