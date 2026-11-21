@@ -8,6 +8,8 @@ test("like and collection are mandatory; optional comment is still prepared and 
   assert.match(plan[1].status, /^simulada/);
   assert.match(plan[2].status, /^simulada/);
   assert.match(plan[3].status, /^simulada/);
+  assert.equal(plan[3].testMode.mapped, true);
+  assert.equal(plan[3].testMode.executed, false);
 });
 
 test("explicit no-comment instruction always suppresses commenting", () => {
@@ -80,6 +82,8 @@ test("test mode marks state as unverifiable instead of assuming pending", () => 
     comment: "Comentário contextual 🌸",
     stateKnown: { liked: false, saveToCollection: false, commented: false }
   });
+  assert.equal(plan[0].testMode.mapped, true);
+  assert.equal(plan[0].testMode.executed, false);
   assert.match(plan[0].status, /^não verificada/);
   assert.match(plan[1].status, /^não verificada/);
   assert.match(plan[2].status, /^não verificada/);
