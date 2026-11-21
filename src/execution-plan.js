@@ -60,7 +60,7 @@ export function buildExecutionPlan({
     } else if (mode === "test" && !item.alreadyDone && item.action === "like" && stateKnown.liked !== true) {
       status = "não verificada — estado da curtida desconhecido";
       reason = stateKnown.reasons?.liked || "Controle de curtida não identificado; não é possível afirmar se já está curtida.";
-    } else if (mode === "test" && !item.alreadyDone && item.action === "saveToCollection" && (stateKnown.saved !== true || stateKnown.collectionInventoryAvailable !== true || (stateKnown.saved === true && stateKnown.collectionMembership !== true))) {
+    } else if (mode === "test" && !item.alreadyDone && item.action === "saveToCollection" && (stateKnown.savedStateKnown !== true || stateKnown.collectionInventoryAvailable !== true || (stateKnown.saved === true && stateKnown.collectionMembership !== true))) {
       status = "não verificada — salvamento/coleção não comprovados";
       reason = stateKnown.reasons?.saveToCollection || "O estado do botão Salvar e a presença na coleção de destino precisam ser verificados separadamente.";
     } else if (mode === "test" && !item.alreadyDone && item.action === "comment" && stateKnown.commented !== true) {
