@@ -553,11 +553,11 @@ export function interpretPostSnapshot(snapshot) {
   };
 
   const finalPath = (() => { try { return new URL(finalUrl).pathname; } catch { return finalUrl; } })();
-  if (snapshot.requestedUrl && !sameInstagramContentUrl(finalUrl,snapshot.requestedUrl)) {
-    throw Object.assign(new Error("O Instagram redirecionou a publicação para outro endereço; nenhuma ação pode ser planejada para o conteúdo solicitado."), { inspectionDiagnostics:{...diagnostics,reason:"content-redirect"} });
-  }
   if (finalPath.startsWith("/accounts/login") || finalPath.startsWith("/accounts/signup") || /entrar na sua conta|log in to instagram|log in to continue/i.test(combined)) {
     throw Object.assign(new Error("Instagram redirecionou para login; a sessão precisa ser autenticada."), { inspectionDiagnostics: { ...diagnostics, reason: "login" } });
+  }
+  if (snapshot.requestedUrl && !sameInstagramContentUrl(finalUrl,snapshot.requestedUrl)) {
+    throw Object.assign(new Error("O Instagram redirecionou a publicação para outro endereço; nenhuma ação pode ser planejada para o conteúdo solicitado."), { inspectionDiagnostics:{...diagnostics,reason:"content-redirect"} });
   }
   if (/challenge|checkpoint|suspended/i.test(finalPath) || /confirme que é você|confirm it’s you|security code|atividade suspeita|suspicious activity/i.test(combined)) {
     throw Object.assign(new Error("Instagram apresentou uma etapa de segurança ou confirmação; a publicação não foi analisada."), { inspectionDiagnostics: { ...diagnostics, reason: "security-check" } });
