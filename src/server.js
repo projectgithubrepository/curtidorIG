@@ -336,11 +336,15 @@ app.post("/api/start", async (req, res) => {
           if (mode === "automatic" && !item.identityVerified) {
             actionLog.push({action:"all",status:"bloqueada",reason:"A publicação não está vinculada a uma mensagem original identificada; nenhuma ação foi executada."});
           } else if (mode === "automatic") {
+            if (taskState.shareAttempted && !taskState.sharedToGroup) actionLog.push({action:"shareToGroup",status:"bloqueada",reason:"Houve uma tentativa anterior sem confirmação. Verifique o grupo antes de confirmar manualmente; o app não enviará novamente para evitar duplicidade."});
             const steps = [
               ["like", !taskState.liked, async () => executeLike(page,item.url), "liked"],
               ["saveToCollection", !(taskState.saved && taskState.savedFolderVerified), async () => executeSaveToCollection(page,item.url,collectionName,savedCollectionUrls), "saved"],
               ["comment", instructions.comment !== "forbidden" && !taskState.commented, async () => executeComment(page,item.url,comment), "commented"],
-              ["shareToGroup", !taskState.sharedToGroup, async () => executeShareToGroup(page,item.url,destinationGroupName), "sharedToGroup"]
+              ["shareToGroup", !taskState.sharedToGroup && !taskState.shareAttempted, async () => executeShareToGroup(page,item.url,destinationGroupName, async () => {
+  taskState = mergeTaskState(taskState,{shareAttempted:true});
+  appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedToGroup:false,shareAttempted:true,liked:taskState.liked,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,commented:taskState.commented,commentForbidden:instructions.comment==="forbidden",completionEmoji,groupCheck:taskState.groupCheck,status:"envio iniciado — aguardando confirmação",detail:"Tentativa de envio registrada antes do clique final"});
+}), "sharedToGroup"]
             ];
             let blocked = false;
             for (const [action,needed,run,key] of steps) {
