@@ -505,12 +505,12 @@ export function isInstagramSavedUrl(value, base = "https://www.instagram.com/") 
 }
 
 function normalizeSavedCollectionLabel(value) {
-  return String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/\\s+/g, " ").trim().toLocaleLowerCase();
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
 }
 
 function savedCollectionLabelMatches(value, wanted) {
   const raw = String(value || "");
-  return raw.split(/[\\r\\n]+/).some(line => normalizeSavedCollectionLabel(line) === wanted) ||
+  return raw.split(/[\r\n]+/).some(line => normalizeSavedCollectionLabel(line) === wanted) ||
     normalizeSavedCollectionLabel(raw) === wanted;
 }
 
