@@ -150,7 +150,11 @@ async function readConversationScrollState(page, move = false) {
 
 async function readOldestVisibleMessageDate(page) {
   const values = await page.locator("time[datetime],time[title],time[aria-label]").evaluateAll(nodes =>
-    nodes.map(node => node.getAttribute("datetime") || node.getAttribute("title") || node.getAttribute("aria-label") || "")
+    nodes.filter(node => {
+      const rect = node.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && rect.right > innerWidth * 0.45 &&
+        rect.left < innerWidth + 10 && rect.bottom > 0 && rect.top < innerHeight;
+    }).map(node => node.getAttribute("datetime") || node.getAttribute("title") || node.getAttribute("aria-label") || "")
       .filter(Boolean)
   ).catch(() => []);
   const days = values.map(value => new Date(value)).filter(date => !Number.isNaN(date.getTime()))
