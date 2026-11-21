@@ -683,6 +683,8 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
   const count = await candidates.count();
   if (count !== 1) throw new Error("Mensagem original não localizada de forma única; reação bloqueada.");
   const message = candidates.first();
+  const existingReaction = await message.locator("button,[role=button]").evaluateAll(nodes => nodes.some(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ").includes(emoji)), emoji).catch(() => false);
+  if (existingReaction) return { groupCheck:true, status:`reação ${emoji} já presente — não repetida` };
   await message.hover();
   const reaction = message.locator('button[aria-label*="reagir" i],button[aria-label*="reaction" i],button[aria-label*="emoji" i],[role="button"][aria-label*="reagir" i],[role="button"][aria-label*="reaction" i]').first();
   if (!(await reaction.count())) throw new Error("Controle de reação da mensagem não identificado.");
