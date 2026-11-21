@@ -1048,7 +1048,7 @@ export async function inspectSavedCollection(page, collectionNameOrUrl) {
 }
 
 async function readSavedToggle(page) {
-  return page.locator("article,main,[role='dialog']").evaluateAll(roots => {
+  return page.locator("main,article,[role='dialog']").evaluateAll(roots => {
     const controls = roots.flatMap(root => [...root.querySelectorAll('button,[role="button"]')]);
     const labels = controls.filter(node => {
       const rect = node.getBoundingClientRect();
@@ -1101,7 +1101,7 @@ export async function unsaveSavedCollectionItem(page, url) {
   return { url, status: "dessalvada e verificada" };
 }
 
-function visibleButton(page, patterns, root = "article,main,[role='dialog']") {
+function visibleButton(page, patterns, root = "main,article,[role='dialog']") {
   const names = patterns.map(pattern => new RegExp(pattern, "i"));
   return page.locator(root).first().locator("button,[role='button']").evaluateAll((nodes, regexSources) => {
     const visible = nodes.filter(node => {
@@ -1116,7 +1116,7 @@ function visibleButton(page, patterns, root = "article,main,[role='dialog']") {
   }, names.map(regex => regex.source));
 }
 
-async function uniqueButton(page, patterns, root = "article,main,[role='dialog']") {
+async function uniqueButton(page, patterns, root = "main,article,[role='dialog']") {
   const candidates = await visibleButton(page, patterns, root);
   if (candidates.length !== 1) throw new Error(candidates.length ? "Mais de um controle corresponde à ação; execução bloqueada." : "Controle da ação não encontrado; execução bloqueada.");
   const escaped = candidates[0].label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -1127,7 +1127,7 @@ export async function executeLike(page, url) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
   if (!sameInstagramContentUrl(page.url(),url)) throw new Error("O Instagram não abriu a publicação solicitada; curtida bloqueada.");
-  const likeState = await page.locator("article,main,[role='dialog']").first().evaluate(root => {
+  const likeState = await page.locator("main,article,[role='dialog']").first().evaluate(root => {
     const labels = [...root.querySelectorAll("button,[role=button]")].map(node => {
       const own=[node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,node.getAttribute("data-testid")];
       const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")]);
@@ -1142,7 +1142,7 @@ export async function executeLike(page, url) {
   const button = await uniqueButton(page, ["curtir", "like"]);
   await button.click();
   await page.waitForTimeout(700);
-  const verified = await page.locator("article,main,[role='dialog']").first().evaluate(root => [...root.querySelectorAll("button,[role=button]")].some(node => {
+  const verified = await page.locator("main,article,[role='dialog']").first().evaluate(root => [...root.querySelectorAll("button,[role=button]")].some(node => {
     const own=[node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,node.getAttribute("data-testid")];
     const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")]);
     return /descurtir|unlike/i.test([...own,...nested].filter(Boolean).join(" "));
@@ -1161,7 +1161,7 @@ export async function executeSaveToCollection(page, url, collectionName, knownCo
   await page.waitForTimeout(1200);
   if (!sameInstagramContentUrl(page.url(),url)) throw new Error("O Instagram não abriu a publicação solicitada; salvamento bloqueado.");
   const key = savedCollectionKey(url);
-  const root = page.locator("article,main,[role='dialog']").first();
+  const root = page.locator("main,article,[role='dialog']").first();
   const labels = await root.locator("button,[role='button']").evaluateAll(nodes => nodes.map(node => {
     const own=[node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,node.getAttribute("data-testid")];
     const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")]);
