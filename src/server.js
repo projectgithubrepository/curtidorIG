@@ -511,6 +511,15 @@ app.post("/api/start", async (req, res) => {
             for (const [action,needed,run,key] of steps) {
               if (stopRequested) { actionLog.push({action,status:"interrompida pelo usuário"}); blocked=true; break; }
               if (!needed) continue;
+              const verificationFailure =
+                action === "like" && !stateKnown.liked ? (stateKnown.reasons?.liked || "Estado da curtida não identificado.") :
+                action === "saveToCollection" && (!stateKnown.savedStateKnown || !savedCollectionInventoryAvailable) ? (stateKnown.reasons?.saveToCollection || "Estado do salvamento ou inventário da coleção não confirmado.") :
+                action === "comment" && !stateKnown.commented ? (stateKnown.reasons?.commented || "Não foi possível confirmar se o perfil já comentou.") : "";
+              if (verificationFailure) {
+                actionLog.push({action,status:"bloqueada — estado atual não verificado",reason:verificationFailure});
+                blocked=true;
+                break;
+              }
               if (action === "comment" && !comment) { actionLog.push({action,status:"bloqueada",reason:"Comentário não passou na validação."}); blocked=true; break; }
               try {
                 const outcome = await run();
