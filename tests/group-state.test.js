@@ -40,7 +40,7 @@ test("explicitly forbidden comment does not block completion, but group send rem
 
 
 test("reads administrative daily targets for Feed and Stories", () => {
-  const message = "Aviso: HOJE NO GRUPO TIVERAM ESSE TOTAL DE PEDIDOS: Data: 18/11 • 66 FEED • 34 STORIES (NOSSO RECORD). Lembre-se que na quinta teremos a conferência do grupo. É importante que sua pasta de salvos esteja completa!";
+  const message = "✨𝘼𝙫𝙞𝙨𝙤: 𝙃𝙊𝙅𝙀 𝙉𝙊 𝙂𝙍𝙐𝙋𝙊 𝙏𝙄𝙑𝙀𝙍𝘼𝙈 𝙀𝙎𝙎𝙀 𝙏𝙊𝙏𝘼𝙇 𝘿𝙀 𝙋𝙀𝘿𝙄𝘿𝙊𝙎: 𝘿𝙖𝙩𝙖: 18/11 • 66 𝙁𝙀𝙀𝘿 • 34 𝙎𝙏𝙊𝙍𝙄𝙀𝙎 (𝙉𝙊𝙎𝙎𝙊 𝙍𝙀𝘾𝙊𝙍𝘿). 𝙇𝙚𝙢𝙗𝙧𝙚-𝙨𝙚, 𝙦𝙪𝙚 𝙣𝙖 𝙌𝙐𝙄𝙉𝙏𝘼 𝙁𝙀𝙄𝙍𝘼 𝙩𝙚𝙧𝙚𝙢𝙤𝙨 𝙖 𝙘𝙤𝙣𝙛𝙚𝙧𝙚̂𝙣𝙘𝙞𝙖 𝙙𝙤 𝙜𝙧𝙪𝙥𝙤. 𝙀́ 𝙢𝙪𝙞𝙩𝙤 𝙞𝙢𝙥𝙤𝙧𝙩𝙖𝙣𝙩𝙚 𝙦𝙪𝙚 𝙨𝙪𝙖 𝙥𝙖𝙨𝙩𝙖 𝙙𝙚 𝙨𝙖𝙡𝙫𝙤𝙨 𝙚𝙨𝙩𝙚𝙟𝙖 𝙘𝙤𝙢𝙥𝙡𝙚𝙩𝙖!";
   const milestone = parseAdministrativeMilestone(message);
   assert.equal(milestone.date, "11-18");
   assert.equal(milestone.feedCount, 66);
