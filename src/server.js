@@ -90,7 +90,7 @@ app.get("/api/diagnostic-summary", (_req, res) => {
     `Direct: ${network.websocketConnections ?? 0} WebSockets / ${network.websocketFrames ?? 0} quadros | IDs de mensagens: ${network.distinctMessageIds ?? 0}`,
     `Stories extraídas da rede: ${network.storyUrlsExtracted ?? 0} ocorrências / ${network.uniqueStoryUrls ?? 0} URLs únicas (WebSocket: ${network.webSocketStoryUrls ?? 0}) | objetos compartilhados: ${network.sharedMediaObjects ?? 0}`,
     ...(scan.storyNetwork ? [
-      `Reconciliação de Stories: ${scan.storyNetwork.uniqueNetworkStoryUrls ?? 0} URLs únicas observadas | ${scan.storyNetwork.acceptedInDateRange ?? 0} aceitas na data | ${scan.storyNetwork.pendingDateVerification ?? 0} aguardando data | ${scan.storyNetwork.rejectedOtherThread ?? 0} outra conversa | ${scan.storyNetwork.rejectedWithoutThread ?? 0} sem conversa | ${scan.storyNetwork.rejectedWithoutMessageId ?? 0} sem ID de mensagem | ${scan.storyNetwork.rejectedAdministrativeMessage ?? 0} administrativas | ${scan.storyNetwork.rejectedOutsideDateRange ?? 0} fora do período`
+      `Reconciliação de Stories: ${scan.storyNetwork.uniqueNetworkStoryUrls ?? 0} URLs únicas observadas | ${scan.storyNetwork.acceptedInDateRange ?? 0} aceitas na data | ${scan.storyNetwork.pendingDateVerification ?? 0} aguardando data | ${scan.storyNetwork.rejectedOtherThread ?? 0} outra conversa | ${scan.storyNetwork.rejectedWithoutThread ?? 0} sem conversa | ${scan.storyNetwork.rejectedWithoutMessageId ?? 0} sem ID de mensagem | ${scan.storyNetwork.rejectedAdministrativeMessage ?? 0} administrativas | ${scan.storyNetwork.rejectedOutsideDateRange ?? 0} fora do período | ${scan.storyNetwork.finalStoryItems ?? 0} itens finais (${scan.storyNetwork.finalUniqueStoryUrls ?? 0} URLs únicas) | ${scan.storyNetwork.acceptedNetworkUrlsMissingFromFinal ?? 0} aceitas ausentes da lista final`
     ] : ["Reconciliação de Stories: contadores por etapa indisponíveis"]),
     "Operações de rede:",
     ...(operations.length ? operations : ["- Nenhuma identificada"]),
@@ -477,8 +477,9 @@ app.post("/api/start", async (req, res) => {
           const reason = "A mensagem e o link foram extraídos, mas o Instagram não forneceu um timestamp válido. O item foi mantido como candidato, porém não pode ser atribuído com segurança ao período selecionado nem executado.";
           const unknownPlan = item.contentType === "story"
             ? [
-                { action:"commentStory", label:"Comentar publicamente no próprio Story", required:true, status:"não verificada — data do pedido não identificada", reason },
-                { action:"shareStoryToGroup", label:"Enviar o Story ao grupo coletivo", required:true, status:"não verificada — data do pedido não identificada", reason }
+                { action:"commentStory", label:"Comentar publicamente no próprio Story", required:instructions.comment!=="forbidden", status:instructions.comment==="forbidden"?"dispensada — pedido explícito para não comentar":"não verificada — data do pedido não identificada", reason },
+                { action:"shareStoryToGroup", label:"Enviar o Story ao grupo coletivo", required:true, status:"não verificada — data do pedido não identificada", reason },
+                { action:"completionReaction", label:"Reagir à mensagem original", required:true, status:"não verificada — data do pedido não identificada", reason }
               ]
             : buildExecutionPlan({ mode, collectionName, destinationGroupName, completionEmoji, taskState:previousState, instructions })
                 .map(action => action.alreadyDone ? action : { ...action, status:"não verificada — data do pedido não identificada", reason });
@@ -526,7 +527,9 @@ app.post("/api/start", async (req, res) => {
               } else actionLog.push({action:"commentStory",status:"já concluída — não repetir"});
 
               if (!taskState.sharedToGroup) {
-                if (shareState !== "not-shared" || !destinationGroupVerification.verified || !destinationGroupVerification.sharedInventoryComplete) {
+                if (taskState.shareAttempted) {
+                  actionLog.push({action:"shareStoryToGroup",status:"bloqueada",reason:"Já existe uma tentativa anterior sem confirmação. Verifique manualmente o grupo antes de qualquer novo envio."});
+                } else if (shareState !== "not-shared" || !destinationGroupVerification.verified || !destinationGroupVerification.sharedInventoryComplete) {
                   actionLog.push({action:"shareStoryToGroup",status:"bloqueada",reason:destinationGroupVerification.reason || "O histórico do grupo coletivo não foi conferido integralmente; envio bloqueado para evitar duplicidade."});
                 } else if (!item.identityVerified) {
                   actionLog.push({action:"shareStoryToGroup",status:"bloqueada",reason:"Story sem vínculo confirmado com a mensagem original."});
@@ -563,6 +566,8 @@ app.post("/api/start", async (req, res) => {
               mode === "test" ? "simulada — nenhuma ação executada" :
               actionLog.find(entry=>entry.action==="commentStory")?.status || "aguardando ação manual";
             const shareStatus = taskState.sharedToGroup ? "já concluída — não repetir" :
+              !item.identityVerified ? "não verificada — mensagem original não identificada" :
+              taskState.shareAttempted ? "bloqueada — tentativa anterior sem confirmação" :
               shareState === "unknown" || !destinationGroupVerification.verified || !destinationGroupVerification.sharedInventoryComplete
                 ? "não verificada — grupo coletivo ou inventário não confirmado"
                 : mode === "test" ? "simulada — nenhuma ação executada"
