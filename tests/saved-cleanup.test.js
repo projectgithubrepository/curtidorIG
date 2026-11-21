@@ -36,5 +36,5 @@ test("rejects ambiguous matching collections", () => {
 test("rejects a base page that has already redirected away from Saved", () => {
   assert.throws(() => selectSavedCollectionHref([
     { text: "Laranja antigos", href: "/usuario/saved/12345/" }
-  ], "Laranja antigos", "https://www.instagram.com/accounts/login/"), /fora da área Salvos/i);
+  ], "Laranja antigos", "https://www.instagram.com/accounts/login/"), /não pertence à área Salvos/i);
 });
