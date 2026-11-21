@@ -42,6 +42,8 @@ function reportItem(item) {
     collectionMode: item.collectionMode || "",
     status: item.status || "",
     taskState: item.taskState || null,
+    comment: item.comment || "",
+    commentSource: item.commentSource || "",
     stateVerification: item.stateVerification || null,
     identityVerified: Boolean(item.identityVerified),
     inspectionDiagnostics: item.inspectionDiagnostics || null,
