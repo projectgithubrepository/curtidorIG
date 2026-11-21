@@ -494,13 +494,15 @@ app.post("/api/start", async (req, res) => {
       const actionTotals = {};
       for (const item of results) for (const action of (item.plan || [])) {
         const key = action.action;
-        if (!actionTotals[key]) actionTotals[key] = { total: 0, simulated: 0, unverified: 0, blocked: 0, done: 0, candidate: 0 };
+        if (!actionTotals[key]) actionTotals[key] = { total: 0, simulated: 0, unverified: 0, blocked: 0, done: 0, candidate: 0, dispensed: 0, waiting: 0 };
         const bucket = actionTotals[key];
         bucket.total++;
         if (/^simulada/.test(action.status)) bucket.simulated++;
         else if (/^não verificada/.test(action.status)) bucket.unverified++;
         else if (/^bloqueada/.test(action.status)) bucket.blocked++;
         else if (/^já concluída/.test(action.status)) bucket.done++;
+        else if (/^dispensada/.test(action.status)) bucket.dispensed++;
+        else if (/^aguardando/.test(action.status)) bucket.waiting++;
         if (action.testMode?.candidate) bucket.candidate++;
       }
       const preliminaryLines = Object.entries(actionTotals).map(([key,value]) =>
