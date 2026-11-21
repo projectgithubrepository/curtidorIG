@@ -1283,20 +1283,36 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
 async function verifyNewShareInDestination(page, url, groupInventory) {
   const threadId=String(groupInventory?.threadId||"");
   if(!threadId) throw new Error("ID do grupo coletivo não disponível para confirmar o envio.");
-  await page.goto("https://www.instagram.com/direct/t/"+encodeURIComponent(threadId)+"/",{waitUntil:"domcontentloaded",timeout:60000});
-  const openedThreadId=page.url().match(/\/direct\/t\/(\d+)/)?.[1]||"";
-  if(openedThreadId!==threadId) throw new Error("O Instagram não reabriu a conversa coletiva esperada após o envio.");
-  for(let attempt=0;attempt<5;attempt++){
-    const visible=await readVisiblePostLinks(page);
-    if(getGroupShareState(url,{sharedUrls:visible.map(item=>item.url),inventoryComplete:true})==="already-shared"){
-      const existing=Array.isArray(groupInventory.sharedUrls)?groupInventory.sharedUrls:[];
-      if(!existing.some(value=>getGroupShareState(url,{sharedUrls:[value],inventoryComplete:true})==="already-shared")) existing.push(url);
-      groupInventory.sharedUrls=existing;
-      return true;
-    }
-    await page.waitForTimeout(500);
+  const capture=createInstagramNetworkCapture(page);
+  let records=[];
+  try {
+    await page.goto("https://www.instagram.com/direct/t/"+encodeURIComponent(threadId)+"/",{waitUntil:"domcontentloaded",timeout:60000});
+    const openedThreadId=page.url().match(/\/direct\/t\/(\d+)/)?.[1]||"";
+    if(openedThreadId!==threadId) throw new Error("O Instagram não reabriu a conversa coletiva esperada após o envio.");
+    await page.waitForTimeout(1200);
+  } finally {
+    await capture.stop();
+    records=capture.records();
   }
-  throw new Error("O envio foi solicitado, mas o link não apareceu nas mensagens recentes do grupo. A tentativa permanece registrada e não será repetida automaticamente.");
+  const observed=new Set((await readVisiblePostLinks(page)).map(item=>item.url));
+  for(const record of records){
+    if(String(record.threadId||"")!==threadId)continue;
+    for(const sharedUrl of record.urls||[])observed.add(sharedUrl);
+  }
+  if(getGroupShareState(url,{sharedUrls:[...observed],inventoryComplete:true})!=="already-shared"){
+    for(let attempt=0;attempt<4;attempt++){
+      await page.waitForTimeout(500);
+      for(const item of await readVisiblePostLinks(page))observed.add(item.url);
+      if(getGroupShareState(url,{sharedUrls:[...observed],inventoryComplete:true})==="already-shared")break;
+    }
+  }
+  if(getGroupShareState(url,{sharedUrls:[...observed],inventoryComplete:true})!=="already-shared"){
+    throw new Error("O envio foi solicitado, mas o link não apareceu nas mensagens recentes do grupo. A tentativa permanece registrada e não será repetida automaticamente.");
+  }
+  const existing=Array.isArray(groupInventory.sharedUrls)?groupInventory.sharedUrls:[];
+  if(!existing.some(value=>getGroupShareState(url,{sharedUrls:[value],inventoryComplete:true})==="already-shared"))existing.push(url);
+  groupInventory.sharedUrls=existing;
+  return true;
 }
 
 export async function executeShareToGroup(page, url, destinationGroupName, onBeforeSend = async () => {}, groupInventory = null) {
