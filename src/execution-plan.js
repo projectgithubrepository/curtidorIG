@@ -2,8 +2,8 @@ const ACTIONS = ["like", "saveToCollection", "comment", "shareToGroup", "complet
 
 export function isValidComment(value) {
   const comment = String(value ?? "").trim();
-  const words = comment.match(/[\\p{L}\\p{N}]+/gu) || [];
-  return words.length >= 2 && /\\p{Extended_Pictographic}/u.test(comment);
+  const words = comment.match(/[\p{L}\p{N}]+/gu) || [];
+  return words.length >= 2 && /\p{Extended_Pictographic}/u.test(comment);
 }
 
 export function interpretGroupInstructions(messageText = "") {
