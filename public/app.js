@@ -63,34 +63,97 @@ start.addEventListener("click", async () => {
 stop.addEventListener("click", async () => { await fetch("/api/stop",{method:"POST"}); stop.disabled=true; message.textContent="Solicitando parada..."; });
 function render(items) {
   results.replaceChildren();
-  if (!items.length) { const p=document.createElement("p"); p.className="muted"; p.textContent="Nenhuma publicação listada ainda."; results.append(p); return; }
+  if (!items.length) {
+    const p=document.createElement("p"); p.className="muted";
+    p.textContent="Nenhuma publicação listada ainda."; results.append(p); return;
+  }
   for (const item of items) {
     const card=document.createElement("article"); card.className="result";
-    const link=document.createElement("a"); link.href=item.url; link.target="_blank"; link.rel="noreferrer"; link.textContent="Abrir publicação no Instagram";
+    const head=document.createElement("div");
     const status=document.createElement("strong"); status.textContent=item.status || "Pendente";
-    const type=document.createElement("small"); type.textContent=item.contentType === "story" ? "Story · fluxo específico ainda não automatizado" : "Feed / Reel";
-    const stateLine=document.createElement("small");
-    const task=item.taskState || { saved:false, savedFolderVerified:false, liked:false, commented:false, sharedToGroup:false, groupCheck:false };
-    const verification=item.stateVerification || {};
-    const likedLabel=verification.liked===false ? "não verificada" : task.liked ? "confirmada" : "pendente";
-    const savedLabel=verification.saveToCollection===false ? "não verificada" : task.saved ? "confirmada" : "pendente";
-    const commentLabel=task.commentForbidden ? "dispensado pelo pedido" : verification.commented===false ? "não verificado" : task.commented ? "confirmado" : "pendente";
-    const folderLabel=task.savedFolderVerified ? "confirmada" : task.saved ? "não confirmada na coleção" : "aguardando salvamento";
-    stateLine.textContent = [`Salva: ${savedLabel}`, `Pasta: ${folderLabel}`, `Curtida: ${likedLabel}`, `Comentário: ${commentLabel}`, `Enviado ao grupo: ${task.sharedToGroup ? "confirmado" : task.shareAttempted ? "verificar antes de reenviar" : "pendente"}`, `Reação na mensagem: ${task.groupCheck ? "confirmada" : "pendente"}`].join(" · ");
-    const date=document.createElement("small"); date.textContent=item.sharedAt ? new Date(item.sharedAt).toLocaleString("pt-BR") : "Data não identificada";
-    const markers=document.createElement("small");
-    const milestoneCount=(item.administrativeMilestones || []).length;
-    markers.textContent=milestoneCount ? "Marcos visíveis: " + (item.administrativeMilestones || []).map(marker => `${marker.date || "data não identificada"} · ${marker.feedCount ?? "?"} Feed · ${marker.storiesCount ?? "?"} Stories`).join(" | ") : "";
-    const caption=document.createElement("p"); caption.textContent=item.caption || item.detail || "";
-    const comment=document.createElement("p"); comment.className="comment"; comment.textContent=item.comment ? "Comentário sugerido: "+item.comment : "";
-    const actionDetails=document.createElement("div"); actionDetails.className="action-details";
-    for (const action of (item.actionLog || [])) { const line=document.createElement("small"); line.textContent=`${action.action}: ${action.status}${action.reason ? " — "+action.reason : ""}`; actionDetails.append(line); }
-    for (const action of (item.plan || [])) { const line=document.createElement("small"); line.textContent=`${action.label}: ${action.status}${action.testMode?.mapped ? " · MAPEADA NO TESTE, NÃO EXECUTADA" : ""}${action.reason ? " — "+action.reason : ""}`; actionDetails.append(line); }
+    const type=document.createElement("small");
+    type.textContent=item.contentType === "story" ? "Story · fluxo público específico" : "Feed / Reel / carrossel";
+    const date=document.createElement("small");
+    date.textContent=item.sharedAt ? new Date(item.sharedAt).toLocaleString("pt-BR") : "Data não identificada";
+    const link=document.createElement("a"); link.href=item.url; link.target="_blank"; link.rel="noreferrer"; link.textContent="Abrir publicação no Instagram";
+    head.append(status,type,date,link); card.append(head);
+
+    const details=document.createElement("details"); details.className="publication-details";
+    const summary=document.createElement("summary"); summary.textContent="Ver análise completa e todas as etapas"; details.append(summary);
+
+    const instruction=document.createElement("p");
+    const policy=item.instructionSummary || {};
+    instruction.textContent="Regra identificada na mensagem do grupo: " +
+      (policy.comment === "forbidden" ? "não comentar (proibição explícita)" : "comentar") +
+      "; enviar ao grupo coletivo: obrigatório.";
+    details.append(instruction);
+
+    const captionTitle=document.createElement("strong"); captionTitle.textContent="Legenda / conteúdo identificado";
+    const caption=document.createElement("p"); caption.textContent=item.caption?.trim() || "Sem legenda legível ou texto de conteúdo disponível.";
+    details.append(captionTitle,caption);
+
     if (item.comment) {
+      const commentTitle=document.createElement("strong"); commentTitle.textContent="Comentário preparado";
+      const comment=document.createElement("p"); comment.className="comment"; comment.textContent=item.comment;
+      const source=document.createElement("small"); source.textContent="Origem: " + (item.commentSource || "não informada");
+      details.append(commentTitle,comment,source);
       const copyComment=document.createElement("button"); copyComment.type="button"; copyComment.className="secondary small-action";
-      copyComment.textContent="Copiar comentário"; copyComment.dataset.copyComment=item.comment;
-      card.append(copyComment);
+      copyComment.textContent="Copiar comentário"; copyComment.dataset.copyComment=item.comment; details.append(copyComment);
+    } else {
+      const noComment=document.createElement("p"); noComment.textContent=policy.comment==="forbidden"
+        ? "Comentário não preparado: a mensagem proíbe comentar."
+        : "Comentário não preparado nesta inspeção.";
+      details.append(noComment);
     }
+
+    const verificationTitle=document.createElement("strong"); verificationTitle.textContent="Verificação do estado atual";
+    details.append(verificationTitle);
+    const verification=item.stateVerification || item.storyInspection?.stateKnown || {};
+    const checks=[
+      ["Curtida",verification.liked],
+      ["Salvamento / coleção",verification.saveToCollection ?? verification.saved],
+      ["Comentário anterior",verification.commented ?? verification.alreadyCommented]
+    ];
+    const checkList=document.createElement("ul");
+    for (const [label,value] of checks) {
+      const li=document.createElement("li");
+      li.textContent=label + ": " + (value===true ? "verificado" : value===false ? "não foi possível verificar" : "não se aplica / sem dado");
+      checkList.append(li);
+    }
+    if (item.storyInspection) {
+      const li=document.createElement("li");
+      li.textContent="Comentário público disponível no Story: " + (item.storyInspection.publicCommentAvailable ? "sim" : "não");
+      checkList.append(li);
+    }
+    details.append(checkList);
+
+    const actionTitle=document.createElement("strong"); actionTitle.textContent="Plano de execução — etapa por etapa";
+    details.append(actionTitle);
+    const actionList=document.createElement("ol");
+    for (const action of (item.plan || [])) {
+      const li=document.createElement("li"); li.className="planned-action";
+      const label=document.createElement("strong"); label.textContent=action.label || action.action;
+      const state=document.createElement("div"); state.textContent="Resultado no TESTE: " + action.status;
+      li.append(label,state);
+      if (action.testMode?.label) {
+        const decision=document.createElement("small"); decision.textContent=action.testMode.label; li.append(decision);
+      }
+      if (action.reason) {
+        const reason=document.createElement("p"); reason.textContent="Motivo / dependência: " + action.reason; li.append(reason);
+      }
+      actionList.append(li);
+    }
+    details.append(actionList);
+
+    if (item.inspectionDiagnostics) {
+      const diagnostic=document.createElement("small");
+      diagnostic.textContent="Inspeção: " + (item.inspectionDiagnostics.reason || "concluída") +
+        " · legenda: " + (item.inspectionDiagnostics.captionAvailable===false ? "não legível" : "disponível");
+      details.append(diagnostic);
+    }
+    card.append(details);
+
+    const task=item.taskState || {};
     const controls=document.createElement("div"); controls.className="result-actions";
     const actions=[
       ["saved","Confirmar que salvou"],
@@ -103,14 +166,15 @@ function render(items) {
     for (const [key,label] of actions) {
       if (task[key] || (key==="savedFolderVerified" && !task.saved)) continue;
       const button=document.createElement("button"); button.type="button"; button.className="secondary small-action";
-      button.textContent=label; button.dataset.action=key; button.dataset.url=item.url; button.dataset.messageId=item.messageId || ""; button.dataset.threadId=item.threadId || "";
-      button.disabled=!item.identityVerified;
-      controls.append(button);
+      button.textContent=label; button.dataset.action=key; button.dataset.url=item.url;
+      button.dataset.messageId=item.messageId || ""; button.dataset.threadId=item.threadId || "";
+      button.disabled=!item.identityVerified; controls.append(button);
     }
     if (!item.identityVerified) {
-      const warning=document.createElement("small"); warning.textContent="Sem vínculo seguro com a mensagem original: confirmações bloqueadas."; controls.append(warning);
+      const warning=document.createElement("small");
+      warning.textContent="Sem vínculo seguro com a mensagem original: confirmações bloqueadas."; controls.append(warning);
     }
-    card.append(status,type,stateLine,date,markers,link,caption,comment,actionDetails,controls); results.append(card);
+    card.append(controls); results.append(card);
   }
 }
 results.addEventListener("click", async event => {
