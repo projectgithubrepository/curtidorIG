@@ -1101,26 +1101,21 @@ export async function unsaveSavedCollectionItem(page, url) {
   return { url, status: "dessalvada e verificada" };
 }
 
-function visibleButton(page, patterns, root = "main,article,[role='dialog']") {
-  const names = patterns.map(pattern => new RegExp(pattern, "i"));
-  return page.locator(root).first().locator("button,[role='button']").evaluateAll((nodes, regexSources) => {
-    const visible = nodes.filter(node => {
-      const rect = node.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    });
-    return visible.map(node => {
-      const own=[node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,node.getAttribute("data-testid")];
-      const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")]);
-      return {label:[...own,...nested].filter(Boolean).join(" ").trim()};
-    }).filter(item => regexSources.some(source => new RegExp(source, "i").test(item.label)));
-  }, names.map(regex => regex.source));
-}
-
 async function uniqueButton(page, patterns, root = "main,article,[role='dialog']") {
-  const candidates = await visibleButton(page, patterns, root);
-  if (candidates.length !== 1) throw new Error(candidates.length ? "Mais de um controle corresponde à ação; execução bloqueada." : "Controle da ação não encontrado; execução bloqueada.");
-  const escaped = candidates[0].label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return page.locator(root).first().getByRole("button", { name: new RegExp(escaped, "i") }).first();
+  const controls=page.locator(root).first().locator("button,[role='button']");
+  const regexSources=patterns.map(pattern=>pattern instanceof RegExp?pattern.source:String(pattern));
+  const matches=await controls.evaluateAll((nodes,sources)=>nodes.map((node,index)=>{
+    const rect=node.getBoundingClientRect();
+    if(rect.width<=0||rect.height<=0)return null;
+    const own=[node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,node.getAttribute("data-testid")];
+    const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[
+      child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")
+    ]);
+    const label=[...own,...nested].filter(Boolean).join(" ").trim();
+    return sources.some(source=>new RegExp(source,"i").test(label))?index:null;
+  }).filter(index=>index!==null),regexSources);
+  if(matches.length!==1)throw new Error(matches.length?"Mais de um controle corresponde à ação; execução bloqueada.":"Controle da ação não encontrado; execução bloqueada.");
+  return controls.nth(matches[0]);
 }
 
 export async function executeLike(page, url) {
