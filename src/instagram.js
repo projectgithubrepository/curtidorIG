@@ -84,6 +84,28 @@ async function readVisibleAdministrativeMilestones(page) {
   const texts = await page.locator('[role="row"],[role="listitem"],[data-testid*="message"]').allInnerTexts().catch(() => []);
   return texts.map(parseAdministrativeMilestone).filter(Boolean);
 }
+function normalizeDirectGroupName(value) {
+  return String(value||"").normalize("NFKC").replace(/\s+/g," ").trim().toLocaleLowerCase();
+}
+
+async function readDirectConversationHeader(page) {
+  let evidence=[];
+  for(let attempt=0;attempt<7;attempt++){
+    evidence=await page.locator(
+      "main header, [role='main'] header, main [role='heading'], [role='main'] [role='heading'], main h1, [role='main'] h1, main header [role='button'], main header button, [role='main'] header [role='button'], [role='main'] header button"
+    ).evaluateAll(nodes=>nodes.filter(node=>{
+      const rect=node.getBoundingClientRect();
+      return rect.width>0&&rect.height>0;
+    }).map(node=>[
+      node.innerText,node.getAttribute("aria-label"),node.getAttribute("title")
+    ].filter(Boolean).join("\n").trim()).filter(Boolean)).catch(()=>[]);
+    const name=evidence.flatMap(value=>value.split(/\r?\n/)).map(value=>value.trim())
+      .find(value=>value&&value.length<120&&!/^(instagram|mensagens|messages|detalhes|details|audio|video|ligar|call|search|ativo agora|active now)$/i.test(value))||"";
+    if(name)return {name,evidence:evidence.slice(0,8)};
+    await page.waitForTimeout(700);
+  }
+  return {name:"",evidence:evidence.slice(0,8)};
+}
 
 export function didScrollTowardOlderMessages(before, after) {
   return Boolean(before?.found && after?.found &&
@@ -391,6 +413,13 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   if (reloadedThreadId !== activeThreadId) {
     await networkCapture.stop();
     throw new Error("O Instagram saiu da conversa selecionada durante a recarga. A coleta foi cancelada para evitar misturar mensagens.");
+  }
+  const sourceHeader=await readDirectConversationHeader(page);
+  if(!sourceHeader.name || normalizeDirectGroupName(sourceHeader.name)!==normalizeDirectGroupName(groupName)){
+    await networkCapture.stop();
+    const error=new Error("A conversa aberta não pôde ser confirmada pelo nome exato do cabeçalho. Solicitado: "+groupName+"; identificado: "+(sourceHeader.name||"não identificado")+". Coleta cancelada.");
+    error.pageDiagnostics={url:page.url(),requestedGroupName:groupName,detectedHeaderName:sourceHeader.name||"",headerEvidence:sourceHeader.evidence};
+    throw error;
   }
 
   const found = new Map();
@@ -1167,27 +1196,14 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
     if (openedThreadId !== expectedThreadId) {
       return { verified:false, reason:`A URL direta não abriu a conversa esperada. ID solicitado: ${expectedThreadId}; ID aberto: ${openedThreadId || "não identificado"}.`, threadId:openedThreadId };
     }
-    // O cabeçalho do Direct pode ser hidratado depois da navegação. Esperar
-    // alguns ciclos e consultar também controles acessíveis do cabeçalho evita
-    // falso negativo por leitura prematura, sem inferir o nome pela URL.
-    let headerEvidence = [];
-    for (let attempt = 0; attempt < 7 && !groupName; attempt++) {
-      headerEvidence = await page.locator(
-        "main header, [role='main'] header, main [role='heading'], main h1, main header [role='button'], main header button"
-      ).evaluateAll(nodes =>
-        nodes.filter(node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; })
-          .map(node => [node.innerText, node.getAttribute("aria-label"), node.getAttribute("title")].filter(Boolean).join("\n").trim())
-          .filter(Boolean)
-      ).catch(() => []);
-      groupName = headerEvidence.flatMap(value => value.split(/\r?\n/)).map(value => value.trim())
-        .find(value => value && value.length < 120 && !/^(instagram|mensagens|messages|detalhes|details|audio|video|ligar|call|search)$/i.test(value)) || "";
-      if (!groupName) await page.waitForTimeout(700);
-    }
+    // A URL comprova o ID; o nome precisa vir do cabeçalho renderizado.
+    const header=await readDirectConversationHeader(page);
+    groupName=header.name;
     if (!groupName) return {
       verified:false,
       reason:"A URL abriu a conversa correta, mas o nome não apareceu nos elementos acessíveis do cabeçalho após aguardar a renderização. Inventário e envios bloqueados.",
       threadId:openedThreadId,
-      headerEvidence:headerEvidence.slice(0,8)
+      headerEvidence:header.evidence
     };
   }
   const threadId = page.url().match(/\/direct\/t\/(\d+)/)?.[1] || "";
