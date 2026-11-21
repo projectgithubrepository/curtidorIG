@@ -104,7 +104,7 @@ A função **Dessalvar publicações em lote, individualmente** deve navegar at�
 - O endereço de Salvos segue o formato `https://www.instagram.com/{usuario}/saved/`, sendo `{usuario}` obtido dinamicamente do perfil da sessão autenticada.
 - É proibido fixar no código o nome de usuário de uma conta de exemplo ou reaproveitar um endereço de outro perfil.
 - A aplicação deve localizar o link do próprio perfil na navegação do Instagram antes de construir a URL de Salvos.
-- A coleção de destino/origem é identificada pelo nome exato exibido na interface dentro dessa área. O endereço-base `/{usuario}/saved/` não comprova, sozinho, que uma coleção específica foi localizada.
+- A coleção de destino é identificada pela URL específica fornecida no formulário (`/usuario/saved/slug/ID/`), validando usuário, slug e ID. Não localizar por busca de nome nem aceitar apenas o endereço-base `/{usuario}/saved/`. O nome visível é extraído da coleção aberta e usado internamente no seletor de salvamento.
 - Se não for possível identificar o perfil autenticado ou associar o nome da coleção a um elemento inequívoco, interromper a operação e registrar o diagnóstico; nunca escolher uma página aleatória.
 
 
