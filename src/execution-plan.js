@@ -76,7 +76,7 @@ export function buildExecutionPlan({
     else if (mode === "manual") status = "aguardando ação manual";
     else status = "pronta para execução";
     const mappedInTest = mode === "test" && status.startsWith("simulada");
-    const candidateInTest = mode === "test" && !item.alreadyDone && item.eligible &&
+    const candidateInTest = mode === "test" && !mappedInTest && !item.alreadyDone && item.eligible &&
       item.policy !== "forbidden" && !status.startsWith("bloqueada") &&
       !status.startsWith("dispensada");
     return {
