@@ -24,6 +24,19 @@ function sameInstagramContentUrl(actualValue, requestedValue) {
   } catch { return false; }
 }
 
+export function oldestCapturedMessageDate(records = [], threadId = "") {
+  const dates = records
+    .filter(record => String(record.threadId || "") === String(threadId))
+    .map(record => {
+      const parsed = new Date(record.timestamp || "");
+      if (Number.isNaN(parsed.getTime())) return "";
+      return [parsed.getFullYear(), String(parsed.getMonth() + 1).padStart(2, "0"), String(parsed.getDate()).padStart(2, "0")].join("-");
+    })
+    .filter(Boolean)
+    .sort();
+  return dates[0] || "";
+}
+
 function dateInRange(sharedAt, startDate, endDate) {
   if (!sharedAt) return { known: false, inRange: false, iso: "" };
   const parsed = new Date(sharedAt);
@@ -439,6 +452,8 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   let historyBoundaryReached = false;
   let historyStalled = false;
   let oldestVisibleDate = "";
+  let oldestCapturedDate = "";
+  let dateBoundarySource = "";
 
   // Não interrompe a varredura só porque ainda não encontrou links:
   // conversas longas podem começar com dezenas de mensagens administrativas.
@@ -453,8 +468,15 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
         if (date.known && date.inRange) found.set(item.url, { ...item, sharedAt: date.iso, dateUnknown: false, collectionMode: "date" });
       }
       oldestVisibleDate = await readOldestVisibleMessageDate(page) || oldestVisibleDate;
-      if (oldestVisibleDate && oldestVisibleDate < startDate) {
+      oldestCapturedDate = oldestCapturedMessageDate(networkCapture.records(), activeThreadId) || oldestCapturedDate;
+      const boundaryCandidates = [
+        ...(oldestVisibleDate ? [{ date: oldestVisibleDate, source: "mensagens visíveis" }] : []),
+        ...(oldestCapturedDate ? [{ date: oldestCapturedDate, source: "timestamp da rede na conversa confirmada" }] : [])
+      ].sort((a, b) => a.date.localeCompare(b.date));
+      const oldestKnown = boundaryCandidates[0];
+      if (oldestKnown && oldestKnown.date < startDate) {
         dateBoundaryReached = true;
+        dateBoundarySource = oldestKnown.source;
         break;
       }
   
@@ -529,6 +551,8 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     stableBoundaryReached: historyBoundaryReached,
     dateBoundaryReached,
     oldestVisibleDate,
+    oldestCapturedDate,
+    dateBoundarySource,
     historyStalled,
     stoppedByUser: Boolean(shouldStop()),
     visibleItems: found.size,
