@@ -85,7 +85,7 @@ function render(items) {
     const comment=document.createElement("p"); comment.className="comment"; comment.textContent=item.comment ? "Comentário sugerido: "+item.comment : "";
     const actionDetails=document.createElement("div"); actionDetails.className="action-details";
     for (const action of (item.actionLog || [])) { const line=document.createElement("small"); line.textContent=`${action.action}: ${action.status}${action.reason ? " — "+action.reason : ""}`; actionDetails.append(line); }
-    for (const action of (item.plan || [])) { const line=document.createElement("small"); line.textContent=`${action.label}: ${action.status}${action.reason ? " — "+action.reason : ""}`; actionDetails.append(line); }
+    for (const action of (item.plan || [])) { const line=document.createElement("small"); line.textContent=`${action.label}: ${action.status}${action.testMode?.mapped ? " · MAPEADA NO TESTE, NÃO EXECUTADA" : ""}${action.reason ? " — "+action.reason : ""}`; actionDetails.append(line); }
     if (item.comment) {
       const copyComment=document.createElement("button"); copyComment.type="button"; copyComment.className="secondary small-action";
       copyComment.textContent="Copiar comentário"; copyComment.dataset.copyComment=item.comment;
