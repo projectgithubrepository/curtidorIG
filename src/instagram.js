@@ -501,6 +501,16 @@ export async function inspectSavedCollection(page, collectionName) {
     await collection.click();
   }
   await page.waitForTimeout(1400);
+  // Carrega a coleção progressivamente até não surgirem novos itens (limite defensivo).
+  let stableRounds = 0;
+  let previousCount = 0;
+  for (let round = 0; round < 80 && stableRounds < 5; round++) {
+    const count = await page.locator('a[href*="/p/"],a[href*="/reel/"],a[href*="/tv/"]').count();
+    stableRounds = count > previousCount ? 0 : stableRounds + 1;
+    previousCount = count;
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(650);
+  }
   const items = await page.locator('a[href*="/p/"],a[href*="/reel/"],a[href*="/tv/"]').evaluateAll(anchors => {
     const map = new Map();
     for (const anchor of anchors) {
