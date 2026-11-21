@@ -79,6 +79,9 @@ export function buildExecutionPlan({
     } else if (item.requiresAllPrevious && !requiredStepsDone) {
       status = "aguardando etapas obrigatórias";
       reason = "A reação só pode ser aplicada após concluir as ações obrigatórias e as solicitadas.";
+    } else if (mode === "test" && item.action === "completionReaction" && stateKnown.messageIdentityVerified !== true) {
+      status = "não verificada — mensagem original não identificada";
+      reason = stateKnown.reasons?.messageIdentityVerified || "O ID da mensagem original no grupo não foi confirmado; não é possível garantir que a reação será aplicada ao pedido correto.";
     } else if (mode === "test") status = "simulada — nenhuma ação executada";
     else if (mode === "manual") status = "aguardando ação manual";
     else status = "pronta para execução";
