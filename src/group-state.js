@@ -1,5 +1,5 @@
 export function normalizeGroupText(value) {
-  return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return String(value ?? "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
 export function isAdministrativeMessage(value) {
