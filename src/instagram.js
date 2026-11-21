@@ -541,7 +541,11 @@ async function readSavedToggle(page) {
 
 export async function unsaveSavedCollectionItem(page, url) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-  await page.waitForTimeout(900);
+  await page.waitForFunction(() => {
+    const root = document.querySelector("article,main,[role=dialog]");
+    const labels = [...(root?.querySelectorAll("button,[role=button]") || [])].map(node => [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText].filter(Boolean).join(" ")).join(" ");
+    return /remover dos salvos|remove from saved|salvar|save/i.test(labels);
+  }, null, { timeout: 10000 }).catch(() => {});
   const before = await readSavedToggle(page);
   if (before === "unsaved") return { url, status: "já dessalva — nenhuma ação" };
   if (before !== "saved") return { url, status: "bloqueada — não foi possível confirmar o estado salvo" };
