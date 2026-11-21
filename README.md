@@ -122,7 +122,11 @@ A proibição explícita de comentar prevalece sobre a regra padrão de comentá
 - Ao terminar o TESTE, exibir imediatamente um **relatório preliminar na própria interface** com totais separados por tipo de ação (curtidas, salvamentos na coleção, comentários em publicações, envios ao grupo coletivo, reações na mensagem original, comentários públicos em Stories e envios de Stories). Para cada tipo, separar ocorrências analisadas, aptas no plano, aguardando pré-requisitos, já concluídas, bloqueadas e não verificadas. Esses números nunca podem ser apresentados como ações executadas.
 - Em cada publicação, mostrar também o texto original do pedido capturado no grupo, o link, o tipo, a data do compartilhamento, o comentário preparado e a decisão individual de cada etapa.
 
-#### Cobertura da coleta por data
+#### Referência administrativa posterior ao fechamento
+
+A mensagem administrativa com os totais de Feed/Reels e Stories é publicada depois do fechamento. Ela serve somente como gabarito posterior de conferência: a coleta precisa funcionar sem essa mensagem. A ausência do aviso não pode impedir a coleta nem, isoladamente, classificar o resultado como incompleto. Quando o aviso correspondente existir, comparar os totais por data e por tipo; nunca reutilizar metas de outro dia nem deixar valores fixos no código. O exemplo de 18/11 (66 Feed/Reels + 34 Stories) é apenas referência histórica para validar o teste.
+
+### Cobertura da coleta por data
 
 - Quando houver mensagem administrativa com quantitativos para a data, usar esses números como referência de cobertura, sem presumir que a varredura encontrou tudo.
 - Comparar separadamente Feed/Reels e Stories, exibindo esperado, encontrado, faltante e excedente. Exemplo de referência: 18/11 = 66 Feed/Reels + 34 Stories = 100 itens.
