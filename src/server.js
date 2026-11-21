@@ -325,7 +325,9 @@ app.post("/api/start", async (req, res) => {
           let taskState = mergeTaskState(previousState, { ...inspection.observedState, commentForbidden: instructions.comment === "forbidden" });
           const comment = taskState.commented || instructions.comment === "forbidden" ? "" : createComment(inspection.caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
           const actionLog = [];
-          if (mode === "automatic") {
+          if (mode === "automatic" && !item.identityVerified) {
+            actionLog.push({action:"all",status:"bloqueada",reason:"A publicação não está vinculada a uma mensagem original identificada; nenhuma ação foi executada."});
+          } else if (mode === "automatic") {
             const steps = [
               ["like", !taskState.liked, async () => executeLike(page,item.url), "liked"],
               ["saveToCollection", !(taskState.saved && taskState.savedFolderVerified), async () => executeSaveToCollection(page,item.url,collectionName), "saved"],
@@ -363,7 +365,16 @@ app.post("/api/start", async (req, res) => {
               actionLog.push({action:"completionReaction",status:"aguardando etapas obrigatórias"});
             }
           }
-          const plan = buildExecutionPlan({ mode, collectionName, completionEmoji, taskState, comment, instructions });
+          let plan = buildExecutionPlan({ mode, collectionName, completionEmoji, taskState, comment, instructions });
+          if (mode === "automatic") {
+            plan = plan.map(entry => {
+              const logged = actionLog.find(record => record.action === entry.action);
+              if (logged) return { ...entry, status:logged.status, reason:logged.reason || "" };
+              if (actionLog.some(record => record.action === "all" && record.status === "bloqueada")) return { ...entry, status:"bloqueada", reason:actionLog[0].reason };
+              if (!entry.alreadyDone && entry.required && !entry.status.startsWith("dispensada") && entry.action !== "completionReaction") return { ...entry, status:"não executada — etapa anterior bloqueada" };
+              return entry;
+            });
+          }
           const result = { ...item, caption:inspection.caption, comment, taskState, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
           results.push(result);
           appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,commentForbidden:instructions.comment==="forbidden",complete:taskState.complete,milestone:item.administrativeMilestones,detail:mode==="test"?"Simulação sem ações":"Planejamento e execução da publicação"});
