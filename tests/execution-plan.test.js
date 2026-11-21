@@ -115,5 +115,5 @@ test("unverified actions are candidates, never counted as mapped executable acti
   assert.equal(plan[2].testMode.mapped, false);
   assert.equal(plan[0].testMode.candidate, true);
   assert.equal(plan[3].testMode.mapped, true);
-  assert.equal(plan[3].testMode.candidate, true);
+  assert.equal(plan[3].testMode.candidate, false);
 });
