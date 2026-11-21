@@ -92,7 +92,7 @@ function renderPreliminary(summary, request) {
     number.textContent = String(value.total ?? 0);
     const detail = document.createElement("small");
     detail.className = "metric-detail";
-    detail.textContent = `${value.simulated ?? 0} aptas · ${value.done ?? 0} concluídas · ${value.blocked ?? 0} bloqueadas · ${value.unverified ?? 0} não verificadas`;
+    detail.textContent = `${value.simulated ?? 0} aptas · ${value.candidate ?? 0} candidatas · ${value.waiting ?? 0} aguardando · ${value.done ?? 0} concluídas · ${value.blocked ?? 0} bloqueadas · ${value.unverified ?? 0} não verificadas · ${value.unclassified ?? 0} sem classificação`;
     tile.append(label, number, detail);
     preliminaryMetrics.append(tile);
   }
@@ -160,10 +160,27 @@ function render(items) {
       ["Comentário anterior",verification.commented ?? verification.alreadyCommented]
     ];
     const checkList=document.createElement("ul");
-    for (const [label,value] of checks) {
+    const verificationReasons=verification.reasons || {};
+    const diagnosticState=verification.diagnostics || {};
+    for (const [label,value,key] of [
+      ["Curtida",verification.liked,"liked"],
+      ["Salvamento no Instagram",verification.saved,"saved"],
+      ["Presença na coleção escolhida",verification.collectionMembership,"saveToCollection"],
+      ["Comentário anterior",verification.commented,"commented"],
+      ["Grupo coletivo",verification.destinationGroupVerified,"shareToGroup"]
+    ]) {
       const li=document.createElement("li");
-      li.textContent=label + ": " + (value===true ? "verificado" : value===false ? "não foi possível verificar" : "não se aplica / sem dado");
+      const known=key==="liked" ? verification.likedKnown : key==="saved" ? verification.savedKnown : key==="commented" ? verification.commentedKnown : value===true;
+      li.textContent=label + ": " + (known ? ((key==="liked"||key==="saved"||key==="commented") ? (value ? "estado identificado: sim" : "estado identificado: não") : "confirmado") : "não confirmado");
+      const why=verificationReasons[key] || "";
+      if(why){const detail=document.createElement("small");detail.textContent=" Motivo: "+why;li.append(detail);}
       checkList.append(li);
+    }
+    if(diagnosticState.readError){
+      const li=document.createElement("li");li.textContent="Falha ao ler controles: "+diagnosticState.readError;checkList.append(li);
+    }
+    if(diagnosticState.controlCount!==undefined){
+      const li=document.createElement("li");li.textContent="Controles encontrados: "+diagnosticState.controlCount+" · "+(diagnosticState.controlLabels||[]).join(" | ");checkList.append(li);
     }
     if (item.storyInspection) {
       const li=document.createElement("li");
