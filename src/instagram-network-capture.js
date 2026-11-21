@@ -263,7 +263,7 @@ function extractPayload(payload, context = {}) {
   visit(payload);
   return {
     records, structures, objectsVisited, messageLikeObjects: records.length,
-    distinctMessageIds: messageIds.size, sharedMediaObjects, storyUrls: records.reduce((sum, record) => sum + record.urls.filter(url => /\\/stories\\//i.test(url)).length, 0), hasReactionFields,
+    distinctMessageIds: messageIds.size, sharedMediaObjects, storyUrls: records.reduce((sum, record) => sum + record.urls.filter(url => /\/stories\//i.test(url)).length, 0), hasReactionFields,
     hasShareFields: [...keys].some(key => /^(share|media_share|xma|slide_messages)$/i.test(key)),
     hasPermalinkOrUrl: [...keys].some(key => /^(permalink|url|href)$/i.test(key)),
     hasMessageId: [...keys].some(key => /^(message_id|mid|item_id)$/i.test(key)),
