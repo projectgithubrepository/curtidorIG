@@ -1016,6 +1016,7 @@ export async function executeComment(page, url, comment) {
 
 export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
   const suppliedUrl = String(destinationGroupUrl || "").trim();
+  let groupName = "";
   const directMatch = suppliedUrl.match(/^https:\/\/www\.instagram\.com\/direct\/t\/(\d+)\/?(?:[?#].*)?$/i);
   if (suppliedUrl && !directMatch) {
     return { verified:false, reason:"URL direta do grupo inválida. Use https://www.instagram.com/direct/t/ID/.", threadId:"" };
@@ -1036,7 +1037,7 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
         .map(node => (node.innerText || "").trim()).filter(Boolean)
     ).catch(() => []);
     const normalized = value => String(value || "").normalize("NFKC").replace(/[\s\u200B-\u200D\uFEFF]+/g," ").trim().toLocaleLowerCase();
-    const groupName = headerEvidence.flatMap(value => value.split("\\n")).map(value => value.trim())
+    groupName = headerEvidence.flatMap(value => value.split(/\\r?\\n/)).map(value => value.trim())
       .find(value => value && value.length < 120 && !/^(instagram|mensagens|messages|detalhes|details)$/i.test(value)) || "";
     if (!groupName) return { verified:false, reason:"A conversa abriu, mas não foi possível ler seu nome no cabeçalho. Inventário e envios bloqueados.", threadId:openedThreadId, headerEvidence:headerEvidence.slice(0,5) };
   } else {
