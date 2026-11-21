@@ -23,7 +23,8 @@ export function buildExecutionPlan({
   collectionName = "",
   completionEmoji = "🌸",
   mode = "test",
-  instructions = {}
+  instructions = {},
+  stateKnown = {}
 } = {}) {
   const state = {
     liked: Boolean(taskState.liked),
@@ -52,7 +53,19 @@ export function buildExecutionPlan({
     if (item.alreadyDone) status = "já concluída — não repetir";
     else if (item.action === "comment" && item.policy === "forbidden") status = "dispensada — pedido explícito para não comentar";
     else if (item.action === "shareToGroup" && state.shareAttempted && !state.sharedToGroup) { status = "bloqueada"; reason = "Tentativa anterior sem confirmação; verifique o grupo para evitar envio duplicado."; }
-    else if (!item.eligible) {
+    else if (item.action === "saveToCollection" && state.saved && !state.savedFolderVerified) {
+      status = "bloqueada";
+      reason = "A publicação já está salva, mas não foi confirmada dentro da coleção escolhida; não alternar o salvamento.";
+    } else if (mode === "test" && !item.alreadyDone && item.action === "like" && stateKnown.liked === false) {
+      status = "não verificada — controle de curtida não identificado";
+      reason = "O Instagram não apresentou um controle reconhecível para confirmar se a publicação já está curtida.";
+    } else if (mode === "test" && !item.alreadyDone && item.action === "saveToCollection" && stateKnown.saveToCollection === false) {
+      status = "não verificada — estado da coleção indisponível";
+      reason = "Não foi possível conferir o estado salvo e a presença na coleção de destino.";
+    } else if (mode === "test" && !item.alreadyDone && item.action === "comment" && stateKnown.commented === false) {
+      status = "não verificada — comentários do usuário não identificados";
+      reason = "Não foi possível confirmar se já existe um comentário deste perfil; evite duplicidade.";
+    } else if (!item.eligible) {
       status = "bloqueada";
       reason = item.action === "saveToCollection" ? "Informe a coleção obrigatória de destino." : "O comentário precisa ter pelo menos duas palavras e um emoji.";
     } else if (item.requiresAllPrevious && !requiredStepsDone) {
