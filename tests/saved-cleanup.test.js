@@ -38,3 +38,18 @@ test("rejects a base page that has already redirected away from Saved", () => {
     { text: "Laranja antigos", href: "/usuario/saved/12345/" }
   ], "Laranja antigos", "https://www.instagram.com/accounts/login/"), /não pertence à área Salvos/i);
 });
+
+test("matches collection links when the exact name is exposed through accessible labels or nested labels", () => {
+  const result = selectSavedCollectionHref([
+    { href: "/usuario/saved/collections/98765/", text: "", ariaLabel: "Laranja antigo" },
+    { href: "/p/WRONG/", text: "Laranja antigo" }
+  ], "Laranja antigo", "https://www.instagram.com/saved/");
+  assert.equal(result, "https://www.instagram.com/usuario/saved/collections/98765/");
+});
+
+test("normalizes whitespace and accents in collection labels without relaxing exact-name matching", () => {
+  const result = selectSavedCollectionHref([
+    { href: "/usuario/saved/98765/", labels: ["  LARANJÁ   antigo  "] }
+  ], "Laranja antigo", "https://www.instagram.com/saved/");
+  assert.equal(result, "https://www.instagram.com/usuario/saved/98765/");
+});
