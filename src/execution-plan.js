@@ -39,10 +39,10 @@ export function buildExecutionPlan({
   };
   const plan = [
     { action: "like", label: "Curtir", alreadyDone: state.liked, eligible: true, required: true },
-    { action: "saveToCollection", label: \`Salvar na coleção “\${collectionName || "Curtido"}”\`, alreadyDone: state.saved && state.savedFolderVerified, eligible: Boolean(collectionName), required: true },
+    { action: "saveToCollection", label: `Salvar na coleção “${collectionName || "Curtido"}”`, alreadyDone: state.saved && state.savedFolderVerified, eligible: Boolean(collectionName), required: true },
     { action: "comment", label: "Comentar", alreadyDone: state.commented, eligible: policy.comment !== "forbidden" && isValidComment(comment), required: policy.comment !== "forbidden", policy: policy.comment },
     { action: "shareToGroup", label: "Enviar para o grupo de destino", alreadyDone: state.sharedToGroup, eligible: true, required: true, policy: "required" },
-    { action: "completionReaction", label: \`Reagir à mensagem original com \${completionEmoji}\`, alreadyDone: state.groupCheck, eligible: true, required: true, requiresAllPrevious: true }
+    { action: "completionReaction", label: `Reagir à mensagem original com ${completionEmoji}`, alreadyDone: state.groupCheck, eligible: true, required: true, requiresAllPrevious: true }
   ];
   const requiredStepsDone = plan.slice(0, 4).every(item => !item.required || item.alreadyDone);
   return plan.map((item, index) => {
