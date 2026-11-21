@@ -698,7 +698,10 @@ export async function inspectPost(page, url) {
   });
 
   await expandVisibleCommentThreads(page);
-  const rootSelector = snapshot.selectors.article ? "article" : snapshot.selectors.dialog ? '[role="dialog"]' : "main";
+  // Em algumas versões do Instagram, o <article> contém só a mídia e
+  // os controles ficam como irmãos dentro de <main>. Priorizar main evita
+  // ler um artigo visual sem os botões de Curtir/Salvar/Comentários.
+  const rootSelector = snapshot.selectors.main ? "main" : snapshot.selectors.article ? "article" : snapshot.selectors.dialog ? '[role="dialog"]' : "main";
   let observedState;
   let stateReadError = "";
   try {
