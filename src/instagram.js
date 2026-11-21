@@ -719,3 +719,75 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
   if (!reactionPresent) throw new Error("A reação não pôde ser verificada na mensagem original.");
   return { groupCheck: true, status: `reação ${emoji} aplicada e verificada na mensagem original` };
 }
+
+
+export async function inspectStory(page, url) {
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForTimeout(1200);
+  if (/accounts\/login/.test(page.url())) throw new Error("Sessão do Instagram não autenticada.");
+  const snapshot = await page.evaluate(() => {
+    const visible = node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; };
+    const fields = [...document.querySelectorAll('textarea,input,[contenteditable="true"],[role="textbox"]')].filter(visible);
+    const publicField = fields.find(node => {
+      const label = [node.getAttribute("placeholder"),node.getAttribute("aria-label"),node.getAttribute("data-placeholder")].filter(Boolean).join(" ").toLowerCase();
+      return /(coment|comment)/i.test(label) && !/(mensagem|message|responder|reply|enviar mensagem)/i.test(label);
+    });
+    const controls = [...document.querySelectorAll('button,[role="button"]')].filter(visible).map(node =>
+      [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ").trim()
+    );
+    const bodyText=(document.body?.innerText||"").slice(0,4000);
+    const profile=[...document.querySelectorAll("nav a[href],a[href]")].find(a=>/perfil|profile/i.test([a.getAttribute("aria-label"),a.innerText].filter(Boolean).join(" ")));
+    const username=(profile?.getAttribute("href")||"").split("/").filter(Boolean)[0]||"";
+    const alreadyCommented=Boolean(username && [...document.querySelectorAll("li,[role='listitem']")].some(node =>
+      [...node.querySelectorAll("a[href]")].some(a=>a.getAttribute("href")==="/"+username+"/") &&
+      (node.innerText||"").trim().length>username.length
+    ));
+    return { publicCommentAvailable:Boolean(publicField), publicCommentLabel:publicField ? [publicField.getAttribute("placeholder"),publicField.getAttribute("aria-label")].filter(Boolean).join(" ") : "", alreadyCommented, usernameKnown:Boolean(username), controls, bodyText };
+  });
+  return { ...snapshot, stateKnown:{ publicCommentAvailable:true, alreadyCommented:snapshot.usernameKnown } };
+}
+
+export async function executeStoryComment(page, url, comment) {
+  const text=String(comment||"").trim();
+  const words=text.match(/[\\p{L}\\p{N}]+/gu)||[];
+  if(words.length<2 || !/\\p{Extended_Pictographic}/u.test(text)) throw new Error("Comentário do Story precisa ter pelo menos duas palavras e um emoji.");
+  const state=await inspectStory(page,url);
+  if(!state.publicCommentAvailable) throw new Error("Comentário público indisponível neste Story; nenhuma resposta privada será enviada.");
+  if(!state.usernameKnown) throw new Error("Não foi possível confirmar a identidade do perfil para evitar comentário duplicado.");
+  if(state.alreadyCommented) return {commented:true,status:"comentário público já identificado — não repetido"};
+  const fields=page.locator('textarea,input,[contenteditable="true"],[role="textbox"]');
+  let editor=null;
+  for(let i=0;i<await fields.count();i++){
+    const el=fields.nth(i); if(!(await el.isVisible().catch(()=>false))) continue;
+    const label=await el.evaluate(node=>[node.getAttribute("placeholder"),node.getAttribute("aria-label"),node.getAttribute("data-placeholder")].filter(Boolean).join(" "));
+    if(/coment|comment/i.test(label)&&!/(mensagem|message|responder|reply)/i.test(label)){editor=el;break;}
+  }
+  if(!editor) throw new Error("Campo de comentário público do Story não identificado.");
+  await editor.fill(text);
+  const publish=page.getByRole("button",{name:/publicar|postar|^post$|comentar|comment/i}).last();
+  if(!(await publish.count())) throw new Error("Botão de publicação do comentário público não identificado.");
+  await publish.click(); await page.waitForTimeout(900);
+  const body=await page.locator("body").innerText().catch(()=>"");
+  if(!body.includes(text)) throw new Error("Comentário público do Story não foi confirmado na tela.");
+  return {commented:true,status:"comentário público no Story publicado e verificado"};
+}
+
+export async function executeStoryShareToGroup(page, url, destinationGroupName, onBeforeSend=async()=>{}) {
+  const groupName=String(destinationGroupName||"").trim();
+  if(!groupName) throw new Error("Informe o grupo coletivo de destino.");
+  await page.goto(url,{waitUntil:"domcontentloaded",timeout:60000}); await page.waitForTimeout(1000);
+  const share=page.getByRole("button",{name:/compartilhar|share|enviar/i}).last();
+  if(!(await share.count())) throw new Error("Controle de compartilhamento do Story não identificado.");
+  await share.click(); await page.waitForTimeout(700);
+  const dialog=page.getByRole("dialog").last();
+  const search=dialog.locator('input,[role="combobox"]').first();
+  if(!(await search.count())) throw new Error("Busca de destinatários do Story não identificada.");
+  await search.fill(groupName); await page.waitForTimeout(900);
+  const target=dialog.getByText(groupName,{exact:true});
+  if(await target.count()!==1) throw new Error("Grupo coletivo não identificado de forma única.");
+  await target.click(); await page.waitForTimeout(300);
+  const send=dialog.getByRole("button",{name:/enviar|send|compartilhar/i}).last();
+  if(!(await send.count())) throw new Error("Botão de envio do Story não identificado.");
+  await onBeforeSend(); await send.click(); await page.waitForTimeout(1000);
+  return {sharedToGroup:true,status:"Story enviado ao grupo coletivo; confirmação visual deve ser conferida"};
+}
