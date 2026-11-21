@@ -802,6 +802,21 @@ export function isInstagramSavedCollectionUrl(value, base = "https://www.instagr
   } catch { return false; }
 }
 
+async function readSavedCollectionItems(page) {
+  return page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]').evaluateAll(anchors=>{
+    const map=new Map();
+    for(const anchor of anchors){
+      try{
+        const url=new URL(anchor.href);
+        if(!/^(?:www\.)?instagram\.com$/i.test(url.hostname)||!/^\/(p|reel|tv)\//.test(url.pathname))continue;
+        const clean="https://www.instagram.com"+url.pathname.replace(/\/$/,"");
+        if(!map.has(clean))map.set(clean,{url:clean,contentType:url.pathname.includes("/reel/")?"reel":"feed"});
+      }catch{}
+    }
+    return [...map.values()];
+  }).catch(()=>[]);
+}
+
 async function scrollSavedCollectionToEnd(page) {
   return page.evaluate(() => {
     const selector='a[href*="/p/"],a[href*="/reel/"],a[href*="/tv/"]';
@@ -884,25 +899,18 @@ export async function inspectSavedCollection(page, collectionNameOrUrl) {
     const collectionName = headingTexts.flatMap(value => value.split("\n")).map(value => value.trim())
       .find(value => value && !/^salvos$|^saved$|^coleções$|^collections$/i.test(value) && value.length < 100) || slugLabel;
     let stableRounds = 0;
-    const collectionLinks=page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]');
+    const discoveredItems=new Map();
     for (let round=0; round<80 && stableRounds<5; round++) {
-      const beforeCount=await collectionLinks.count();
+      for(const item of await readSavedCollectionItems(page))discoveredItems.set(item.url,item);
+      const beforeCount=discoveredItems.size;
       const scrollState=await scrollSavedCollectionToEnd(page);
       await page.waitForTimeout(650);
-      const afterCount=await collectionLinks.count();
+      for(const item of await readSavedCollectionItems(page))discoveredItems.set(item.url,item);
+      const afterCount=discoveredItems.size;
       stableRounds=afterCount>beforeCount?0:scrollState.atBottom?stableRounds+1:0;
     }
     if (stableRounds < 5) throw new Error("O inventário da coleção não alcançou um fim estável após 80 tentativas de rolagem. A coleção não será considerada completa.");
-    const items = await page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]').evaluateAll(anchors => {
-      const map = new Map();
-      for (const anchor of anchors) { try {
-        const url = new URL(anchor.href);
-        if (!["/p/","/reel/","/tv/"].some(prefix => url.pathname.startsWith(prefix))) continue;
-        const clean = url.origin + url.pathname.replace(/\/$/,"");
-        if (!map.has(clean)) map.set(clean,{url:clean,contentType:url.pathname.includes("/reel/")?"reel":"feed"});
-      } catch {} }
-      return [...map.values()];
-    });
+    const items=[...discoveredItems.values()];
     return { collectionName, collectionUrl:page.url(), items, collectionId:expectedCollectionId };
   }
   const name = suppliedCollectionUrl;
@@ -1021,27 +1029,18 @@ export async function inspectSavedCollection(page, collectionNameOrUrl) {
     throw new Error("O link da coleção não abriu uma rota específica de coleção (" + page.url() + "). A página geral /saved/ não será aceita como pasta. Nenhuma publicação será processada.");
   }
   let stableRounds = 0;
-  const collectionLinks=page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]');
+  const discoveredItems=new Map();
   for (let round = 0; round < 80 && stableRounds < 5; round++) {
-    const beforeCount=await collectionLinks.count();
+    for(const item of await readSavedCollectionItems(page))discoveredItems.set(item.url,item);
+    const beforeCount=discoveredItems.size;
     const scrollState=await scrollSavedCollectionToEnd(page);
     await page.waitForTimeout(650);
-    const afterCount=await collectionLinks.count();
+    for(const item of await readSavedCollectionItems(page))discoveredItems.set(item.url,item);
+    const afterCount=discoveredItems.size;
     stableRounds=afterCount>beforeCount?0:scrollState.atBottom?stableRounds+1:0;
   }
   if (stableRounds < 5) throw new Error("O inventário da coleção não alcançou um fim estável após 80 tentativas de rolagem. A coleção não será considerada completa.");
-  const items = await page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]').evaluateAll(anchors => {
-    const map = new Map();
-    for (const anchor of anchors) {
-      try {
-        const url = new URL(anchor.href);
-        if (!/^\/(p|reel|tv)\//.test(url.pathname)) continue;
-        const clean = url.origin + url.pathname.replace(/\/$/, "");
-        if (!map.has(clean)) map.set(clean, { url: clean, contentType: url.pathname.includes("/reel/") ? "reel" : "feed" });
-      } catch {}
-    }
-    return [...map.values()];
-  });
+  const items=[...discoveredItems.values()];
   return { collectionName: name, collectionUrl: page.url(), items };
 }
 
