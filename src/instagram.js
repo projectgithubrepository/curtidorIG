@@ -1352,6 +1352,8 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
     throw new Error("Reação bloqueada: não há identidade e texto suficientes da mensagem original.");
   }
   await page.goto(`https://www.instagram.com/direct/t/${encodeURIComponent(item.threadId)}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
+  const openedThreadId=page.url().match(/\/direct\/t\/(\d+)/)?.[1]||"";
+  if(openedThreadId!==String(item.threadId)) throw new Error("O Instagram não abriu a conversa original; reação bloqueada.");
   await page.waitForTimeout(1200);
   const excerpt = String(item.messageText).trim().slice(0, 100);
   const candidates = page.locator('[role="row"],[role="listitem"],[data-testid*="message"],[data-testid*="Message"]').filter({ hasText: excerpt });
