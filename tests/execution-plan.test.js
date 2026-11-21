@@ -103,7 +103,7 @@ test("already-saved post outside the selected collection is blocked", () => {
 });
 
 
-test("unverified actions are candidates, never counted as mapped executable actions", () => {
+test("unverified actions are not candidates or mapped executable actions", () => {
   const plan = buildExecutionPlan({
     mode: "test",
     collectionName: "Curtido",
