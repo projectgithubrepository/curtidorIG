@@ -137,3 +137,12 @@ test("does not mark otherwise verified actions apt without the source message id
     assert.equal(action.testMode.mapped,false);
   }
 });
+
+test("blocks contradictory unsaved button when the destination collection already contains the post", () => {
+  const plan=buildExecutionPlan({
+    mode:"test",collectionName:"Laranja antigo",comment:"Comentário válido 🌸",
+    stateKnown:{...verifiedInspection,savedStateKnown:true,saved:false,collectionInventoryAvailable:true,collectionMembership:true}
+  });
+  assert.match(plan[1].status,/^não verificada/);
+  assert.match(plan[1].reason,/botão Salvar indica que ela não está salva/i);
+});
