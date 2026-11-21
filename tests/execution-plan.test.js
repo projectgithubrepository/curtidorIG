@@ -64,3 +64,10 @@ test("comment generation must have two words and an emoji", () => {
   const valid = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Conteúdo muito interessante 🌸" });
   assert.match(valid[2].status, /^simulada/);
 });
+
+test("uncertain previous send is blocked to prevent duplicates", () => {
+  const plan = buildExecutionPlan({ mode:"automatic", collectionName:"Curtido", comment:"Comentário válido 🌸", taskState:{ shareAttempted:true } });
+  assert.equal(plan[3].status, "bloqueada");
+  assert.match(plan[3].reason, /envio duplicado/);
+  assert.match(plan[4].status, /^aguardando/);
+});
