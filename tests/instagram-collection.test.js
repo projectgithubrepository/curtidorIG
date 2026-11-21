@@ -86,3 +86,16 @@ test("reports exactly where network Story URLs are lost during collection", () =
     rejectedOutsideDateRange:1
   });
 });
+
+test("classifies a Story URL only once when an invalid and a valid message both contain it", () => {
+  const found=new Map(), fallback=new Map(), args=options(found,fallback);
+  const story="https://www.instagram.com/stories/same.user/390000000000000099";
+  const result=addNetworkMessages([
+    {messageId:"wrong-thread",threadId:"9999999999999999",timestamp:"2026-11-18T12:00:00.000Z",urls:[story]},
+    {messageId:"valid-message",threadId,timestamp:"2026-11-18T13:00:00.000Z",urls:[story]}
+  ],args);
+  assert.equal(result.storyCollection.uniqueNetworkStoryUrls,1);
+  assert.equal(result.storyCollection.acceptedInDateRange,1);
+  assert.equal(result.storyCollection.rejectedOtherThread,0);
+  assert.equal(found.size,1);
+});
