@@ -10,7 +10,9 @@ A interface deverá solicitar:
 
 - **Grupo do Instagram:** selecionar ou informar a conversa/grupo de onde serão coletadas as publicações.
 - **Data inicial e data final:** período em que as publicações foram compartilhadas/adicionadas à conversa.
-- **Coleção de destino:** nome da coleção semanal do Instagram na qual a pessoa deseja organizar as publicações, quando esse recurso estiver disponível na interface.
+- **Coleção de destino:** nome exato da coleção dos Salvos; o valor inicial é `Curtido`, editável pelo usuário.
+- **Grupo coletivo de envios:** nome exato da conversa que receberá cada publicação; o valor inicial é `grupo de envios`, editável pelo usuário.
+- **Modo:** TESTE, AUTOMÁTICO ou MANUAL. TESTE é o padrão; AUTOMÁTICO exige confirmação explícita.
 
 Não haverá campo para colar links manualmente como fluxo principal.
 
@@ -22,8 +24,9 @@ Não haverá campo para colar links manualmente como fluxo principal.
 4. Extrair a URL e a data/hora da mensagem que compartilhou cada publicação.
 5. Ignorar mensagens fora do período, links que não sejam publicações compatíveis e itens indisponíveis.
 6. Remover duplicatas, inclusive quando a mesma publicação tiver sido compartilhada mais de uma vez.
-7. Comparar com o histórico local para não incluir novamente publicações já processadas.
-8. Apresentar a quantidade encontrada e a lista coletada antes de qualquer ação na conta.
+7. Vincular cada publicação ao ID exato da mensagem de origem; a mesma URL em mensagens distintas continua tendo identidades distintas.
+8. Consultar o histórico local para evitar repetir ações já confirmadas.
+9. Apresentar a quantidade encontrada e o plano por publicação. No modo TESTE, nenhuma interação é executada.
 
 **Definição do período:** o filtro considera a data em que a publicação foi compartilhada na conversa, não a data original em que o autor publicou o conteúdo no Instagram.
 
@@ -61,9 +64,9 @@ O histórico continua local, sem banco de dados ou envio a serviços externos.
 - Se a interface do Instagram mudar ou a conversa não carregar completamente, interromper a coleta e informar que o resultado pode estar incompleto.
 - Não afirmar que todas as mensagens do período foram coletadas se o Instagram não disponibilizar todo o histórico.
 
-## Fora do escopo desta etapa
+## Estado e limites da implementação
 
-A coleta direta da conversa, seleção do grupo, filtro por período, organização em coleção e integração com o histórico ainda precisam ser implementados e validados no Instagram real. Este documento registra a regra de negócio desejada; não significa que essas funções já estejam disponíveis.
+A interface possui os modos TESTE, AUTOMÁTICO e MANUAL. A execução automática de Feed/Reels usa a interface visível do Instagram e interrompe a etapa quando não consegue identificar ou verificar o controle correto. A seleção da coleção depende de o Instagram exibir o seletor de coleções; se a publicação já estiver salva sem confirmação da pasta, a aplicação não alterna o estado para evitar dessalvar por engano. Stories ainda são identificados, mas permanecem bloqueados para execução porque exigem fluxo específico. O comportamento real dos seletores deve ser validado com a conta autenticada e uma publicação de teste antes de usar em lote.
 
 
 ## Limpeza posterior dos Salvos
