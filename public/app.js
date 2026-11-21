@@ -77,7 +77,7 @@ function renderPreliminary(summary, request) {
   const coverage = summary.collectionCoverage || {};
   const scan = summary.collectionDiagnostics || {};
   const coverageText = coverage.available
-    ? `Meta administrativa: Feed ${coverage.actualFeed}/${coverage.expectedFeed} · Stories ${coverage.actualStories}/${coverage.expectedStories} · ${coverage.matches ? "contagens conferem" : "COLETA INCOMPLETA — divergência"}.`
+    ? `Meta administrativa: Feed ${coverage.actualFeed}/${coverage.expectedFeed} (faltam ${coverage.missingFeed}, excedentes ${coverage.excessFeed}) · Stories ${coverage.actualStories}/${coverage.expectedStories} (faltam ${coverage.missingStories}, excedentes ${coverage.excessStories}) · ${coverage.matches ? "contagens conferem" : "COLETA INCOMPLETA — divergência"}.`
     : "Sem meta administrativa correspondente à data para validar a quantidade.";
   const scanText = scan.historyRounds !== undefined
     ? `Varredura: ${scan.historyRounds} rodadas · ${scan.dateBoundaryReached ? "mensagem anterior à data inicial encontrada" : scan.stableBoundaryReached ? "topo do histórico detectado" : "fim do histórico não confirmado"} · ${summary.itemsWithoutDate ?? 0} itens sem data mantidos como candidatos.`
