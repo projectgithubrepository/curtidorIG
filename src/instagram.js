@@ -660,8 +660,8 @@ export async function inspectSavedCollection(page, collectionName) {
   if (!name) throw new Error("Informe o nome exato da coleção que será usada como origem.");
   // Descobre o perfil da sessão autenticada pela navegação do próprio Instagram.
   // Não fixa username de exemplo nem assume /saved/ sem o segmento do perfil.
-  const profileLink = page.locator('a[href^="/"]').filter({ has: page.locator('img') });
-  const profileCandidates = await page.locator('a[href^="/"]').evaluateAll(nodes => nodes
+  const profileLink = page.locator('nav a[href^="/"]').filter({ has: page.locator('img') });
+  const profileCandidates = await page.locator('nav a[href^="/"]').evaluateAll(nodes => nodes
     .map(anchor => ({
       href: anchor.getAttribute("href") || "",
       label: [anchor.getAttribute("aria-label"), anchor.getAttribute("title"), anchor.innerText].filter(Boolean).join(" ")
