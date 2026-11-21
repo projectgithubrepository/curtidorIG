@@ -157,7 +157,9 @@ app.get("/api/status", (_req, res) => res.json({
   running,
   connected: Boolean(browserContext),
   hasDiagnostic: Boolean(diagnosticReport),
-  progress
+  progress,
+  preliminarySummary: diagnosticReport?.summary || null,
+  request: diagnosticReport?.request || null
 }));
 app.get("/api/results", (_req, res) => res.json({ results }));
 app.get("/api/cleanup-results", (_req, res) => res.json({ results: cleanupResults, progress: cleanupProgress }));
