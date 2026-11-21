@@ -633,7 +633,9 @@ app.post("/api/start", async (req, res) => {
                   ? "Botão Salvar identificado (" + (inspection.observedState.saved ? "salva" : "não salva") + "), mas o inventário da coleção “" + collectionName + "” não foi carregado; a pasta correta não pode ser confirmada."
                   : !savedCollectionUrls?.has(collectionKey)
                     ? "Inventário carregado, mas esta publicação não consta na coleção “" + collectionName + "”."
-                    : "Estado salvo e presença na coleção confirmados.",
+                    : !inspection.observedState.saved
+                      ? "A coleção contém esta publicação, mas o botão Salvar indica estado não salvo; há divergência e nenhuma alteração deve ser feita."
+                      : "Estado salvo e presença na coleção confirmados.",
               commented: inspection.stateKnown?.commented
                 ? (inspection.inspectionDiagnostics?.stateVerification?.identifiedUsername
                   ? "Perfil @" + inspection.inspectionDiagnostics.stateVerification.identifiedUsername + " identificado; " + (inspection.observedState.commented ? "comentário encontrado entre os comentários visíveis." : "nenhum comentário correspondente encontrado entre os comentários visíveis; conteúdo não carregado pode não ter sido examinado.")
