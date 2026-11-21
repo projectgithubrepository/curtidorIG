@@ -103,7 +103,7 @@ app.get("/api/diagnostic-summary", (_req, res) => {
     `Coleção de destino "${report.request?.collectionName || "?"}": ${summary.savedCollectionInventoryAvailable ? "inventariada" : "NÃO localizada/inventariada"}`,
     ...(summary.savedCollectionInventoryError ? [`Falha da coleção: ${String(summary.savedCollectionInventoryError).replace(/\s+/g, " ").slice(0, 350)}`] : []),
     `Grupo coletivo: ${summary.destinationGroupVerification?.verified ? "confirmado" : "não confirmado"}${summary.destinationGroupVerification?.reason ? " — " + String(summary.destinationGroupVerification.reason).replace(/\s+/g, " ").slice(0, 300) : ""}`,
-    `Plano: ${summary.plannedActions ?? 0} etapas | aptas: ${summary.mappedActions ?? 0} | bloqueadas: ${summary.blockedActions ?? 0} | não verificadas: ${summary.unverifiedActions ?? 0} | inspeções interrompidas: ${summary.inspectionFailures ?? 0}`,
+    `Plano: ${summary.plannedActions ?? 0} etapas | aptas: ${summary.mappedActions ?? 0} | candidatas: ${summary.candidateActions ?? 0} | aguardando: ${summary.waitingActions ?? 0} | já concluídas: ${summary.alreadyDoneActions ?? 0} | dispensadas: ${summary.dispensedActions ?? 0} | bloqueadas: ${summary.blockedActions ?? 0} | não verificadas: ${summary.unverifiedActions ?? 0} | sem classificação: ${summary.unclassifiedActions ?? 0} | inspeções interrompidas: ${summary.inspectionFailures ?? 0}`,
     ...(warnings.length ? ["Avisos relevantes:", ...warnings] : ["Avisos relevantes: nenhum"]),
     `Gerado: ${report.generatedAt || "?"}`,
     "Resumo filtrado: sem URLs individuais, legendas, textos de mensagens, payloads, cookies, tokens ou senhas."
@@ -775,9 +775,14 @@ app.post("/api/start", async (req, res) => {
       const simulatedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^simulada/.test(action.status)).length, 0);
       const blockedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^bloqueada/.test(action.status)).length, 0);
       const unverifiedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^não verificada/.test(action.status)).length, 0);
-      const testIncomplete = mode === "test" && (inspectionFailures > 0 || captionUnavailable > 0 || unverifiedActions > 0 || blockedActions > 0 || storiesBlocked > 0 || !savedCollectionInventoryAvailable || collectionIncomplete);
+      const waitingActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^aguardando/.test(action.status)).length, 0);
+      const dispensedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^dispensada/.test(action.status)).length, 0);
+      const unclassifiedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action =>
+        !/^(simulada|não verificada|bloqueada|já concluída|dispensada|aguardando|candidata)/.test(action.status)
+      ).length, 0);
+      const testIncomplete = mode === "test" && (inspectionFailures > 0 || captionUnavailable > 0 || unverifiedActions > 0 || blockedActions > 0 || storiesBlocked > 0 || unclassifiedActions > 0 || !savedCollectionInventoryAvailable || collectionIncomplete);
       progress.message = mode === "test"
-        ? `TESTE ${testIncomplete ? "PARCIAL" : "CONCLUÍDO"}: ${inspectedFeedReels}/${collected.length} itens analisados; ${collectionCoverage.available ? `cobertura da administração: Feed ${actualFeedForDate}/${collectionCoverage.expectedFeed}, Stories ${actualStoriesForDate}/${collectionCoverage.expectedStories}; ` : ""}${withoutDate} candidatos sem data incluídos; ${withoutIdentity} sem identidade;  ${mappedActions} ações simuladas e aptas à execução automática, mas NÃO EXECUTADAS; ${candidateActions} candidatas aguardando verificação/pré-requisitos; ${alreadyDoneActions} já concluídas; ${blockedActions} bloqueadas; ${unverifiedActions} estados não verificados; ${storiesBlocked} Stories com etapas bloqueadas ou não verificadas; ${inspectionFailures} inspeções interrompidas; ${captionUnavailable} sem legenda legível; ${plannedActions} etapas no plano. Nenhuma ação foi executada.`
+        ? `TESTE ${testIncomplete ? "PARCIAL" : "CONCLUÍDO"}: ${inspectedFeedReels}/${collected.length} itens analisados; ${collectionCoverage.available ? `cobertura da administração: Feed ${actualFeedForDate}/${collectionCoverage.expectedFeed}, Stories ${actualStoriesForDate}/${collectionCoverage.expectedStories}; ` : ""}${withoutDate} candidatos sem data incluídos; ${withoutIdentity} sem identidade; ${mappedActions} ações simuladas e aptas à execução automática, mas NÃO EXECUTADAS; ${candidateActions} candidatas; ${waitingActions} aguardando etapas; ${alreadyDoneActions} já concluídas; ${dispensedActions} dispensadas; ${blockedActions} bloqueadas; ${unverifiedActions} não verificadas; ${unclassifiedActions} sem classificação; ${storiesBlocked} Stories com etapas bloqueadas ou não verificadas; ${inspectionFailures} inspeções interrompidas; ${captionUnavailable} sem legenda legível; ${plannedActions} etapas no plano. Nenhuma ação foi executada.`
         : mode === "manual" ? `Coleta ${collectionIncomplete ? "PARCIAL" : "concluída"}: ${results.length} itens preparados para execução manual; ${withoutDate} sem data e ${withoutIdentity} sem identidade.`
         : `Execução automática finalizada: ${results.length} itens analisados. Consulte o resultado de cada ação.`;
       logDiagnostic("INFO", "Coleta concluída", { listed: results.length, inspectionFailures, captionUnavailable, unverifiedActions, savedCollectionInventoryAvailable, networkResponses: network?.capturedResponses ?? 0 });
@@ -813,8 +818,11 @@ app.post("/api/start", async (req, res) => {
           candidateActions,
           alreadyDoneActions,
           simulatedActions,
+          waitingActions,
+          dispensedActions,
           blockedActions,
           unverifiedActions,
+          unclassifiedActions,
           savedCollectionInventoryAvailable,
           savedCollectionInventoryError: savedCollectionInventoryError || null
         },
