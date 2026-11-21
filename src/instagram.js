@@ -1408,8 +1408,12 @@ async function openStoryContent(page, url) {
     confirmationClicked = true;
     await page.waitForTimeout(1400);
     validatePage();
-    const stillVisible = await page.getByRole("button", { name: /^ver story$/i }).count().catch(() => 0);
-    if (stillVisible > 0) throw new Error("O botão “Ver story” permaneceu na tela após o clique; o conteúdo não foi confirmado como aberto.");
+    const remaining = page.getByRole("button", { name: /^ver story$/i });
+    let stillVisible = false;
+    for (let index = 0; index < await remaining.count(); index++) {
+      if (await remaining.nth(index).isVisible().catch(() => false)) stillVisible = true;
+    }
+    if (stillVisible) throw new Error("O botão “Ver story” permaneceu na tela após o clique; o conteúdo não foi confirmado como aberto.");
   } else {
     const screenText = await page.locator("body").innerText().catch(() => "");
     if (/ver story/i.test(screenText) && !/comentários|comments/i.test(screenText)) {
@@ -1452,7 +1456,7 @@ export async function inspectStory(page, url) {
     const commentListComplete=explicitEmpty||(expectedComments!==null&&commentNodes.length>=expectedComments&&!hasMoreComments);
     return { publicCommentAvailable:Boolean(publicField), publicCommentLabel:publicField ? [publicField.getAttribute("placeholder"),publicField.getAttribute("aria-label")].filter(Boolean).join(" ") : "", alreadyCommented, usernameKnown:Boolean(username), commentListComplete, expectedComments, commentRowsInspected:commentNodes.length, controls, bodyText };
   });
-  return { ...snapshot, storyOpen, stateKnown:{ publicCommentAvailable:snapshot.publicCommentAvailable, alreadyCommented:isCommentStateVerified({usernameKnown:snapshot.usernameKnown,alreadyCommented:snapshot.commentListComplete}) } };
+  return { ...snapshot, storyOpen, stateKnown:{ publicCommentAvailable:snapshot.publicCommentAvailable, alreadyCommented:isCommentStateVerified({usernameKnown:snapshot.usernameKnown,alreadyCommented:snapshot.alreadyCommented,commentListComplete:snapshot.commentListComplete}) } };
 }
 
 export async function executeStoryComment(page, url, comment) {
