@@ -18,8 +18,8 @@ function sameInstagramContentUrl(actualValue, requestedValue) {
   try {
     const actual=new URL(actualValue);
     const requested=new URL(requestedValue);
-    return /(^|\.)instagram\.com$/i.test(actual.hostname) &&
-      /(^|\.)instagram\.com$/i.test(requested.hostname) &&
+    return /^(?:www\.)?instagram\.com$/i.test(actual.hostname) &&
+      /^(?:www\.)?instagram\.com$/i.test(requested.hostname) &&
       actual.pathname.replace(/\/$/,"")===requested.pathname.replace(/\/$/,"");
   } catch { return false; }
 }
@@ -763,7 +763,7 @@ export async function inspectPost(page, url) {
 export function extractInstagramUsernameFromProfileHref(value, base = "https://www.instagram.com/") {
   try {
     const url = new URL(value, base);
-    if (!/(^|\.)instagram\.com$/i.test(url.hostname)) return "";
+    if (!/^(?:www\.)?instagram\.com$/i.test(url.hostname)) return "";
     const parts = url.pathname.split("/").filter(Boolean);
     if (parts.length !== 1) return "";
     const reserved = new Set(["accounts", "direct", "explore", "reels", "stories", "p", "reel", "tv", "saved"]);
@@ -1065,7 +1065,7 @@ async function readSavedToggle(page) {
 export async function unsaveSavedCollectionItem(page, url) {
   let target;
   try { target = new URL(url); } catch { return { url, status: "bloqueada — URL inválida" }; }
-  if (!/^www\.?instagram\.com$/i.test(target.hostname) || !/^\/(p|reel|tv)\//.test(target.pathname)) {
+  if (!/^(?:www\.)?instagram\.com$/i.test(target.hostname) || !/^\/(p|reel|tv)\//.test(target.pathname)) {
     return { url, status: "bloqueada — URL não é uma publicação válida do Instagram" };
   }
   await page.goto(target.href, { waitUntil: "domcontentloaded", timeout: 60000 });
