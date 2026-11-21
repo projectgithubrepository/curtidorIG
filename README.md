@@ -69,6 +69,13 @@ Esta seção consolida as regras funcionais que a aplicação deve seguir. As re
 - Consultar o histórico local para evitar repetir trabalho já confirmado.
 - Se o histórico da conversa não carregar por completo, não declarar que todo o período foi analisado.
 
+### 2.1 Stories e coleção de destino
+
+- A extração de Stories deve reconhecer permalinks e formatos de compartilhamento aninhados do Direct, sem teto de URLs por mensagem. Cada Story exige identidade verificável do autor e do ID.
+- A cobertura de Feed/Reels e Stories deve ser comparada separadamente com a mensagem administrativa da data selecionada. A divergência mantém o teste parcial; não se deve fabricar ou duplicar itens para atingir a meta.
+- A coleção de destino deve ser localizada pelo nome exato na área Salvos, inclusive quando o rótulo estiver em elemento irmão do link do cartão. A aplicação só confirma a pasta após navegar por um link inequívoco dentro de Salvos e inventariar seus itens.
+- Se a coleção não for localizada, o diagnóstico deve preservar URL da página, texto visível e motivo da falha; não assumir que qualquer publicação genericamente salva pertence à coleção escolhida.
+
 ### 3. Regras obrigatórias por publicação
 
 Aplicar as regras a cada publicação individualmente, considerando o pedido associado:
