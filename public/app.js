@@ -71,7 +71,7 @@ function render(items) {
     const type=document.createElement("small"); type.textContent=item.contentType === "story" ? "Story · fluxo específico ainda não automatizado" : "Feed / Reel";
     const stateLine=document.createElement("small");
     const task=item.taskState || { saved:false, savedFolderVerified:false, liked:false, commented:false, sharedToGroup:false, groupCheck:false };
-    stateLine.textContent = [`Salva: ${task.saved ? "confirmada" : "pendente"}`, `Pasta: ${task.savedFolderVerified ? "confirmada" : "pendente"}`, `Curtida: ${task.liked ? "confirmada" : "pendente"}`, `Comentário: ${task.commented ? "confirmado" : task.commentForbidden ? "dispensado pelo pedido" : "pendente"}`, `Enviado ao grupo: ${task.sharedToGroup ? "confirmado" : "pendente"}`, `Reação na mensagem: ${task.groupCheck ? "confirmada" : "pendente"}`].join(" · ");
+    stateLine.textContent = [`Salva: ${task.saved ? "confirmada" : "pendente"}`, `Pasta: ${task.savedFolderVerified ? "confirmada" : "pendente"}`, `Curtida: ${task.liked ? "confirmada" : "pendente"}`, `Comentário: ${task.commented ? "confirmado" : task.commentForbidden ? "dispensado pelo pedido" : "pendente"}`, `Enviado ao grupo: ${task.sharedToGroup ? "confirmado" : task.shareAttempted ? "verificar antes de reenviar" : "pendente"}`, `Reação na mensagem: ${task.groupCheck ? "confirmada" : "pendente"}`].join(" · ");
     const date=document.createElement("small"); date.textContent=item.sharedAt ? new Date(item.sharedAt).toLocaleString("pt-BR") : "Data não identificada";
     const markers=document.createElement("small");
     const milestoneCount=(item.administrativeMilestones || []).length;
