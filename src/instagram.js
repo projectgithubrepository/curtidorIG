@@ -749,8 +749,8 @@ export async function inspectStory(page, url) {
 
 export async function executeStoryComment(page, url, comment) {
   const text=String(comment||"").trim();
-  const words=text.match(/[\\p{L}\\p{N}]+/gu)||[];
-  if(words.length<2 || !/\\p{Extended_Pictographic}/u.test(text)) throw new Error("Comentário do Story precisa ter pelo menos duas palavras e um emoji.");
+  const words=text.match(/[\p{L}\p{N}]+/gu)||[];
+  if(words.length<2 || !/\p{Extended_Pictographic}/u.test(text)) throw new Error("Comentário do Story precisa ter pelo menos duas palavras e um emoji.");
   const state=await inspectStory(page,url);
   if(!state.publicCommentAvailable) throw new Error("Comentário público indisponível neste Story; nenhuma resposta privada será enviada.");
   if(!state.usernameKnown) throw new Error("Não foi possível confirmar a identidade do perfil para evitar comentário duplicado.");
