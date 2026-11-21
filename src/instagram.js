@@ -218,25 +218,38 @@ export function addNetworkMessages(records, { groupThreadId, startDate, endDate,
   let rejectedThread = 0;
   let rejectedUnscoped = 0;
   let rejectedIdentity = 0;
+  const storyUrlsObserved = new Set();
+  const storyUrlsAccepted = new Set();
+  const storyUrlsUnknownDate = new Set();
+  const storyUrlsRejectedThread = new Set();
+  const storyUrlsRejectedUnscoped = new Set();
+  const storyUrlsRejectedIdentity = new Set();
+  const storyUrlsRejectedAdministrative = new Set();
+  const storyUrlsRejectedOutsideDate = new Set();
   for (const record of records) {
+    const recordStories = (record.urls || []).filter(url => /\\/stories\\//i.test(url));
+    for (const url of recordStories) storyUrlsObserved.add(url);
     if (!groupThreadId || !record.threadId) {
+      for (const url of recordStories) storyUrlsRejectedUnscoped.add(url);
       rejectedUnscoped++;
       continue;
     }
     if (record.threadId !== groupThreadId) {
+      for (const url of recordStories) storyUrlsRejectedThread.add(url);
       rejectedThread++;
       continue;
     }
-    if (!record.messageId) { rejectedIdentity++; continue; }
+    if (!record.messageId) { for (const url of recordStories) storyUrlsRejectedIdentity.add(url); rejectedIdentity++; continue; }
     const text = record.text || "";
     if (text && isAdministrativeMessage(text)) {
       const marker = parseAdministrativeMilestone(text);
       if (marker) milestones.set(record.messageId, { ...marker, messageId: record.messageId, sharedAt: record.timestamp });
+      for (const url of recordStories) storyUrlsRejectedAdministrative.add(url);
       continue;
     }
     for (const url of record.urls || []) {
       const date = dateInRange(record.timestamp, startDate, endDate);
-      if (date.known && !date.inRange) continue;
+      if (date.known && !date.inRange) { if (/\\/stories\\//i.test(url)) storyUrlsRejectedOutsideDate.add(url); continue; }
       const item = {
         url,
         messageId: String(record.messageId),
@@ -260,6 +273,7 @@ export function addNetworkMessages(records, { groupThreadId, startDate, endDate,
         found.delete(url);
         found.set(identityKey, { ...previous, ...item, sharedAt: date.iso, dateUnknown: false, collectionMode: "network-date" });
         accepted++;
+        if (/\\/stories\\//i.test(url)) storyUrlsAccepted.add(url);
       } else {
         const previous = fallback.get(identityKey) || found.get(identityKey) || found.get(url) || {};
         const merged = { ...previous, ...item, dateUnknown: true, collectionMode: "network-date-unknown" };
@@ -273,10 +287,22 @@ export function addNetworkMessages(records, { groupThreadId, startDate, endDate,
         else if (found.has(identityKey)) found.set(identityKey, merged);
         else fallback.set(identityKey, merged);
         unknownDateCandidates++;
+        if (/\\/stories\\//i.test(url)) storyUrlsUnknownDate.add(url);
       }
     }
   }
-  return { accepted, unknownDateCandidates, rejectedThread, rejectedUnscoped, rejectedIdentity };
+  return { accepted, unknownDateCandidates, rejectedThread, rejectedUnscoped, rejectedIdentity,
+    storyCollection: {
+      uniqueNetworkStoryUrls: storyUrlsObserved.size,
+      acceptedInDateRange: storyUrlsAccepted.size,
+      pendingDateVerification: storyUrlsUnknownDate.size,
+      rejectedOtherThread: storyUrlsRejectedThread.size,
+      rejectedWithoutThread: storyUrlsRejectedUnscoped.size,
+      rejectedWithoutMessageId: storyUrlsRejectedIdentity.size,
+      rejectedAdministrativeMessage: storyUrlsRejectedAdministrative.size,
+      rejectedOutsideDateRange: storyUrlsRejectedOutsideDate.size
+    }
+  };
 }
 
 export async function collectGroupPosts(page, { groupName, startDate, endDate, shouldStop = () => false }) {
