@@ -898,7 +898,7 @@ export async function executeLike(page, url) {
   const likeState = await page.locator("article,main,[role='dialog']").first().evaluate(root => {
     const labels = [...root.querySelectorAll("button,[role=button]")].map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" ");
     if (/descurtir|unlike/i.test(labels)) return true;
-    if (/curtir|^like$/im.test(labels)) return false;
+    if (/curtir|\\blike\\b/i.test(labels)) return false;
     return null;
   }).catch(() => null);
   if (likeState === null) throw new Error("Estado da curtida não identificado com segurança; clique bloqueado para não desfazer uma curtida existente.");
@@ -1004,7 +1004,7 @@ export async function inspectDestinationGroup(page, destinationGroupName) {
   for (let round = 0; round < 150 && stalledRounds < MAX_STALLED_SCROLL_ROUNDS; round++) {
     for (const item of await readVisiblePostLinks(page)) sharedUrls.add(item.url);
     const scroll = await scrollToOlderMessages(page);
-    if (didReachHistoryStart(scroll.after, scroll.progressed)) {
+    if (didReachHistoryStart(scroll.after, scroll.progressed) || (!scroll.progressed && scroll.before?.found && isAtHistoryStart(scroll.before))) {
       sharedInventoryComplete = true;
       for (const item of await readVisiblePostLinks(page)) sharedUrls.add(item.url);
       break;
