@@ -402,9 +402,29 @@ app.post("/api/start", async (req, res) => {
           const comment = taskState.commented || instructions.comment === "forbidden" ? "" : createComment(inspection.caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
           const commentSource = inspection.caption?.trim() ? "legenda" : "fallback sem legenda";
           const stateKnown = {
-            liked: inspection.stateKnown?.liked ?? false,
-            saveToCollection: Boolean(savedCollectionInventoryAvailable && inspection.stateKnown?.saved),
-            commented: inspection.stateKnown?.commented ?? false
+            liked: inspection.stateKnown?.liked === true,
+            saved: inspection.stateKnown?.saved === true,
+            collectionMembership: Boolean(savedCollectionInventoryAvailable && savedCollectionUrls?.has(collectionKey)),
+            commented: inspection.stateKnown?.commented === true,
+            destinationGroupVerified: false,
+            reasons: {
+              liked: inspection.stateKnown?.liked
+                ? "Controle identificado; estado atual: " + (inspection.observedState.liked ? "já curtida" : "não curtida") + "."
+                : "Controle de curtida não reconhecido. Controles encontrados: " + (inspection.observedState.controlLabels || "nenhum") + ".",
+              saveToCollection: !inspection.stateKnown?.saved
+                ? "Controle Salvar/Remover dos salvos não reconhecido. Controles encontrados: " + (inspection.observedState.controlLabels || "nenhum") + "."
+                : !savedCollectionInventoryAvailable
+                  ? "Botão Salvar identificado (" + (inspection.observedState.saved ? "salva" : "não salva") + "), mas o inventário da coleção “" + collectionName + "” não foi carregado; a pasta correta não pode ser confirmada."
+                  : !savedCollectionUrls?.has(collectionKey)
+                    ? "Inventário carregado, mas esta publicação não consta na coleção “" + collectionName + "”."
+                    : "Estado salvo e presença na coleção confirmados.",
+              commented: inspection.stateKnown?.commented
+                ? (inspection.inspectionDiagnostics?.stateVerification?.identifiedUsername
+                  ? "Perfil @" + inspection.inspectionDiagnostics.stateVerification.identifiedUsername + " identificado; " + (inspection.observedState.commented ? "comentário encontrado entre os comentários visíveis." : "nenhum comentário correspondente encontrado entre os comentários visíveis; conteúdo não carregado pode não ter sido examinado.")
+                  : "Perfil identificado; comentários visíveis examinados.")
+                : (inspection.inspectionDiagnostics?.stateVerification?.commentInspectionReason || "Perfil do usuário não identificado; não foi possível verificar comentários anteriores."),
+              shareToGroup: "O grupo coletivo “" + destinationGroupName + "” não foi aberto/localizado para confirmar o destino nesta etapa."
+            }
           };
           const actionLog = [];
           if (mode === "automatic" && !item.identityVerified) {
@@ -464,8 +484,11 @@ app.post("/api/start", async (req, res) => {
           const result = { ...item, caption:inspection.caption, comment, taskState, commentSource, instructionSummary:{comment:instructions.comment,shareToGroup:instructions.shareToGroup}, stateVerification:{
             liked:inspection.observedState.liked, likedKnown:Boolean(inspection.stateKnown?.liked),
             saved:inspection.observedState.saved, savedKnown:Boolean(inspection.stateKnown?.saved),
+            collectionMembershipKnown:Boolean(savedCollectionInventoryAvailable), collectionMembership:stateKnown.collectionMembership,
             commented:inspection.observedState.commented, commentedKnown:Boolean(inspection.stateKnown?.commented),
-            controlCount:inspection.observedState.controlCount || 0, controlLabels:inspection.observedState.controlLabels || ""
+            destinationGroupVerified:stateKnown.destinationGroupVerified, reasons:stateKnown.reasons,
+            controlCount:inspection.observedState.controlCount || 0, controlLabels:inspection.observedState.controlLabels || "",
+            diagnostics:inspection.inspectionDiagnostics?.stateVerification || null
           }, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
           results.push(result);
           appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,completionEmoji,commentForbidden:instructions.comment==="forbidden",complete:taskState.complete,milestone:item.administrativeMilestones,detail:mode==="test"?"Simulação sem ações":"Planejamento e execução da publicação"});
@@ -494,7 +517,7 @@ app.post("/api/start", async (req, res) => {
       const actionTotals = {};
       for (const item of results) for (const action of (item.plan || [])) {
         const key = action.action;
-        if (!actionTotals[key]) actionTotals[key] = { total: 0, simulated: 0, unverified: 0, blocked: 0, done: 0, candidate: 0, dispensed: 0, waiting: 0 };
+        if (!actionTotals[key]) actionTotals[key] = { total: 0, simulated: 0, unverified: 0, blocked: 0, done: 0, candidate: 0, dispensed: 0, waiting: 0, unclassified: 0 };
         const bucket = actionTotals[key];
         bucket.total++;
         if (/^simulada/.test(action.status)) bucket.simulated++;
@@ -503,10 +526,11 @@ app.post("/api/start", async (req, res) => {
         else if (/^já concluída/.test(action.status)) bucket.done++;
         else if (/^dispensada/.test(action.status)) bucket.dispensed++;
         else if (/^aguardando/.test(action.status)) bucket.waiting++;
+        else bucket.unclassified++;
         if (action.testMode?.candidate) bucket.candidate++;
       }
       const preliminaryLines = Object.entries(actionTotals).map(([key,value]) =>
-        `- ${actionLabels[key] || key}: ${value.total} previstas | ${value.simulated} simuladas aptas | ${value.unverified} não verificadas | ${value.blocked} bloqueadas | ${value.done} já concluídas`
+        `- ${actionLabels[key] || key}: ${value.total} previstas | ${value.simulated} aptas no TESTE | ${value.candidate} candidatas | ${value.waiting} aguardando etapas | ${value.unverified} não verificadas | ${value.blocked} bloqueadas | ${value.done} já concluídas | ${value.unclassified} sem classificação`
       );
       const plannedActions = results.reduce((sum,item) => sum + (item.plan?.length || 0), 0);
       const mappedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => action.testMode?.mapped).length, 0);
