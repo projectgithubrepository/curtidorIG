@@ -4,6 +4,7 @@ import { isAdministrativeMessage, parseAdministrativeMilestone } from "./group-s
 import { createInstagramNetworkCapture } from "./instagram-network-capture.js";
 
 const PROFILE_DIR = path.resolve("data", "instagram-profile");
+const MAX_STALLED_SCROLL_ROUNDS = 8;
 
 export async function openInstagram() {
   return chromium.launchPersistentContext(PROFILE_DIR, {
@@ -318,12 +319,13 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   let scrollTargetFound = false;
   let dateBoundaryReached = false;
   let historyBoundaryReached = false;
+  let historyStalled = false;
   let oldestVisibleDate = "";
 
   // Não interrompe a varredura só porque ainda não encontrou links:
   // conversas longas podem começar com dezenas de mensagens administrativas.
   // Continua subindo até detectar o topo/ausência real de carregamento do histórico.
-  for (let round = 0; round < 70 && !shouldStop(); round++) {
+  while (!shouldStop() && !dateBoundaryReached && !historyBoundaryReached && !historyStalled) {
     historyRounds++;
     for (const marker of await readVisibleAdministrativeMilestones(page)) milestones.set(marker.text, marker);
     const batch = await readVisiblePostLinks(page);
@@ -348,6 +350,10 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     // permanece incompleto até o limite global, em vez de declarar fim do histórico.
     if (isAtHistoryStart(scroll.after)) {
       historyBoundaryReached = true;
+      break;
+    }
+    if (noScrollProgressRounds >= MAX_STALLED_SCROLL_ROUNDS) {
+      historyStalled = true;
       break;
     }
   }
@@ -398,11 +404,10 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     stableBoundaryReached: historyBoundaryReached,
     dateBoundaryReached,
     oldestVisibleDate,
-    scanLimitReached: historyRounds >= 70 && !historyBoundaryReached && !shouldStop(),
+    historyStalled,
     stoppedByUser: Boolean(shouldStop()),
     visibleItems: found.size,
     unknownDateCandidates: fallback.size,
-    networkResponseLimitReached: networkDiagnostics.capturedResponses >= 500
   };
   // Não descartar silenciosamente mensagens com link e identidade, mas sem timestamp.
   // Elas seguem para inspeção como candidatas com data desconhecida e não entram na contagem
