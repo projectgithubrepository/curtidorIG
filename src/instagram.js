@@ -1162,6 +1162,7 @@ export async function executeSaveToCollection(page, url, collectionName, knownCo
     return [...own,...nested].filter(Boolean).join(" ");
   }).join(" | "));
   const isSaved = /remover dos salvos|remove from saved|remove saved|unsave/i.test(labels);
+  if (!isSaved && knownCollectionUrls?.has(key)) throw new Error("A coleção contém esta publicação, mas o botão Salvar indica estado não salvo. Há divergência entre o controle e o inventário; nenhuma alteração foi feita.");
   if (isSaved) {
     if (knownCollectionUrls?.has(key)) return { saved:true,savedFolderVerified:true,status:"já salva na coleção correta — não repetida" };
     if (!knownCollectionUrls && await (async()=>{const collection=await inspectSavedCollection(page,collectionName);return collection.items.some(item=>savedCollectionKey(item.url)===key);})()) return { saved:true,savedFolderVerified:true,status:"já salva na coleção correta — não repetida" };
