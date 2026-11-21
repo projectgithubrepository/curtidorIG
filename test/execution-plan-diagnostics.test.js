@@ -77,3 +77,24 @@ test("salvamento já existente exige confirmação da coleção exata", () => {
   assert.match(save.status, /^bloqueada/);
   assert.match(save.reason, /coleção confirmada|inclusão não foi comprovada/i);
 });
+
+
+test("completion reaction is not apt without the original group message identity", () => {
+  const plan = buildExecutionPlan({
+    ...base,
+    taskState: {
+      liked:true, saved:true, savedFolderVerified:true,
+      commented:true, sharedToGroup:true, groupCheck:false
+    },
+    stateKnown: {
+      liked:true, savedStateKnown:true, saved:true,
+      collectionInventoryAvailable:true, collectionMembership:true,
+      commented:true, destinationGroupVerified:true,
+      messageIdentityVerified:false,
+      reasons:{ messageIdentityVerified:"ID da mensagem original não foi capturado." }
+    }
+  });
+  const reaction = plan.find(entry => entry.action === "completionReaction");
+  assert.match(reaction.status, /^não verificada/);
+  assert.match(reaction.reason, /ID da mensagem original não foi capturado/);
+});
