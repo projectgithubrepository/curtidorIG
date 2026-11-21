@@ -697,7 +697,7 @@ app.post("/api/start", async (req, res) => {
         startedAt,
         finishedAt: new Date().toISOString(),
         outcome: stopRequested ? "interrompida" : (testIncomplete || collectionIncomplete) ? "parcial" : "concluída",
-        request: { groupName, collectionName, destinationGroupName, mode, completionEmoji, startDate, endDate },
+        request: { groupName, collectionName, collectionUrl, destinationGroupName, destinationGroupUrl, mode, completionEmoji, startDate, endDate },
         summary: {
           publicationsFound: collected.length,
           publicationsInspected: inspectedFeedReels,
