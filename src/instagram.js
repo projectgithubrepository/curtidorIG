@@ -1381,12 +1381,46 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
 }
 
 
+async function openStoryContent(page, url) {
+  let requested;
+  try { requested = new URL(url); } catch { throw new Error("URL do Story inválida."); }
+  if (requested.hostname !== "www.instagram.com" || !/^\/stories\/[^/]+\/\d+\/?$/.test(requested.pathname)) {
+    throw new Error("O endereço informado não é um Story canônico do Instagram.");
+  }
+  await page.goto(requested.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForTimeout(900);
+  const validatePage = () => {
+    if (/\/accounts\/login/.test(page.url())) throw new Error("Sessão do Instagram não autenticada.");
+    if (/challenge|checkpoint|suspended/i.test(page.url())) throw new Error("Instagram apresentou uma etapa de segurança; Story não analisado.");
+    if (!sameInstagramContentUrl(page.url(), requested.href)) throw new Error("O Instagram não abriu o Story solicitado; nenhuma ação será planejada para outro conteúdo.");
+  };
+  validatePage();
+  const confirmation = page.getByRole("button", { name: /^ver story$/i });
+  const visible = [];
+  for (let index = 0; index < await confirmation.count(); index++) {
+    const button = confirmation.nth(index);
+    if (await button.isVisible().catch(() => false)) visible.push(button);
+  }
+  if (visible.length > 1) throw new Error("Mais de um botão “Ver story” foi encontrado; abertura cancelada por ambiguidade.");
+  let confirmationClicked = false;
+  if (visible.length === 1) {
+    await visible[0].click();
+    confirmationClicked = true;
+    await page.waitForTimeout(1400);
+    validatePage();
+    const stillVisible = await page.getByRole("button", { name: /^ver story$/i }).count().catch(() => 0);
+    if (stillVisible > 0) throw new Error("O botão “Ver story” permaneceu na tela após o clique; o conteúdo não foi confirmado como aberto.");
+  } else {
+    const screenText = await page.locator("body").innerText().catch(() => "");
+    if (/ver story/i.test(screenText) && !/comentários|comments/i.test(screenText)) {
+      throw new Error("A tela de confirmação “Ver story” foi detectada, mas o botão não pôde ser identificado com segurança.");
+    }
+  }
+  return { confirmationClicked, confirmationLabel: confirmationClicked ? "Ver story" : "" };
+}
+
 export async function inspectStory(page, url) {
-  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-  await page.waitForTimeout(1200);
-  if (/accounts\/login/.test(page.url())) throw new Error("Sessão do Instagram não autenticada.");
-  if (/challenge|checkpoint|suspended/i.test(page.url())) throw new Error("Instagram apresentou uma etapa de segurança; Story não analisado.");
-  if (!sameInstagramContentUrl(page.url(),url)) throw new Error("O Instagram não abriu o Story solicitado; nenhuma ação será planejada para outro conteúdo.");
+  const storyOpen = await openStoryContent(page, url);
   await expandVisibleCommentThreads(page);
   const snapshot = await page.evaluate(() => {
     const visible = node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; };
@@ -1418,7 +1452,7 @@ export async function inspectStory(page, url) {
     const commentListComplete=explicitEmpty||(expectedComments!==null&&commentNodes.length>=expectedComments&&!hasMoreComments);
     return { publicCommentAvailable:Boolean(publicField), publicCommentLabel:publicField ? [publicField.getAttribute("placeholder"),publicField.getAttribute("aria-label")].filter(Boolean).join(" ") : "", alreadyCommented, usernameKnown:Boolean(username), commentListComplete, expectedComments, commentRowsInspected:commentNodes.length, controls, bodyText };
   });
-  return { ...snapshot, stateKnown:{ publicCommentAvailable:snapshot.publicCommentAvailable, alreadyCommented:isCommentStateVerified({usernameKnown:snapshot.usernameKnown,alreadyCommented:snapshot.alreadyCommented,commentListComplete:snapshot.commentListComplete}) } };
+  return { ...snapshot, storyOpen, stateKnown:{ publicCommentAvailable:snapshot.publicCommentAvailable, alreadyCommented:isCommentStateVerified({usernameKnown:snapshot.usernameKnown,alreadyCommented:snapshot.commentListComplete}) } };
 }
 
 export async function executeStoryComment(page, url, comment) {
@@ -1457,15 +1491,7 @@ export async function executeStoryShareToGroup(page, url, destinationGroupName, 
   const currentState=getGroupShareState(url,groupInventory);
   if(currentState==="already-shared") return {sharedToGroup:true,status:"Story já encontrado no grupo coletivo — não reenviado"};
   if(currentState!=="not-shared") throw new Error("Não foi possível comprovar se o Story já está no grupo coletivo; envio bloqueado para evitar duplicidade.");
-  let requested;
-  try { requested=new URL(url); } catch { throw new Error("URL do Story inválida."); }
-  if(requested.hostname!=="www.instagram.com" || !/^\/stories\/[^/]+\/\d+\/?$/.test(requested.pathname)) throw new Error("O endereço informado não é um Story canônico do Instagram.");
-  await page.goto(requested.href,{waitUntil:"domcontentloaded",timeout:60000});
-  await page.waitForTimeout(1000);
-  if(/\/accounts\/login/.test(page.url())) throw new Error("Instagram solicitou login antes do compartilhamento do Story.");
-  let opened;
-  try { opened=new URL(page.url()); } catch { throw new Error("O Instagram abriu um endereço inválido para o Story."); }
-  if(opened.origin!==requested.origin || opened.pathname.replace(/\/$/,"")!==requested.pathname.replace(/\/$/,"")) throw new Error("O Instagram redirecionou para outro conteúdo; Story não compartilhado.");
+  await openStoryContent(page, url);
   const share=await uniqueButton(page,[/\b(?:compartilhar|share|enviar)\b/i],"main,[role='dialog']");
   await share.click();
   await page.waitForTimeout(700);
