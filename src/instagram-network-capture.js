@@ -113,6 +113,42 @@ function collectUrls(value, output, seen = new WeakSet(), depth = 0) {
   else for (const child of Object.values(value)) collectUrls(child, output, seen, depth + 1);
 }
 
+function storyIdentity(value, depth = 0, seen = new WeakSet()) {
+  if (!value || typeof value !== "object" || depth > 8 || seen.has(value)) return { username: "", storyId: "" };
+  seen.add(value);
+  const username = String(value.username ?? value.user?.username ?? value.owner?.username ?? value.author?.username ?? "");
+  const candidates = [value.story_id, value.pk, value.media_id, value.id];
+  const rawId = candidates.find(item => item != null && /^\d+(?:_\d+)?$/.test(String(item)));
+  let storyId = rawId == null ? "" : String(rawId).split("_")[0];
+  let nested = { username: "", storyId: "" };
+  for (const child of Object.values(value)) {
+    if (child && typeof child === "object") {
+      nested = storyIdentity(child, depth + 1, seen);
+      if (nested.username && nested.storyId) break;
+    }
+  }
+  return { username: username || nested.username, storyId: storyId || nested.storyId };
+}
+
+function collectStoryUrls(value, output, seen = new WeakSet(), depth = 0) {
+  if (!value || typeof value !== "object" || depth > MAX_DEPTH || seen.has(value)) return;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    value.forEach(item => collectStoryUrls(item, output, seen, depth + 1));
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (/^(story_share|shared_story|story_media|story_item)$/i.test(key) && child && typeof child === "object") {
+      const identity = storyIdentity(child);
+      if (identity.username && identity.storyId) {
+        const url = "https://www.instagram.com/stories/" + identity.username + "/" + identity.storyId;
+        if (!output.includes(url) && output.length < MAX_URLS_PER_MESSAGE) output.push(url);
+      }
+    }
+    if (child && typeof child === "object") collectStoryUrls(child, output, seen, depth + 1);
+  }
+}
+
 function collectMediaCodes(value, output, seen = new WeakSet(), depth = 0, insideShare = false) {
   if (!value || typeof value !== "object" || depth > MAX_DEPTH || seen.has(value)) return;
   seen.add(value);
@@ -126,9 +162,13 @@ function collectMediaCodes(value, output, seen = new WeakSet(), depth = 0, insid
     value.video_versions || value.carousel_media || value.__typename === "XDTMedia");
   if (code && (ownMediaContext || insideShare) && /^[A-Za-z0-9_-]{5,}$/.test(String(code))) {
     const productType = String(value.product_type || "").toLowerCase();
-    const path = productType === "clips" ? "reel" : "p";
-    const url = "https://www.instagram.com/" + path + "/" + String(code);
-    if (!output.includes(url) && output.length < MAX_URLS_PER_MESSAGE) output.push(url);
+    // Story IDs não são shortcodes de Feed. Só criamos URLs de Story quando
+    // há uma estrutura explícita de story_share/shared_story com perfil e ID.
+    if (productType !== "story" && productType !== "stories") {
+      const path = productType === "clips" ? "reel" : "p";
+      const url = "https://www.instagram.com/" + path + "/" + String(code);
+      if (!output.includes(url) && output.length < MAX_URLS_PER_MESSAGE) output.push(url);
+    }
   }
   for (const [key, child] of Object.entries(value)) {
     const childIsShare = insideShare || /^(share|media_share|xma|shared_media|media)$/i.test(key);
@@ -196,6 +236,7 @@ function extractPayload(payload, context = {}) {
       messageIds.add(id);
       const urls = [];
       collectUrls(value, urls);
+      collectStoryUrls(value, urls);
       collectMediaCodes(value, urls);
       const timestamp = normalizeTimestamp(value.timestamp_ms ?? value.timestamp ?? value.created_at ?? value.sent_at);
       const text = messageText(value);
