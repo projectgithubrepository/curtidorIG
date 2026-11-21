@@ -183,10 +183,11 @@ async function scrollToOlderMessages(page) {
 
   // Só usa a roda do mouse se o scroll programático não moveu o contêiner.
   // Isso evita aplicar duas rolagens em sequência e causar efeito de "piscar".
+  // Só considerar avanço quando o contêiner realmente se deslocou na direção
+  // do histórico antigo. Crescimento de scrollHeight/DOM pode ocorrer sem rolagem
+  // e não comprova que mensagens anteriores foram alcançadas.
   const moved = before.found && after.found &&
-    (after.scrollTop < before.scrollTop - 2 ||
-      after.scrollHeight > before.scrollHeight + 20 ||
-      after.messageMarkers > before.messageMarkers);
+    after.scrollTop < before.scrollTop - 2;
   if (!moved) {
     const point = before.found
       ? { x: before.left + Math.round(before.width / 2), y: before.top + Math.round(before.height / 2) }
@@ -199,9 +200,7 @@ async function scrollToOlderMessages(page) {
   }
 
   const progressed = before.found && after.found &&
-    (after.scrollTop < before.scrollTop - 2 ||
-      after.scrollHeight > before.scrollHeight + 20 ||
-      after.messageMarkers > before.messageMarkers);
+    after.scrollTop < before.scrollTop - 2;
   return { progressed, before, after, usedWheelFallback };
 }
 
@@ -315,6 +314,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   let lastScrollState = null;
   let scrollTargetFound = false;
   let dateBoundaryReached = false;
+  let historyBoundaryReached = false;
   let oldestVisibleDate = "";
 
   // Não interrompe a varredura só porque ainda não encontrou links:
@@ -340,8 +340,13 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     if (scroll.usedWheelFallback) wheelFallbackRounds++;
     noScrollProgressRounds = scroll.progressed ? 0 : noScrollProgressRounds + 1;
     if (scroll.progressed) scrollProgressRounds++;
-    // Garante uma varredura mínima antes de concluir que chegou ao início.
-    if (historyRounds >= 12 && noScrollProgressRounds >= 6) break;
+    // Só confirma o início quando o contêiner de mensagens está no topo.
+    // Falta de movimento fora do topo não encerra a varredura: o diagnóstico
+    // permanece incompleto até o limite global, em vez de declarar fim do histórico.
+    if (isAtHistoryStart(scroll.after)) {
+      historyBoundaryReached = true;
+      break;
+    }
   }
 
   await networkCapture.stop();
@@ -380,7 +385,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   }
 
   const milestoneList = [...milestones.values()];
-  const historyBoundaryReached = dateBoundaryReached || isAtHistoryStart(lastScrollState?.after);
+  historyBoundaryReached = historyBoundaryReached || dateBoundaryReached || isAtHistoryStart(lastScrollState?.after);
   const collectionDiagnostics = {
     historyRounds,
     scrollProgressRounds,
