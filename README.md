@@ -72,6 +72,9 @@ Esta seção consolida as regras funcionais que a aplicação deve seguir. As re
 ### 2.1 Stories e coleção de destino
 
 - A extração de Stories deve reconhecer permalinks e formatos de compartilhamento aninhados do Direct, sem teto de URLs por mensagem. Cada Story exige identidade verificável do autor e do ID.
+- Ao receber versões incrementais da mesma mensagem em respostas de rede diferentes, unir todos os links/IDs extraídos; uma resposta parcial nunca pode substituir uma versão anterior mais completa.
+- Reconhecer marcadores de Story em nomes de campos versionados e em metadados como `media_product_type`, `item_type`, `share_type` e `attachment_type`, inclusive em estruturas XMA profundas.
+- A varredura da área Salvos deve abrir a aba **Coleções/Collections** quando ela existir antes de procurar a pasta nomeada. O inventário só é confirmado após localizar um link inequívoco da coleção e ler os itens da página correspondente.
 - A cobertura de Feed/Reels e Stories deve ser comparada separadamente com a mensagem administrativa da data selecionada. A divergência mantém o teste parcial; não se deve fabricar ou duplicar itens para atingir a meta.
 - A coleção de destino deve ser localizada pelo nome exato na área Salvos, inclusive quando o rótulo estiver em elemento irmão do link do cartão. A aplicação só confirma a pasta após navegar por um link inequívoco dentro de Salvos e inventariar seus itens.
 - Se a coleção não for localizada, o diagnóstico deve preservar URL da página, texto visível e motivo da falha; não assumir que qualquer publicação genericamente salva pertence à coleção escolhida.
