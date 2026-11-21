@@ -75,8 +75,28 @@ export function buildExecutionPlan({
     } else if (mode === "test") status = "simulada — nenhuma ação executada";
     else if (mode === "manual") status = "aguardando ação manual";
     else status = "pronta para execução";
-    const mappedInTest = mode === "test" && !item.alreadyDone && item.eligible && item.policy !== "forbidden" && !status.startsWith("bloqueada") && !status.startsWith("dispensada");
-    return { ...item, status, reason, sequence: index + 1, ...(mode === "test" ? { testMode: { mapped: mappedInTest, executed: false, label: mappedInTest ? "MAPEADA — seria considerada na execução automática; NÃO EXECUTADA no modo TESTE" : "não mapeada para execução: " + status } } : {}) };
+    const mappedInTest = mode === "test" && status.startsWith("simulada");
+    const candidateInTest = mode === "test" && !item.alreadyDone && item.eligible &&
+      item.policy !== "forbidden" && !status.startsWith("bloqueada") &&
+      !status.startsWith("dispensada");
+    return {
+      ...item,
+      status,
+      reason,
+      sequence: index + 1,
+      ...(mode === "test" ? {
+        testMode: {
+          mapped: mappedInTest,
+          candidate: candidateInTest,
+          executed: false,
+          label: mappedInTest
+            ? "AÇÃO APTA — seria executada no AUTOMÁTICO; não foi executada no TESTE"
+            : candidateInTest
+              ? "CANDIDATA — depende da confirmação do estado/pré-requisitos; não foi executada"
+              : "NÃO EXECUTÁVEL — " + status
+        }
+      } : {})
+    };
   });
 }
 
