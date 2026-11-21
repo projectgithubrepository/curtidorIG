@@ -939,9 +939,13 @@ async function readSavedToggle(page) {
     const labels = controls.filter(node => {
       const rect = node.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;
-    }).map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ").trim()).filter(Boolean);
-    if (labels.some(label => /remover dos salvos|remove from saved|remove saved/i.test(label))) return "saved";
-    if (labels.some(label => /^(salvar|save|salvar publicação|save post)$/i.test(label))) return "unsaved";
+    }).map(node => {
+      const own=[node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,node.getAttribute("data-testid")];
+      const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")]);
+      return [...own,...nested].filter(Boolean).join(" ").trim();
+    }).filter(Boolean);
+    if (labels.some(label => /remover dos salvos|remove from saved|remove saved|unsave/i.test(label))) return "saved";
+    if (labels.some(label => /^(salvar|save|salvar publicação|save post|adicionar aos salvos|add to saved)$/i.test(label))) return "unsaved";
     return "unknown";
   }).catch(() => "unknown");
 }
@@ -968,7 +972,11 @@ export async function unsaveSavedCollectionItem(page, url) {
   for (let index = 0; index < await controls.count(); index++) {
     const control = controls.nth(index);
     if (!(await control.isVisible().catch(() => false))) continue;
-    const label = await control.evaluate(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ").trim());
+    const label = await control.evaluate(node => {
+      const own=[node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,node.getAttribute("data-testid")];
+      const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")]);
+      return [...own,...nested].filter(Boolean).join(" ").trim();
+    });
     if (/remover dos salvos|remove from saved|remove saved/i.test(label)) matches.push(control);
   }
   if (matches.length !== 1) return { url, status: "bloqueada — controle explícito de remover dos salvos não identificado de forma única" };
@@ -986,9 +994,11 @@ function visibleButton(page, patterns, root = "article,main,[role='dialog']") {
       const rect = node.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;
     });
-    return visible.map(node => ({
-      label: [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText].filter(Boolean).join(" ").trim()
-    })).filter(item => regexSources.some(source => new RegExp(source, "i").test(item.label)));
+    return visible.map(node => {
+      const own=[node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,node.getAttribute("data-testid")];
+      const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")]);
+      return {label:[...own,...nested].filter(Boolean).join(" ").trim()};
+    }).filter(item => regexSources.some(source => new RegExp(source, "i").test(item.label)));
   }, names.map(regex => regex.source));
 }
 
@@ -1003,7 +1013,11 @@ export async function executeLike(page, url) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
   const likeState = await page.locator("article,main,[role='dialog']").first().evaluate(root => {
-    const labels = [...root.querySelectorAll("button,[role=button]")].map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" ");
+    const labels = [...root.querySelectorAll("button,[role=button]")].map(node => {
+      const own=[node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,node.getAttribute("data-testid")];
+      const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")]);
+      return [...own,...nested].filter(Boolean).join(" ");
+    }).join(" ");
     if (/descurtir|unlike/i.test(labels)) return true;
     if (/curtir|\\blike\\b/i.test(labels)) return false;
     return null;
@@ -1028,8 +1042,12 @@ export async function executeSaveToCollection(page, url, collectionName, knownCo
   await page.waitForTimeout(1200);
   const key = savedCollectionKey(url);
   const root = page.locator("article,main,[role='dialog']").first();
-  const labels = await root.locator("button,[role='button']").evaluateAll(nodes => nodes.map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" | "));
-  const isSaved = /remover dos salvos|remove from saved/i.test(labels);
+  const labels = await root.locator("button,[role='button']").evaluateAll(nodes => nodes.map(node => {
+    const own=[node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,node.getAttribute("data-testid")];
+    const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")]);
+    return [...own,...nested].filter(Boolean).join(" ");
+  }).join(" | "));
+  const isSaved = /remover dos salvos|remove from saved|remove saved|unsave/i.test(labels);
   if (isSaved) {
     if (knownCollectionUrls?.has(key)) return { saved:true,savedFolderVerified:true,status:"já salva na coleção correta — não repetida" };
     if (!knownCollectionUrls && await (async()=>{const collection=await inspectSavedCollection(page,collectionName);return collection.items.some(item=>savedCollectionKey(item.url)===key);})()) return { saved:true,savedFolderVerified:true,status:"já salva na coleção correta — não repetida" };
@@ -1048,7 +1066,11 @@ export async function executeSaveToCollection(page, url, collectionName, knownCo
   const save = dialog.getByRole("button", { name: /concluir|done|salvar|save/i }).last();
   if (await save.count() && await save.isVisible().catch(() => false)) await save.click();
   await page.waitForTimeout(800);
-  const finalLabels = await root.locator("button,[role='button']").evaluateAll(nodes => nodes.map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" | ")).catch(() => "");
+  const finalLabels = await root.locator("button,[role='button']").evaluateAll(nodes => nodes.map(node => {
+    const own=[node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,node.getAttribute("data-testid")];
+    const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")]);
+    return [...own,...nested].filter(Boolean).join(" ");
+  }).join(" | ")).catch(() => "");
   if (!/remover dos salvos|remove from saved/i.test(finalLabels)) throw new Error("O Instagram não confirmou o estado salvo após selecionar a coleção.");
   knownCollectionUrls?.add(key);
   return { saved:true,savedFolderVerified:true,status:"salva na coleção e verificada pelo seletor e estado salvo" };
@@ -1237,7 +1259,7 @@ export async function inspectStory(page, url) {
     const commentListComplete=explicitEmpty||(expectedComments!==null&&commentNodes.length>=expectedComments&&!hasMoreComments);
     return { publicCommentAvailable:Boolean(publicField), publicCommentLabel:publicField ? [publicField.getAttribute("placeholder"),publicField.getAttribute("aria-label")].filter(Boolean).join(" ") : "", alreadyCommented, usernameKnown:Boolean(username), commentListComplete, expectedComments, commentRowsInspected:commentNodes.length, controls, bodyText };
   });
-  return { ...snapshot, stateKnown:{ publicCommentAvailable:true, alreadyCommented:isCommentStateVerified({usernameKnown:snapshot.usernameKnown,alreadyCommented:snapshot.alreadyCommented,commentListComplete:snapshot.commentListComplete}) } };
+  return { ...snapshot, stateKnown:{ publicCommentAvailable:snapshot.publicCommentAvailable, alreadyCommented:isCommentStateVerified({usernameKnown:snapshot.usernameKnown,alreadyCommented:snapshot.alreadyCommented,commentListComplete:snapshot.commentListComplete}) } };
 }
 
 export async function executeStoryComment(page, url, comment) {
