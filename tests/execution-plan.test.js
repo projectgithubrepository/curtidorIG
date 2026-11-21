@@ -54,14 +54,15 @@ test("completion flower waits for all mandatory and requested actions", () => {
     mode: "test",
     collectionName: "Curtido",
     taskState: { liked: true, saved: true, savedFolderVerified: true, commented: true },
-    instructions: { comment: "required", shareToGroup: "required" }
+    instructions: { comment: "required", shareToGroup: "required" },
+    stateKnown: { messageIdentityVerified: true }
   });
   assert.match(plan[4].status, /^aguardando/);
   assert.equal(summarizeExecutionPlan(plan).optional, 0);
 });
 
 test("missing destination collection blocks mandatory save and completion reaction", () => {
-  const plan = buildExecutionPlan({ mode: "test", comment: "Comentário válido 🌸" });
+  const plan = buildExecutionPlan({ mode: "test", comment: "Comentário válido 🌸", stateKnown: { messageIdentityVerified: true } });
   assert.equal(plan[1].status, "bloqueada");
   assert.match(plan[4].status, /^aguardando/);
 });
