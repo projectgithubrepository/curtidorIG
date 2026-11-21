@@ -369,3 +369,65 @@ test("does not misclassify a Story shortcode as a Feed permalink", async () => {
   await capture.stop();
   assert.deepEqual(capture.records()[0].urls, ["https://www.instagram.com/stories/story.creator/390000000000000034"]);
 });
+
+test("merges Story links across incremental responses for the same Direct message", async () => {
+  const page = new EventEmitter();
+  page.url = () => "https://www.instagram.com/direct/t/1783131735658148";
+  const capture = createInstagramNetworkCapture(page);
+  const emitStoryResponse = (storyId) => page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql",
+    status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({
+      postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: {} }),
+      url: () => "https://www.instagram.com/api/graphql"
+    }),
+    json: async () => ({ data: { thread: { items: [{
+      message_id: "incremental-story-message",
+      timestamp_ms: 1795021200000,
+      sender: { username: "member" },
+      content: { story_share_v2: { media: {
+        pk: storyId,
+        user: { username: "story.creator" },
+        product_type: "story"
+      } } }
+    }] } } })
+  });
+  emitStoryResponse("390000000000000041");
+  emitStoryResponse("390000000000000042");
+  await capture.stop();
+  const records = capture.records();
+  assert.equal(records.length, 1);
+  assert.deepEqual(records[0].urls.sort(), [
+    "https://www.instagram.com/stories/story.creator/390000000000000041",
+    "https://www.instagram.com/stories/story.creator/390000000000000042"
+  ]);
+  assert.equal(capture.summary().uniqueStoryUrls, 2);
+});
+
+test("recognizes Story media markers nested under generic XMA and versioned share keys", async () => {
+  const page = new EventEmitter();
+  const capture = createInstagramNetworkCapture(page);
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql",
+    status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({
+      postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: { thread_id: "1783131735658148" } }),
+      url: () => "https://www.instagram.com/api/graphql"
+    }),
+    json: async () => ({ data: { thread: { items: [{
+      message_id: "story-xma-versioned",
+      timestamp_ms: 1795021200000,
+      sender: { username: "member" },
+      content: { xma: { layout: { shared_story_attachment: { media: {
+        media_id: "390000000000000043_17890000000000000",
+        user_info: { username: "story.creator" },
+        product_type: "story",
+        code: "STORYSHORTCODE43"
+      } } } } }
+    }] } } })
+  });
+  await capture.stop();
+  assert.deepEqual(capture.records()[0].urls, ["https://www.instagram.com/stories/story.creator/390000000000000043"]);
+});
