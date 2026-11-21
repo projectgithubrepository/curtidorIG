@@ -233,7 +233,7 @@ app.post("/api/cleanup", async (req, res) => {
         cleanupProgress.done = index + 1;
         cleanupProgress.message = `${cleanupProgress.done} de ${cleanupProgress.total} itens verificados.`;
       }
-      cleanupProgress.message = stopRequested ? "Limpeza interrompida pelo usuário." : mode === "test" ? `Teste concluído: ${cleanupResults.length} itens listados. Nenhum salvamento foi alterado.` : `Limpeza finalizada: ${cleanupResults.filter(item => item.status.startsWith("dessalvada") || item.status.startsWith("já dessalva")).length} itens verificados.`;
+      if (cleanupProgress.message.startsWith("Processo interrompido por segurança:")) { /* preserva o motivo da interrupção */ } else cleanupProgress.message = stopRequested ? "Limpeza interrompida pelo usuário." : mode === "test" ? `Teste concluído: ${cleanupResults.length} itens listados. Nenhum salvamento foi alterado.` : `Limpeza finalizada: ${cleanupResults.filter(item => item.status.startsWith("dessalvada") || item.status.startsWith("já dessalva")).length} itens verificados.`;
     } catch (error) { cleanupProgress.message = error.message; }
     finally { running = false; cleanupProgress.current = ""; }
   })();
