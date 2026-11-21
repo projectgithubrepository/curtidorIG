@@ -97,7 +97,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     `Grupo: ${report.request?.groupName || "não informado"} | Período: ${report.request?.startDate || "?"} a ${report.request?.endDate || "?"}`,
     `Coleção de destino: ${report.request?.collectionName || "não informada"}`,
     `Publicações: ${summary.publicationsFound ?? report.publications?.length ?? 0} | Feed/Reels: ${summary.feedsAndReels ?? "?"} | Stories: ${summary.stories ?? "?"} | Marcos administrativos: ${summary.administrativeMilestones ?? "?"} | Sem data: ${summary.itemsWithoutDate ?? "?"}`,
-    ...(report.request?.mode === "test" ? [`PLANO DE TESTE: ${summary.publicationsInspected ?? 0} itens processados | ${summary.inspectionFailures ?? 0} inspeções interrompidas | ${summary.captionUnavailable ?? 0} sem legenda legível | ${summary.storiesBlocked ?? 0} Stories bloqueadas | ${summary.plannedActions ?? 0} etapas planejadas | ${summary.mappedActions ?? 0} ações mapeadas para execução, mas NÃO EXECUTADAS | ${summary.unverifiedActions ?? 0} estados não verificados | Inventário da coleção: ${summary.savedCollectionInventoryAvailable ? "confirmado" : "indisponível"}`] : []),
+    ...(report.request?.mode === "test" ? [`PLANO DE TESTE: ${summary.publicationsInspected ?? 0} itens processados | ${summary.inspectionFailures ?? 0} inspeções interrompidas | ${summary.captionUnavailable ?? 0} sem legenda legível | ${summary.storiesBlocked ?? 0} Stories com etapas bloqueadas/não verificadas | ${summary.mappedActions ?? 0} ações mapeadas, mas NÃO EXECUTADAS | ${summary.alreadyDoneActions ?? 0} já concluídas | ${summary.simulatedActions ?? 0} simuladas | ${summary.blockedActions ?? 0} bloqueadas | ${summary.unverifiedActions ?? 0} estados não verificados | ${summary.plannedActions ?? 0} etapas no plano | Inventário da coleção: ${summary.savedCollectionInventoryAvailable ? "confirmado" : "indisponível"}`] : []),
     "",
     "CAPTURA DE REDE",
     `Respostas: ${network.capturedResponses ?? 0} | Lidas: ${network.parsedResponses ?? 0} | Não interpretadas: ${network.unparsedResponses ?? 0}`,
@@ -463,11 +463,13 @@ app.post("/api/start", async (req, res) => {
       const plannedActions = results.reduce((sum,item) => sum + (item.plan?.length || 0), 0);
       const mappedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => action.testMode?.mapped).length, 0);
       const inspectedFeedReels = results.filter(item => item.contentType !== "story" ? Boolean(item.stateVerification) : Boolean(item.storyInspection)).length;
-      const unverifiedActions = results.filter(item => item.contentType !== "story").reduce((sum,item) =>
-        sum + (item.plan || []).filter(action => /^(não verificada|bloqueada)/.test(action.status)).length, 0);
-      const testIncomplete = mode === "test" && (inspectionFailures > 0 || captionUnavailable > 0 || unverifiedActions > 0 || storiesBlocked > 0 || !savedCollectionInventoryAvailable);
+      const alreadyDoneActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^já concluída/.test(action.status)).length, 0);
+      const simulatedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^simulada/.test(action.status)).length, 0);
+      const blockedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^bloqueada/.test(action.status)).length, 0);
+      const unverifiedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^não verificada/.test(action.status)).length, 0);
+      const testIncomplete = mode === "test" && (inspectionFailures > 0 || captionUnavailable > 0 || unverifiedActions > 0 || blockedActions > 0 || storiesBlocked > 0 || !savedCollectionInventoryAvailable);
       progress.message = mode === "test"
-        ? `TESTE ${testIncomplete ? "PARCIAL" : "CONCLUÍDO"}: ${results.length}/${collected.length} publicações listadas; ${inspectionFailures} inspeções interrompidas; ${captionUnavailable} sem legenda legível; ${unverifiedActions} ações sem verificação suficiente; ${storiesBlocked} Stories bloqueadas; ${plannedActions} etapas exibidas. Nenhuma ação foi executada.`
+        ? `TESTE ${testIncomplete ? "PARCIAL" : "CONCLUÍDO"}: ${inspectedFeedReels}/${collected.length} itens analisados; ${mappedActions} ações mapeadas para execução, mas NÃO EXECUTADAS; ${alreadyDoneActions} já concluídas; ${simulatedActions} simuladas; ${blockedActions} bloqueadas; ${unverifiedActions} estados não verificados; ${storiesBlocked} Stories com etapas bloqueadas ou não verificadas; ${inspectionFailures} inspeções interrompidas; ${captionUnavailable} sem legenda legível; ${plannedActions} etapas no plano. Nenhuma ação foi executada.`
         : mode === "manual" ? `Coleta concluída: ${results.length} itens preparados para execução manual.`
         : `Execução automática finalizada: ${results.length} itens analisados. Consulte o resultado de cada ação.`;
       logDiagnostic("INFO", "Coleta concluída", { listed: results.length, inspectionFailures, captionUnavailable, unverifiedActions, savedCollectionInventoryAvailable, networkResponses: network?.capturedResponses ?? 0 });
@@ -491,6 +493,9 @@ app.post("/api/start", async (req, res) => {
           storiesBlocked,
           plannedActions,
           mappedActions,
+          alreadyDoneActions,
+          simulatedActions,
+          blockedActions,
           unverifiedActions,
           savedCollectionInventoryAvailable
         },
