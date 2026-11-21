@@ -413,7 +413,7 @@ app.post("/api/start", async (req, res) => {
           appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,completionEmoji,commentForbidden:instructions.comment==="forbidden",complete:taskState.complete,milestone:item.administrativeMilestones,detail:mode==="test"?"Simulação sem ações":"Planejamento e execução da publicação"});
         } catch (error) {
           logDiagnostic("ERROR", "Falha ao inspecionar publicação", { url:item.url,error:error.message,inspectionDiagnostics:error.inspectionDiagnostics||null });
-          const blockedPlan = buildExecutionPlan({ mode, collectionName, completionEmoji, taskState:previousState, instructions })
+          const blockedPlan = buildExecutionPlan({ mode, collectionName, destinationGroupName, completionEmoji, taskState:previousState, instructions })
             .map(action => ({ ...action, status:"bloqueada — inspeção não concluída", reason:error.message }));
           const result={...item,caption:"",comment:"",taskState:previousState,plan:blockedPlan,actionLog:[],inspectionDiagnostics:error.inspectionDiagnostics||null,status:"inspeção não concluída — ações não verificadas",detail:error.message};
           results.push(result);
