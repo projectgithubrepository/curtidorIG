@@ -630,6 +630,17 @@ export async function inspectSavedCollection(page, collectionName) {
   if (!isInstagramSavedUrl(page.url())) {
     throw new Error("O Instagram redirecionou para fora de Salvos (" + page.url() + "). Navegação e dessalvamento cancelados.");
   }
+  // Em várias versões web, as coleções ficam em uma aba separada dentro de Salvos.
+  // Abre essa aba antes de procurar o cartão, sem confundir o inventário geral com pastas.
+  const collectionTab = page.getByRole("tab", { name: /^(coleções|collections)$/i }).first();
+  const collectionButton = page.getByRole("button", { name: /^(coleções|collections)$/i }).first();
+  if (await collectionTab.count().catch(() => 0) && await collectionTab.isVisible().catch(() => false)) {
+    await collectionTab.click();
+    await page.waitForTimeout(900);
+  } else if (await collectionButton.count().catch(() => 0) && await collectionButton.isVisible().catch(() => false)) {
+    await collectionButton.click();
+    await page.waitForTimeout(900);
+  }
   // A interface do Instagram varia: o nome pode estar no texto de um filho,
   // no aria-label, no title ou em um cartão cujo link envolve a miniatura.
   const anchors = await page.locator("a[href]").evaluateAll(nodes => nodes
@@ -664,7 +675,7 @@ export async function inspectSavedCollection(page, collectionName) {
   // Alguns layouts renderizam o nome em um ramo irmão do link da miniatura.
   // Procura o texto exato e associa somente um link descendente na área Salvos.
   const siblingLabelLinks = await page.locator("body *").evaluateAll((nodes, targetName) => {
-    const normalize = value => String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/\\s+/g, " ").trim().toLocaleLowerCase();
+    const normalize = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
     const target = normalize(targetName);
     const found = [];
     for (const node of nodes) {
@@ -672,7 +683,7 @@ export async function inspectSavedCollection(page, collectionName) {
       if (!text || normalize(text) !== target) continue;
       for (let parent = node, depth = 0; parent && depth < 8; parent = parent.parentElement, depth++) {
         const links = [...parent.querySelectorAll("a[href]")].filter(anchor => {
-          try { const url = new URL(anchor.href, location.href); return url.origin === location.origin && url.pathname.split("/").some(part => part.toLowerCase() === "saved"); } catch { return false; }
+          try { const url = new URL(anchor.href, location.href); return url.origin === location.origin && /\/saved(?:\/|$)/i.test(url.pathname); } catch { return false; }
         });
         if (links.length) {
           for (const anchor of links) found.push({ href: anchor.href, text: anchor.innerText || "", ariaLabel: anchor.getAttribute("aria-label") || "", title: anchor.getAttribute("title") || "", labels: [text] });
@@ -686,7 +697,7 @@ export async function inspectSavedCollection(page, collectionName) {
   let collectionHref;
   try { collectionHref = selectSavedCollectionHref(anchors, name, page.url()); }
   catch (error) {
-    const diagnostics = await page.evaluate(() => ({ url: location.href, title: document.title, visibleText: (document.body?.innerText || "").slice(0, 1200), savedLinks: [...document.querySelectorAll("a[href]")].filter(a => /\\/saved\\//i.test(a.getAttribute("href") || "")).length })).catch(() => ({}));
+    const diagnostics = await page.evaluate(() => ({ url: location.href, title: document.title, visibleText: (document.body?.innerText || "").slice(0, 1200), savedLinks: [...document.querySelectorAll("a[href]")].filter(a => /\/saved\//i.test(a.getAttribute("href") || "")).length })).catch(() => ({}));
     throw new Error(error.message + " Diagnóstico da página Salvos: " + JSON.stringify(diagnostics));
   }
   await page.goto(collectionHref, { waitUntil: "domcontentloaded", timeout: 60000 });
