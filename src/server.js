@@ -383,18 +383,20 @@ app.post("/api/start", async (req, res) => {
       const networkResponseLimitReached = Boolean(collectionDiagnostics?.networkResponseLimitReached);
       const collectionIncomplete = !collectionScanComplete || withoutDate > 0 || withoutIdentity > 0 ||
         networkResponseLimitReached || (collectionCoverage.available && !collectionCoverage.matches);
-      if (mode === "automatic" && collectionIncomplete) {
+      const executionPreflightIncomplete = collectionIncomplete || !destinationGroupVerification.verified;
+      if (mode === "automatic" && executionPreflightIncomplete) {
         const reasons = [];
         if (!collectionScanComplete) reasons.push("o limite do histórico não foi confirmado");
         if (withoutDate > 0) reasons.push(`${withoutDate} itens estão sem data verificável`);
         if (withoutIdentity > 0) reasons.push(`${withoutIdentity} itens não têm vínculo com a mensagem original`);
         if (networkResponseLimitReached) reasons.push("o limite de respostas capturadas foi atingido");
+        if (!destinationGroupVerification.verified) reasons.push(destinationGroupVerification.reason);
         if (collectionCoverage.available && !collectionCoverage.matches) {
           reasons.push(`meta administrativa divergente: Feed ${actualFeedForDate}/${collectionCoverage.expectedFeed}, Stories ${actualStoriesForDate}/${collectionCoverage.expectedStories}`);
         }
         throw Object.assign(new Error("Execução automática cancelada antes de qualquer ação: coleta incompleta — " + reasons.join("; ") + "."), {
           collectionCoverage, collectionDiagnostics, networkDiagnostics: collected[0]?.networkDiagnostics || null,
-          administrativeTarget, destinationGroupVerification, collectionIncomplete, itemsWithoutDate: withoutDate, itemsWithoutIdentity: withoutIdentity
+          administrativeTarget, destinationGroupVerification, collectionIncomplete, executionPreflightIncomplete, itemsWithoutDate: withoutDate, itemsWithoutIdentity: withoutIdentity
         });
       }
       const usedFallback = collected.some(item => item.collectionMode === "last-300-fallback");
@@ -524,7 +526,7 @@ app.post("/api/start", async (req, res) => {
               const verificationFailure =
                 action === "like" && !stateKnown.liked ? (stateKnown.reasons?.liked || "Estado da curtida não identificado.") :
                 action === "saveToCollection" && (!stateKnown.savedStateKnown || !savedCollectionInventoryAvailable) ? (stateKnown.reasons?.saveToCollection || "Estado do salvamento ou inventário da coleção não confirmado.") :
-                action === "comment" && !stateKnown.commented ? (stateKnown.reasons?.commented || "Não foi possível confirmar se o perfil já comentou.") : "";
+                action === "comment" && !stateKnown.commented ? (stateKnown.reasons?.commented || "Não foi possível confirmar se o perfil já comentou.") :\n                action === "shareToGroup" && !stateKnown.destinationGroupVerified ? (stateKnown.reasons?.shareToGroup || "Grupo coletivo não verificado.") : "";
               if (verificationFailure) {
                 actionLog.push({action,status:"bloqueada — estado atual não verificado",reason:verificationFailure});
                 blocked=true;
@@ -696,7 +698,7 @@ app.post("/api/start", async (req, res) => {
           administrativeTarget: error.administrativeTarget || null,\n          destinationGroupVerification: error.destinationGroupVerification || null,
           collectionCoverage: error.collectionCoverage || null,
           collectionDiagnostics: error.collectionDiagnostics || null,
-          collectionIncomplete: Boolean(error.collectionIncomplete),
+          collectionIncomplete: Boolean(error.collectionIncomplete),\n          executionPreflightIncomplete: Boolean(error.executionPreflightIncomplete),
           itemsWithoutDate: error.itemsWithoutDate ?? 0,
           itemsWithoutIdentity: error.itemsWithoutIdentity ?? 0
         },
