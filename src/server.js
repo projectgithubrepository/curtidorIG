@@ -331,6 +331,7 @@ app.post("/api/start", async (req, res) => {
   const groupName = String(req.body.groupName ?? "").trim();
   const collectionName = String(req.body.collectionName ?? "").trim();
   const destinationGroupName = String(req.body.destinationGroupName ?? "").trim();
+  const destinationGroupUrl = String(req.body.destinationGroupUrl ?? "").trim();
   const mode = String(req.body.mode ?? "test").toLowerCase();
   const completionEmoji = String(req.body.completionEmoji ?? "🌸").trim() || "🌸";
   const confirmed = req.body.confirm === true;
@@ -351,7 +352,7 @@ app.post("/api/start", async (req, res) => {
   diagnosticLog = [];
   diagnosticReport = null;
   const startedAt = new Date().toISOString();
-  logDiagnostic("INFO", "Coleta iniciada", { groupName, startDate, endDate, mode, destinationGroupName, collectionName });
+  logDiagnostic("INFO", "Coleta iniciada", { groupName, startDate, endDate, mode, destinationGroupName, destinationGroupUrl, collectionName });
   progress = { total: 0, done: 0, current: groupName, message: "Abrindo o Instagram..." };
   res.json({ ok: true, message: mode === "automatic" ? "Coleta e execução automática iniciadas. Cada ação será verificada." : mode === "manual" ? "Coleta iniciada em modo manual." : "Teste iniciado: nenhuma ação será executada no Instagram." });
 
@@ -387,7 +388,7 @@ app.post("/api/start", async (req, res) => {
       let destinationGroupVerification = { verified:false, reason:"Grupo coletivo não verificado nesta execução.", threadId:"" };
       if (mode === "test" || mode === "automatic") {
         try {
-          destinationGroupVerification = await inspectDestinationGroup(page, destinationGroupName);
+          destinationGroupVerification = await inspectDestinationGroup(page, destinationGroupName, destinationGroupUrl);
           logDiagnostic(destinationGroupVerification.verified ? "INFO" : "WARN", "Verificação do grupo coletivo", destinationGroupVerification);
         } catch (error) {
           destinationGroupVerification = { verified:false, reason:"Falha ao verificar grupo coletivo: " + error.message, threadId:"" };
