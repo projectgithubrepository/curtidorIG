@@ -458,12 +458,12 @@ app.post("/api/start", async (req, res) => {
         : "";
       const inspectionFailures = results.filter(item => item.status === "inspeção não concluída — ações não verificadas").length;
       const captionUnavailable = results.filter(item => item.inspectionDiagnostics?.captionAvailable === false).length;
-      const storiesBlocked = results.filter(item => item.contentType === "story").length;
+      const storiesBlocked = results.filter(item => item.contentType === "story" && (item.plan || []).some(action => /^(bloqueada|não verificada)/.test(action.status))).length;
       const plannedActions = results.reduce((sum,item) => sum + (item.plan?.length || 0), 0);
-      const inspectedFeedReels = results.filter(item => item.contentType !== "story" && Boolean(item.stateVerification)).length;
+      const inspectedFeedReels = results.filter(item => item.contentType !== "story" ? Boolean(item.stateVerification) : Boolean(item.storyInspection)).length;
       const unverifiedActions = results.filter(item => item.contentType !== "story").reduce((sum,item) =>
         sum + (item.plan || []).filter(action => /^(não verificada|bloqueada)/.test(action.status)).length, 0);
-      const testIncomplete = mode === "test" && (inspectionFailures > 0 || captionUnavailable > 0 || unverifiedActions > 0 || !savedCollectionInventoryAvailable);
+      const testIncomplete = mode === "test" && (inspectionFailures > 0 || captionUnavailable > 0 || unverifiedActions > 0 || storiesBlocked > 0 || !savedCollectionInventoryAvailable);
       progress.message = mode === "test"
         ? `TESTE ${testIncomplete ? "PARCIAL" : "CONCLUÍDO"}: ${results.length}/${collected.length} publicações listadas; ${inspectionFailures} inspeções interrompidas; ${captionUnavailable} sem legenda legível; ${unverifiedActions} ações sem verificação suficiente; ${storiesBlocked} Stories bloqueadas; ${plannedActions} etapas exibidas. Nenhuma ação foi executada.`
         : mode === "manual" ? `Coleta concluída: ${results.length} itens preparados para execução manual.`
