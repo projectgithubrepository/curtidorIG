@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { isInstagramSavedUrl, selectSavedCollectionHref } from "../src/instagram.js";
 
 test("accepts only Instagram URLs inside the Saved area", () => {
-  assert.equal(isInstagramSavedUrl("https://www.instagram.com/usuario/saved/"), false);
+  assert.equal(isInstagramSavedUrl("https://www.instagram.com/usuario/saved/"), true);
   assert.equal(isInstagramSavedUrl("https://www.instagram.com/example/saved/12345/"), true);
   assert.equal(isInstagramSavedUrl("https://www.instagram.com/p/ABC123/"), false);
   assert.equal(isInstagramSavedUrl("https://example.com/saved/"), false);
