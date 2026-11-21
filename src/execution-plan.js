@@ -75,7 +75,8 @@ export function buildExecutionPlan({
     } else if (mode === "test") status = "simulada — nenhuma ação executada";
     else if (mode === "manual") status = "aguardando ação manual";
     else status = "pronta para execução";
-    return { ...item, status, reason, sequence: index + 1 };
+    const mappedInTest = mode === "test" && !item.alreadyDone && item.eligible && item.policy !== "forbidden" && !status.startsWith("bloqueada") && !status.startsWith("dispensada");
+    return { ...item, status, reason, sequence: index + 1, ...(mode === "test" ? { testMode: { mapped: mappedInTest, executed: false, label: mappedInTest ? "MAPEADA — seria considerada na execução automática; NÃO EXECUTADA no modo TESTE" : "não mapeada para execução: " + status } } : {}) };
   });
 }
 
