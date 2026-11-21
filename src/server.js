@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { openInstagram, collectGroupPosts, inspectPost, inspectStory, inspectSavedCollection, inspectDestinationGroup, unsaveSavedCollectionItem, executeLike, executeSaveToCollection, executeComment, executeStoryComment, executeShareToGroup, executeCompletionReaction, getGroupShareState } from "./instagram.js";
+import { openInstagram, collectGroupPosts, inspectPost, inspectStory, inspectSavedCollection, inspectDestinationGroup, unsaveSavedCollectionItem, executeLike, executeSaveToCollection, executeComment, executeStoryComment, executeStoryShareToGroup, executeShareToGroup, executeCompletionReaction, getGroupShareState } from "./instagram.js";
 import { createComment } from "./comments.js";
 import { appendHistory, getTaskState, getRecentComments, readHistory } from "./history.js";
 import { mergeTaskState, taskStateLabel, administrativeTargetsForRange } from "./group-state.js";
@@ -488,35 +488,99 @@ app.post("/api/start", async (req, res) => {
         if (item.contentType === "story") {
           try {
             const story = await inspectStory(page, item.url);
-            const comment = previousState.commented ? "" : createComment("", [...previous, ...results.map(r => r.comment).filter(Boolean)]);
-            const storyPlan = [
-              { action:"commentStory", label:"Comentar publicamente no próprio Story", required:true, alreadyDone:Boolean(previousState.commented || story.alreadyCommented), eligible:story.publicCommentAvailable },
-              { action:"shareStoryToGroup", label:`Enviar o Story ao grupo coletivo “${destinationGroupName || "grupo de envios"}”`, required:true, alreadyDone:Boolean(previousState.sharedToGroup), eligible:true }
-            ].map((entry,index) => {
-              let status = entry.alreadyDone ? "já concluída — não repetir" :
-                entry.action==="commentStory" && !entry.eligible ? "bloqueada — comentários públicos indisponíveis neste Story" :
-                entry.action==="commentStory" && !story.stateKnown.alreadyCommented ? "não verificada — não foi possível confirmar comentários anteriores" :
-                entry.action==="shareStoryToGroup" ? "bloqueada — fluxo específico de compartilhamento de Stories ainda não validado" :
-                mode==="test" ? "simulada — nenhuma ação executada" :
-                "pronta para execução";
-              const mapped = mode==="test" && status.startsWith("simulada");
-              const candidate = mode==="test" && !entry.alreadyDone && entry.eligible && !status.startsWith("bloqueada");
-              return {...entry,status,sequence:index+1,...(mode==="test"?{testMode:{mapped,candidate,executed:false,label:mapped?"AÇÃO APTA — seria executada; não foi executada no TESTE":candidate?"CANDIDATA — depende da confirmação do estado":"NÃO EXECUTÁVEL — "+status}}:{}),reason:entry.action==="commentStory" && !entry.eligible ? "O recurso de comentário público não está disponível neste Story; não enviar resposta privada." : entry.action==="shareStoryToGroup" ? "O envio de Stories ao grupo coletivo ainda não foi validado; não será prometido como ação automática." : ""};
+            const commentForbidden = instructions.comment === "forbidden";
+            const commentAlreadyDone = Boolean(previousState.commented || story.alreadyCommented);
+            const shareState = getGroupShareState(item.url, destinationGroupVerification);
+            const shareAlreadyDone = Boolean(previousState.sharedToGroup || shareState === "already-shared");
+            let taskState = mergeTaskState(previousState, {
+              commented: commentAlreadyDone,
+              commentForbidden,
+              sharedToGroup: shareAlreadyDone
             });
-            const actionLog=[];
-            let taskState=previousState;
-            if(mode==="automatic" && !previousState.commented && story.publicCommentAvailable && story.stateKnown.alreadyCommented && item.identityVerified) {
-              const outcome=await executeStoryComment(page,item.url,comment);
-              taskState=mergeTaskState(taskState,{commented:true});
-              actionLog.push({action:"commentStory",status:outcome.status});
-            } else if(mode==="automatic" && !previousState.commented) {
-              actionLog.push({action:"commentStory",status:"bloqueada",reason:!story.publicCommentAvailable ? "Comentários públicos indisponíveis; nenhuma DM será enviada." : "Não foi possível verificar com segurança se já existe comentário do perfil."});
+            const comment = commentForbidden || taskState.commented
+              ? "" : createComment(story.bodyText || "", [...previous, ...results.map(r => r.comment).filter(Boolean)]);
+            const actionLog = [];
+
+            if (mode === "automatic") {
+              if (commentForbidden) {
+                actionLog.push({action:"commentStory",status:"dispensada — pedido explícito para não comentar"});
+              } else if (!taskState.commented) {
+                if (!story.publicCommentAvailable) {
+                  actionLog.push({action:"commentStory",status:"bloqueada",reason:"Comentários públicos indisponíveis; nenhuma resposta privada/DM será enviada."});
+                } else if (story.stateKnown?.alreadyCommented !== true || !item.identityVerified) {
+                  actionLog.push({action:"commentStory",status:"bloqueada",reason:"Não foi possível confirmar a identidade do perfil, a lista de comentários ou a mensagem original."});
+                } else {
+                  const outcome = await executeStoryComment(page,item.url,comment);
+                  taskState = mergeTaskState(taskState,{commented:true});
+                  actionLog.push({action:"commentStory",status:outcome.status});
+                }
+              } else actionLog.push({action:"commentStory",status:"já concluída — não repetir"});
+
+              if (!taskState.sharedToGroup) {
+                if (shareState !== "not-shared" || !destinationGroupVerification.verified || !destinationGroupVerification.sharedInventoryComplete) {
+                  actionLog.push({action:"shareStoryToGroup",status:"bloqueada",reason:destinationGroupVerification.reason || "O histórico do grupo coletivo não foi conferido integralmente; envio bloqueado para evitar duplicidade."});
+                } else if (!item.identityVerified) {
+                  actionLog.push({action:"shareStoryToGroup",status:"bloqueada",reason:"Story sem vínculo confirmado com a mensagem original."});
+                } else {
+                  const outcome = await executeStoryShareToGroup(
+                    page,item.url,destinationGroupName,destinationGroupUrl,
+                    async () => {
+                      taskState = mergeTaskState(taskState,{shareAttempted:true});
+                      appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:story.bodyText||"",comment,groupName,collectionName,sharedAt:item.sharedAt,commented:taskState.commented,commentForbidden,sharedToGroup:false,shareAttempted:true,completionEmoji,status:"envio de Story iniciado — aguardando confirmação",detail:"Tentativa de compartilhamento de Story registrada antes do envio"});
+                    },
+                    destinationGroupVerification
+                  );
+                  taskState = mergeTaskState(taskState,{sharedToGroup:true,shareAttempted:true});
+                  actionLog.push({action:"shareStoryToGroup",status:outcome.status});
+                }
+              } else actionLog.push({action:"shareStoryToGroup",status:"já concluída — não repetir"});
+
+              const requiredStoryStepsDone = (taskState.commented || commentForbidden) && taskState.sharedToGroup;
+              if (requiredStoryStepsDone && !taskState.groupCheck && item.identityVerified && !stopRequested) {
+                try {
+                  const outcome = await executeCompletionReaction(page,item,completionEmoji);
+                  taskState = mergeTaskState(taskState,{groupCheck:true});
+                  actionLog.push({action:"completionReaction",status:outcome.status});
+                } catch (error) {
+                  actionLog.push({action:"completionReaction",status:"bloqueada",reason:error.message});
+                }
+              }
             }
-            const result={...item,taskState,caption:story.bodyText||"",comment,commentSource:story.bodyText?.trim()?"texto do Story":"fallback sem texto legível",instructionSummary:{comment:"required",shareToGroup:"required"},storyInspection:story,plan:storyPlan,actionLog,status:taskState.commented ? "Story comentado publicamente ou já concluído" : "Story analisado — comentário público pendente ou indisponível"};
+
+            const commentStatus = commentForbidden ? "dispensada — pedido explícito para não comentar" :
+              taskState.commented ? "já concluída — não repetir" :
+              !story.publicCommentAvailable ? "bloqueada — comentários públicos indisponíveis neste Story" :
+              story.stateKnown?.alreadyCommented !== true ? "não verificada — não foi possível confirmar comentários anteriores" :
+              mode === "test" ? "simulada — nenhuma ação executada" :
+              actionLog.find(entry=>entry.action==="commentStory")?.status || "aguardando ação manual";
+            const shareStatus = taskState.sharedToGroup ? "já concluída — não repetir" :
+              shareState === "unknown" || !destinationGroupVerification.verified || !destinationGroupVerification.sharedInventoryComplete
+                ? "não verificada — grupo coletivo ou inventário não confirmado"
+                : mode === "test" ? "simulada — nenhuma ação executada"
+                : actionLog.find(entry=>entry.action==="shareStory")?.status || "aguardando ação manual";
+            const storyRequiredDone = (taskState.commented || commentForbidden) && taskState.sharedToGroup;
+            const reactionStatus = taskState.groupCheck ? "já concluída — não repetir" :
+              !item.identityVerified ? "não verificada — mensagem original não identificada" :
+              storyRequiredDone ? (mode==="test" ? "simulada — nenhuma ação executada" : actionLog.find(entry=>entry.action==="completionReaction")?.status || "pronta para execução")
+              : "aguardando etapas obrigatórias";
+            const storyPlan = [
+              {action:"commentStory",label:"Comentar publicamente no próprio Story",required:!commentForbidden,status:commentStatus,reason:commentForbidden?"Pedido original proíbe comentário.":!story.publicCommentAvailable?"O recurso de comentário público não está disponível; não enviar resposta privada.":story.stateKnown?.alreadyCommented!==true?"Não foi possível comprovar a identidade do perfil e a integralidade dos comentários.":""},
+              {action:"shareStoryToGroup",label:`Enviar o Story ao grupo coletivo “${destinationGroupName || "grupo de envios"}”`,required:true,status:shareStatus,reason:shareState==="unknown"||!destinationGroupVerification.verified||!destinationGroupVerification.sharedInventoryComplete?destinationGroupVerification.reason||"Inventário do destino não confirmado.":""},
+              {action:"completionReaction",label:`Reagir à mensagem original com ${completionEmoji}`,required:true,status:reactionStatus,reason:!item.identityVerified?"ID da mensagem original não confirmado.":!storyRequiredDone?"A reação só ocorre após comentário (ou proibição explícita) e envio ao grupo coletivo.":""}
+            ].map((entry,index)=>{
+              const mapped=mode==="test"&&entry.status.startsWith("simulada");
+              const candidate=mode==="test"&&entry.status.startsWith("candidata");
+              return {...entry,sequence:index+1,...(mode==="test"?{testMode:{mapped,candidate,executed:false,label:mapped?"AÇÃO APTA — seria executada no AUTOMÁTICO; não foi executada no TESTE":candidate?"CANDIDATA — depende de pré-requisitos":"NÃO EXECUTÁVEL — "+entry.status}}:{})};
+            });
+            const result={...item,taskState,caption:story.bodyText||"",comment,commentSource:story.bodyText?.trim()?"texto do Story":"fallback sem texto legível",instructionSummary:{comment:instructions.comment,shareToGroup:"required"},storyInspection:story,stateVerification:{commented:story.alreadyCommented,commentedKnown:story.stateKnown?.alreadyCommented===true,destinationGroupVerified:destinationGroupVerification.verified&&destinationGroupVerification.sharedInventoryComplete,destinationGroupReason:destinationGroupVerification.reason,messageIdentityVerified:Boolean(item.identityVerified&&item.threadId&&item.messageId)},plan:storyPlan,actionLog,status:taskState.sharedToGroup?"Story enviado ou já localizado no grupo coletivo":taskState.commented?"Story comentado publicamente ou já concluído":"Story analisado — etapas pendentes ou bloqueadas"};
             results.push(result);
-            appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,comment,groupName,collectionName,sharedAt:item.sharedAt,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,completionEmoji,status:result.status,detail:"Inspeção e regra de comentário público em Story"});
+            appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:story.bodyText||"",comment,groupName,collectionName,sharedAt:item.sharedAt,commented:taskState.commented,commentForbidden,sharedToGroup:taskState.sharedToGroup,shareAttempted:taskState.shareAttempted,groupCheck:taskState.groupCheck,completionEmoji,status:result.status,detail:"Inspeção, comentário público, envio ao grupo e reação do Story"});
           } catch(error) {
-            const result={...item,taskState:previousState,caption:"",comment:"",plan:[{action:"commentStory",label:"Comentar publicamente no próprio Story",required:true,status:"bloqueada — inspeção não concluída",reason:error.message}],actionLog:[],status:"Story não pôde ser inspecionado"};
+            const result={...item,taskState:previousState,caption:"",comment:"",plan:[
+              {action:"commentStory",label:"Comentar publicamente no próprio Story",required:instructions.comment!=="forbidden",status:"bloqueada — inspeção não concluída",reason:error.message},
+              {action:"shareStoryToGroup",label:"Enviar o Story ao grupo coletivo",required:true,status:"bloqueada — inspeção não concluída",reason:error.message},
+              {action:"completionReaction",label:"Reagir à mensagem original",required:true,status:"aguardando etapas obrigatórias",reason:"As etapas do Story não foram concluídas."}
+            ],actionLog:[],status:"Story não pôde ser inspecionado"};
             results.push(result);
             logDiagnostic("WARN","Falha ao inspecionar Story",{url:item.url,error:error.message});
           }
