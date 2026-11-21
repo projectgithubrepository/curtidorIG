@@ -2,14 +2,16 @@
 
 Aplicação local, leve e em português para coletar publicações compartilhadas em um grupo/conversa do Instagram durante um período definido.
 
-## Primeira versão
+## Funcionalidades
 
-- Interface para informar o nome exato do grupo e o período; coleta heurística de links de posts/Reels encontrados nas mensagens carregadas pelo Instagram.
-- Playwright abre um navegador Chromium com perfil persistente e isolado do Chrome/Edge. Na primeira utilização, use **Conectar Instagram / fazer login** e entre manualmente; cookies e sessão ficam salvos nos dados locais do aplicativo para as próximas execuções. O navegador permanece aberto entre coletas.
-- Histórico CSV local em `data/historico.csv`, atualizado a cada publicação.
-- Verificação de URLs já registradas para evitar repetir uma publicação.
-- Deduplicação, leitura de legenda, sugestão de comentário local e revisão dos resultados na interface.
-- Checklist individual por publicação para registrar, após conferência no Instagram, salvamento, coleção/pasta correta, curtida, comentário e check na mensagem exata do grupo. Cada confirmação exige ação explícita e fica registrada no histórico CSV; a aplicação não clica nem publica essas interações automaticamente.
+- Coleta de Feed, Reels, carrosséis e Stories compartilhados em uma conversa do Instagram, vinculando cada link à mensagem original e à data do compartilhamento.
+- Comparação da cobertura por tipo com a referência administrativa da data, quando disponível; itens sem data ou identidade ficam fora da execução até serem confirmados.
+- Inventário da coleção de Salvos e do grupo coletivo por URLs diretas, com validação dos destinos e proteção contra envios duplicados.
+- Modos TESTE, AUTOMÁTICO e MANUAL. O TESTE não altera o Instagram; o AUTOMÁTICO exige confirmação explícita e revalida cada ação; o MANUAL organiza e registra conferências.
+- Planejamento de curtidas, salvamentos, comentários, compartilhamentos, comentários públicos em Stories e reação à mensagem original.
+- Comentários preparados localmente, com fallback neutro quando não há legenda legível, mínimo de duas palavras e um emoji.
+- Histórico CSV local e relatórios preliminares/diagnósticos para explicar estados concluídos, aptos, bloqueados e não verificados.
+- Playwright abre um Chromium com perfil persistente, isolado do Chrome/Edge. O login é feito manualmente e a sessão fica armazenada nos dados locais do aplicativo.
 - Botão para interromper a fila.
 
 ## Aplicativo para Mac Neo
@@ -41,7 +43,7 @@ O CSV é criado automaticamente nos dados locais do aplicativo e registra data/h
 
 ## Regra de origem das publicações
 
-A pessoa informa o nome do grupo e o período. A coleta procura links de posts/Reels nas mensagens e usa a data/hora exposta no DOM pelo Instagram. O resultado é heurístico: mensagens sem data legível são ignoradas; mudanças na interface podem impedir a coleta. A data usada é a do compartilhamento na conversa, não a publicação original. Os detalhes estão em [Regras de negócio](docs/regras-de-negocio.md).
+A pessoa informa o grupo de origem e o período. A coleta combina DOM e respostas de rede do Direct para localizar Feed, Reels, carrosséis e Stories, usando a data/hora da mensagem que compartilhou o link. Mensagens com link e identidade, mas sem timestamp, são mantidas como candidatas com data desconhecida e não entram na cobertura nem na execução automática. A coleta só é considerada completa quando a fronteira do histórico e, quando disponível, a referência administrativa forem conferidas. Os detalhes estão em [Regras de negócio](docs/regras-de-negocio.md).
 
 ## Regras de negócio completas
 
@@ -208,7 +210,7 @@ A mensagem administrativa com os totais de Feed/Reels e Stories é publicada dep
 
 ### 10. Estado atual e limitações conhecidas
 
-As regras acima são o comportamento funcional esperado; nem todas as etapas estão validadas no Instagram real. Feed/Reels e a seleção da coleção dependem dos elementos que o Instagram efetivamente disponibilizar na sessão. O fluxo de Stories ainda possui etapas específicas bloqueadas enquanto não forem validadas, inclusive comentário público e compartilhamento no grupo coletivo. A limpeza de Salvos também depende da identificação inequívoca da coleção e da confirmação do estado individual; se a coleção não for localizada com segurança, nenhuma alteração deve ser feita. Esses bloqueios devem aparecer no relatório e não autorizam substituir as regras por um comportamento diferente.
+As regras acima são o comportamento funcional esperado; nem todas as etapas estão validadas no Instagram real. Feed/Reels e a seleção da coleção dependem dos elementos que o Instagram efetivamente disponibilizar na sessão. O fluxo de Stories possui inspeção, preparação de comentário público, compartilhamento no grupo coletivo e reação à mensagem original. O compartilhamento só é considerado concluído quando o link aparece nas mensagens recentes do destino; se a interface não permitir essa confirmação, a tentativa fica registrada e não é repetida automaticamente. Essas etapas ainda exigem validação em uma sessão real do Instagram antes do uso em lote. A limpeza de Salvos depende da identificação inequívoca da coleção e da confirmação do estado individual; se a coleção não for localizada com segurança, nenhuma alteração deve ser feita.
 
 A interface do Instagram muda frequentemente. Publicações privadas, removidas, expiradas ou indisponíveis podem não ser processadas. A coleta é limitada ao histórico que o Instagram disponibilizar e não pode afirmar cobertura integral quando houver falha de carregamento ou rolagem.
 
@@ -218,9 +220,9 @@ Os comentários são gerados localmente por composição, não pela escolha de u
 
 ## Limitações importantes
 
-Esta é uma primeira implementação e ainda precisa ser validada com a conta e a versão atual do Instagram. O Instagram altera frequentemente a interface; seletores podem precisar de ajustes. Publicações privadas, removidas ou indisponíveis não serão processadas. A análise de Stories ainda não está implementada. O checklist registra confirmações manuais e não comprova ações por leitura automática da conta.
+Esta implementação ainda precisa ser validada com a conta e a versão atual do Instagram. O Instagram altera frequentemente a interface; seletores podem precisar de ajustes. Publicações privadas, removidas, expiradas ou indisponíveis não serão processadas. A inspeção de Stories e seus fluxos de comentário público/compartilhamento estão implementados, mas precisam ser confirmados em execução real; estados desconhecidos permanecem bloqueados.
 
-O aplicativo não contorna CAPTCHA, checkpoint, MFA, limites ou bloqueios. Se surgir uma verificação ou sinal de restrição, interrompa o uso e conclua qualquer confirmação diretamente no Instagram. A coleta e preparação de comentários não devem se transformar em disparos automáticos em lote: curtir, comentar ou salvar deve depender de uma ação explícita da pessoa na interface do Instagram. Não use para spam ou interação em massa.
+O aplicativo não contorna CAPTCHA, checkpoint, MFA, limites ou bloqueios. Se surgir uma verificação ou sinal de restrição, interrompa o uso e conclua qualquer confirmação diretamente no Instagram. O modo AUTOMÁTICO só opera após confirmação explícita, preflight completo e verificação individual do estado de cada ação. Se o Instagram não permitir identificar o conteúdo, o controle ou o resultado, a etapa é bloqueada e registrada. Não use para spam ou interação em massa.
 
 ## Desenvolvimento
 
