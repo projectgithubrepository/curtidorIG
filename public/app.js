@@ -71,7 +71,12 @@ function render(items) {
     const type=document.createElement("small"); type.textContent=item.contentType === "story" ? "Story · fluxo específico ainda não automatizado" : "Feed / Reel";
     const stateLine=document.createElement("small");
     const task=item.taskState || { saved:false, savedFolderVerified:false, liked:false, commented:false, sharedToGroup:false, groupCheck:false };
-    stateLine.textContent = [`Salva: ${task.saved ? "confirmada" : "pendente"}`, `Pasta: ${task.savedFolderVerified ? "confirmada" : "pendente"}`, `Curtida: ${task.liked ? "confirmada" : "pendente"}`, `Comentário: ${task.commented ? "confirmado" : task.commentForbidden ? "dispensado pelo pedido" : "pendente"}`, `Enviado ao grupo: ${task.sharedToGroup ? "confirmado" : task.shareAttempted ? "verificar antes de reenviar" : "pendente"}`, `Reação na mensagem: ${task.groupCheck ? "confirmada" : "pendente"}`].join(" · ");
+    const verification=item.stateVerification || {};
+    const likedLabel=verification.liked===false ? "não verificada" : task.liked ? "confirmada" : "pendente";
+    const savedLabel=verification.saveToCollection===false ? "não verificada" : task.saved ? "confirmada" : "pendente";
+    const commentLabel=task.commentForbidden ? "dispensado pelo pedido" : verification.commented===false ? "não verificado" : task.commented ? "confirmado" : "pendente";
+    const folderLabel=task.savedFolderVerified ? "confirmada" : task.saved ? "não confirmada na coleção" : "aguardando salvamento";
+    stateLine.textContent = [`Salva: ${savedLabel}`, `Pasta: ${folderLabel}`, `Curtida: ${likedLabel}`, `Comentário: ${commentLabel}`, `Enviado ao grupo: ${task.sharedToGroup ? "confirmado" : task.shareAttempted ? "verificar antes de reenviar" : "pendente"}`, `Reação na mensagem: ${task.groupCheck ? "confirmada" : "pendente"}`].join(" · ");
     const date=document.createElement("small"); date.textContent=item.sharedAt ? new Date(item.sharedAt).toLocaleString("pt-BR") : "Data não identificada";
     const markers=document.createElement("small");
     const milestoneCount=(item.administrativeMilestones || []).length;
