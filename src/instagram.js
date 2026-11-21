@@ -391,7 +391,8 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     scanLimitReached: historyRounds >= 70 && !historyBoundaryReached && !shouldStop(),
     stoppedByUser: Boolean(shouldStop()),
     visibleItems: found.size,
-    unknownDateCandidates: fallback.size
+    unknownDateCandidates: fallback.size,
+    networkResponseLimitReached: networkDiagnostics.capturedResponses >= 500
   };
   // Não descartar silenciosamente mensagens com link e identidade, mas sem timestamp.
   // Elas seguem para inspeção como candidatas com data desconhecida e não entram na contagem
