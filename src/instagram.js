@@ -707,7 +707,7 @@ export async function inspectSavedCollection(page, collectionNameOrUrl) {
         parts[2].toLowerCase() !== expectedSlug.toLowerCase() || parts[3] !== expectedCollectionId) {
       throw new Error("A URL não abriu a coleção específica solicitada. Nenhuma publicação será processada.");
     }
-    const headingTexts = await page.locator("h1,h2,header,[role='main'] header,main").evaluateAll(nodes =>
+    const headingTexts = await page.locator("h1,h2").evaluateAll(nodes =>
       nodes.filter(node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; })
         .map(node => (node.innerText || "").trim()).filter(value => value && value.length < 180)
     ).catch(() => []);
@@ -1032,7 +1032,7 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
     if (openedThreadId !== expectedThreadId) {
       return { verified:false, reason:`A URL direta não abriu a conversa esperada. ID solicitado: ${expectedThreadId}; ID aberto: ${openedThreadId || "não identificado"}.`, threadId:openedThreadId };
     }
-    const headerEvidence = await page.locator("header, [role='main'] header, main").evaluateAll(nodes =>
+    const headerEvidence = await page.locator("main header").evaluateAll(nodes =>
       nodes.filter(node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; })
         .map(node => (node.innerText || "").trim()).filter(Boolean)
     ).catch(() => []);
