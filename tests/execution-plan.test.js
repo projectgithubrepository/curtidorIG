@@ -71,3 +71,28 @@ test("uncertain previous send is blocked to prevent duplicates", () => {
   assert.match(plan[3].reason, /envio duplicado/);
   assert.match(plan[4].status, /^aguardando/);
 });
+
+
+test("test mode marks state as unverifiable instead of assuming pending", () => {
+  const plan = buildExecutionPlan({
+    mode: "test",
+    collectionName: "Laranja Girls",
+    comment: "Comentário contextual 🌸",
+    stateKnown: { liked: false, saveToCollection: false, commented: false }
+  });
+  assert.match(plan[0].status, /^não verificada/);
+  assert.match(plan[1].status, /^não verificada/);
+  assert.match(plan[2].status, /^não verificada/);
+  assert.match(plan[3].status, /^simulada/);
+});
+
+test("already-saved post outside the selected collection is blocked", () => {
+  const plan = buildExecutionPlan({
+    mode: "test",
+    collectionName: "Laranja Girls",
+    taskState: { saved: true, savedFolderVerified: false },
+    comment: "Comentário contextual 🌸"
+  });
+  assert.equal(plan[1].status, "bloqueada");
+  assert.match(plan[1].reason, /fora da coleção/);
+});
