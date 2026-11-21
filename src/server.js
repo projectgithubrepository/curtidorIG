@@ -342,6 +342,10 @@ app.post("/api/start", async (req, res) => {
   if (!["test","automatic","manual"].includes(mode)) return res.status(400).json({ error: "Modo inválido." });
   if (mode === "automatic" && !confirmed) return res.status(400).json({ error: "A execução automática exige confirmação explícita." });
   if (mode === "automatic" && !destinationGroupName) return res.status(400).json({ error: "Informe o nome exato do grupo coletivo de envios." });
+  if (mode === "test" || mode === "automatic") {
+    if (!destinationGroupUrl) return res.status(400).json({ error: "Informe a URL direta da conversa do grupo coletivo (https://www.instagram.com/direct/t/ID/). Isso evita selecionar um grupo errado pela busca." });
+    if (!/^https:\/\/www\\.instagram\\.com\/direct\/t\/\d+\/?(?:[?#].*)?$/i.test(destinationGroupUrl)) return res.status(400).json({ error: "URL do grupo inválida. Informe a URL direta do Instagram no formato https://www.instagram.com/direct/t/ID/." });
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
     return res.status(400).json({ error: "Informe um período válido, com data inicial anterior ou igual à final." });
   }
