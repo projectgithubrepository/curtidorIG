@@ -399,11 +399,10 @@ export function interpretPostSnapshot(snapshot) {
 
   const caption = (articleText || dialogText || mainText || ogDescription).trim();
   if (!caption) {
-    const reason = snapshot.hasVideo || snapshot.hasImage ? "media-without-readable-caption" : "post-content-not-rendered";
-    const message = reason === "media-without-readable-caption"
-      ? "A página carregou mídia, mas não foi possível extrair a legenda ou o texto da publicação."
-      : "A página abriu, mas o conteúdo da publicação não apareceu nas estruturas reconhecidas.";
-    throw Object.assign(new Error(message), { inspectionDiagnostics: { ...diagnostics, reason } });
+    diagnostics.reason = snapshot.hasVideo || snapshot.hasImage ? "media-without-readable-caption" : "post-content-not-rendered";
+    diagnostics.captionAvailable = false;
+  } else {
+    diagnostics.captionAvailable = true;
   }
   return { caption: caption.slice(0, 5000), diagnostics };
 }
@@ -463,10 +462,11 @@ export async function inspectPost(page, url) {
 
   const rootSelector = snapshot.selectors.article ? "article" : snapshot.selectors.dialog ? '[role="dialog"]' : "main";
   const observedState = await page.locator(rootSelector).first().evaluate(element => {
-    const labels = [...element.querySelectorAll('button,[role="button"]')].map(node =>
+    const controls = [...element.querySelectorAll('button,[role="button"]')];
+    const labels = controls.map(node =>
       [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText].filter(Boolean).join(" ")
     ).join(" ");
-    const profileLink = [...document.querySelectorAll("nav a[href]")].find(node =>
+    const profileLink = [...document.querySelectorAll("nav a[href],a[href]")].find(node =>
       /perfil|profile/i.test([node.getAttribute("aria-label"), node.innerText].filter(Boolean).join(" "))
     );
     const username = (profileLink?.getAttribute("href") || "").split("/").filter(Boolean)[0] || "";
@@ -475,9 +475,24 @@ export async function inspectPost(page, url) {
       [...item.querySelectorAll("a[href]")].some(link => link.getAttribute("href") === "/" + username + "/") &&
       (item.innerText || "").trim().length > username.length
     );
-    return { liked: /descurtir|unlike/i.test(labels), saved: /remover dos salvos|remove from saved/i.test(labels), commented };
-  }).catch(() => ({ liked: false, saved: false, commented: false }));
-  return { caption: interpreted.caption, observedState, inspectionDiagnostics: interpreted.diagnostics };
+    return {
+      liked: /descurtir|unlike/i.test(labels),
+      saved: /remover dos salvos|remove from saved/i.test(labels),
+      commented,
+      stateKnown: {
+        liked: /curtir|like|descurtir|unlike/i.test(labels),
+        saved: /salvar|save|remover dos salvos|remove from saved/i.test(labels),
+        commented: Boolean(username)
+      },
+      controlCount: controls.length,
+      controlLabels: labels.slice(0, 800)
+    };
+  }).catch(() => ({
+    liked: false, saved: false, commented: false,
+    stateKnown: { liked: false, saved: false, commented: false },
+    controlCount: 0, controlLabels: ""
+  }));
+  return { caption: interpreted.caption, observedState, stateKnown: observedState.stateKnown, inspectionDiagnostics: interpreted.diagnostics };
 }
 
 
