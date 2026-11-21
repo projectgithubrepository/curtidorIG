@@ -147,7 +147,7 @@ function collectStoryUrls(value, output, seen = new WeakSet(), depth = 0, storyC
   }
   for (const [key, child] of entries) {
     if (!child || typeof child !== "object") continue;
-    const childStoryContext = storyContext || /^(story|stories|story_share|shared_story|story_media|story_item|story_items|shared_story_media)$/i.test(key);
+    const childStoryContext = storyContext || /story|stories/i.test(key);
     collectStoryUrls(child, output, seen, depth + 1, childStoryContext);
   }
 }
@@ -285,14 +285,19 @@ export function createInstagramNetworkCapture(page) {
     for (const record of items) {
       const key = record.messageId + "|" + record.threadId;
       const previous = recordsByKey.get(key);
-      if (!previous || previous.urls.length < record.urls.length || (!previous.timestamp && record.timestamp)) {
-        recordsByKey.set(key, { ...record, responseThreadId: context.threadId || "" });
+      if (!previous) {
+        recordsByKey.set(key, { ...record, urls: [...new Set(record.urls || [])], responseThreadId: context.threadId || "" });
       } else {
-        previous.urls = [...new Set([...previous.urls, ...record.urls])];
-        if (!previous.timestamp) previous.timestamp = record.timestamp;
-        if (!previous.text) previous.text = record.text;
-        if (!previous.sender) previous.sender = record.sender;
+        // Respostas incrementais podem repetir a mensagem com anexos diferentes.
+        // Unir os links evita perder Stories de uma versão anterior mais completa.
+        previous.urls = [...new Set([...(previous.urls || []), ...(record.urls || [])])];
+        if (!previous.timestamp && record.timestamp) previous.timestamp = record.timestamp;
+        if (!previous.text && record.text) previous.text = record.text;
+        if (!previous.sender && record.sender) previous.sender = record.sender;
         previous.hasReactionData ||= record.hasReactionData;
+        if (!previous.responseThreadId && context.threadId) previous.responseThreadId = context.threadId;
+        if (!previous.structurePath && record.structurePath) previous.structurePath = record.structurePath;
+        previous.objectKeys = [...new Set([...(previous.objectKeys || []), ...(record.objectKeys || [])])].slice(0, 60);
       }
     }
   };
@@ -428,6 +433,10 @@ export function createInstagramNetworkCapture(page) {
         webSocketSharedMediaObjects: websocketStats.sharedMediaObjects,
         webSocketStoryUrls: websocketStats.storyUrls,
         storyUrlsExtracted: aggregate.storyUrls + websocketStats.storyUrls,
+        uniqueStoryUrls: [...recordsByKey.values()].reduce((set, record) => {
+          for (const url of record.urls || []) if (/\/stories\//i.test(url)) set.add(url);
+          return set;
+        }, new Set()).size,
         operationDetails: [...byOperation.values()].slice(0, 30),
         distinctMessageIds: recordsByKey.size,
         extractedShareUrls: [...recordsByKey.values()].reduce((sum, item) => sum + item.urls.length, 0),
