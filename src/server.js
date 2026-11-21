@@ -667,7 +667,7 @@ app.post("/api/start", async (req, res) => {
               if (!needed) continue;
               const verificationFailure =
                 action === "like" && !stateKnown.liked ? (stateKnown.reasons?.liked || "Estado da curtida não identificado.") :
-                action === "saveToCollection" && (!stateKnown.savedStateKnown || !savedCollectionInventoryAvailable) ? (stateKnown.reasons?.saveToCollection || "Estado do salvamento ou inventário da coleção não confirmado.") :
+                action === "saveToCollection" && (!stateKnown.savedStateKnown || !savedCollectionInventoryAvailable || (stateKnown.collectionMembership === true && stateKnown.saved === false)) ? (stateKnown.reasons?.saveToCollection || "Estado do salvamento ou inventário da coleção não confirmado.") :
                 action === "comment" && !stateKnown.commented ? (stateKnown.reasons?.commented || "Não foi possível confirmar se o perfil já comentou.") :
                 action === "shareToGroup" && !stateKnown.destinationGroupVerified ? (stateKnown.reasons?.shareToGroup || "Grupo coletivo não verificado.") : "";
               if (verificationFailure) {
