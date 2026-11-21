@@ -582,7 +582,7 @@ async function readSavedToggle(page) {
     if (labels.some(label => /remover dos salvos|remove from saved|remove saved/i.test(label))) return "saved";
     if (labels.some(label => /^(salvar|save|salvar publicação|save post)$/i.test(label))) return "unsaved";
     return "unknown";
-  }).then(states => states.includes("saved") ? "saved" : states.includes("unsaved") ? "unsaved" : "unknown").catch(() => "unknown");
+  }).catch(() => "unknown");
 }
 
 export async function unsaveSavedCollectionItem(page, url) {
