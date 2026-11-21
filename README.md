@@ -77,7 +77,7 @@ Esta seção consolida as regras funcionais que a aplicação deve seguir. As re
 - Preservar IDs longos (64 bits) como texto ao interpretar JSON de respostas HTTP e WebSocket; não converter IDs de mídia do Instagram para `Number`, pois a precisão numérica pode colapsar Stories diferentes.
 - A varredura da área Salvos deve abrir a aba **Coleções/Collections** quando ela existir antes de procurar a pasta nomeada. O inventário só é confirmado após localizar um link inequívoco da coleção e ler os itens da página correspondente.
 - A cobertura de Feed/Reels e Stories deve ser comparada separadamente com a mensagem administrativa da data selecionada. A divergência mantém o teste parcial; não se deve fabricar ou duplicar itens para atingir a meta.
-- A coleção de destino deve ser localizada pelo nome exato na área Salvos, inclusive quando o rótulo estiver em elemento irmão do link do cartão. A aplicação só confirma a pasta após navegar por um link inequívoco dentro de Salvos e inventariar seus itens.
+- A coleção de destino é aberta diretamente pela URL específica fornecida no formulário (`/usuario/saved/slug/ID/`). A aplicação valida o caminho e o ID da coleção, percorre os itens e extrai o rótulo da própria página para selecionar essa pasta ao salvar.
 - Se a coleção não for localizada, o diagnóstico deve preservar URL da página, texto visível e motivo da falha; não assumir que qualquer publicação genericamente salva pertence à coleção escolhida.
 
 ### 3. Regras obrigatórias por publicação
