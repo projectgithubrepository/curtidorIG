@@ -53,6 +53,10 @@ export function buildExecutionPlan({
     let reason = "";
     if (item.alreadyDone) status = "já concluída — não repetir";
     else if (item.action === "comment" && item.policy === "forbidden") status = "dispensada — pedido explícito para não comentar";
+    else if (!item.eligible) {
+      status = "bloqueada";
+      reason = item.action === "saveToCollection" ? "Informe a coleção obrigatória de destino." : "O comentário precisa ter pelo menos duas palavras e um emoji.";
+    }
     else if (item.action === "shareToGroup" && state.shareAttempted && !state.sharedToGroup) { status = "bloqueada"; reason = "Tentativa anterior sem confirmação; verifique o grupo para evitar envio duplicado."; }
     else if (item.action === "saveToCollection" && state.saved && !state.savedFolderVerified && stateKnown.collectionInventoryAvailable !== true) {
       status = "não verificada — coleção de destino não conferida";
@@ -72,9 +76,6 @@ export function buildExecutionPlan({
     } else if (mode === "test" && !item.alreadyDone && item.action === "shareToGroup" && stateKnown.destinationGroupVerified !== true) {
       status = "não verificada — grupo coletivo não validado";
       reason = stateKnown.reasons?.shareToGroup || "O grupo coletivo não foi localizado e confirmado; não é possível classificar o envio como apto.";
-    } else if (!item.eligible) {
-      status = "bloqueada";
-      reason = item.action === "saveToCollection" ? "Informe a coleção obrigatória de destino." : "O comentário precisa ter pelo menos duas palavras e um emoji.";
     } else if (item.requiresAllPrevious && !requiredStepsDone) {
       status = "aguardando etapas obrigatórias";
       reason = "A reação só pode ser aplicada após concluir as ações obrigatórias e as solicitadas.";
