@@ -794,6 +794,27 @@ export function isInstagramSavedCollectionUrl(value, base = "https://www.instagr
   } catch { return false; }
 }
 
+async function scrollSavedCollectionToEnd(page) {
+  return page.evaluate(() => {
+    const selector='a[href*="/p/"],a[href*="/reel/"],a[href*="/tv/"]';
+    const candidates=[...document.querySelectorAll("main,main *")].filter(element=>{
+      const rect=element.getBoundingClientRect();
+      return rect.width>120&&rect.height>100&&element.clientHeight>80&&element.scrollHeight>element.clientHeight+20;
+    }).map(element=>({
+      element,
+      links:element.querySelectorAll(selector).length,
+      area:element.clientWidth*element.clientHeight,
+      scrollHeight:element.scrollHeight
+    })).sort((a,b)=>(b.links-a.links)||(a.area-b.area)||(b.scrollHeight-a.scrollHeight));
+    const target=candidates[0]?.element||document.scrollingElement||document.documentElement;
+    target.scrollTop=target.scrollHeight;
+    if(document.scrollingElement)document.scrollingElement.scrollTop=document.scrollingElement.scrollHeight;
+    window.scrollTo(0,document.body?.scrollHeight||0);
+    const top=Number(target.scrollTop)||0;
+    return {found:Boolean(candidates.length),atBottom:top+target.clientHeight>=target.scrollHeight-8,scrollTop:top,scrollHeight:target.scrollHeight,links:candidates[0]?.links||0};
+  }).catch(()=>({found:false,atBottom:false,scrollTop:0,scrollHeight:0,links:0}));
+}
+
 function normalizeSavedCollectionLabel(value) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
 }
@@ -854,14 +875,16 @@ export async function inspectSavedCollection(page, collectionNameOrUrl) {
     const slugLabel = slugWords ? slugWords[0].toLocaleUpperCase() + slugWords.slice(1) : slugWords;
     const collectionName = headingTexts.flatMap(value => value.split("\n")).map(value => value.trim())
       .find(value => value && !/^salvos$|^saved$|^coleções$|^collections$/i.test(value) && value.length < 100) || slugLabel;
-    let stableRounds = 0, previousCount = 0;
+    let stableRounds = 0;
+    const collectionLinks=page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]');
     for (let round=0; round<80 && stableRounds<5; round++) {
-      const count = await page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]').count();
-      stableRounds = count > previousCount ? 0 : stableRounds + 1; previousCount = count;
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      const beforeCount=await collectionLinks.count();
+      const scrollState=await scrollSavedCollectionToEnd(page);
       await page.waitForTimeout(650);
+      const afterCount=await collectionLinks.count();
+      stableRounds=afterCount>beforeCount?0:scrollState.atBottom?stableRounds+1:0;
     }
-    if (stableRounds < 5) throw new Error("O inventário da coleção não estabilizou após 80 tentativas de rolagem. A coleção não será considerada completa.");
+    if (stableRounds < 5) throw new Error("O inventário da coleção não alcançou um fim estável após 80 tentativas de rolagem. A coleção não será considerada completa.");
     const items = await page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]').evaluateAll(anchors => {
       const map = new Map();
       for (const anchor of anchors) { try {
@@ -990,15 +1013,15 @@ export async function inspectSavedCollection(page, collectionNameOrUrl) {
     throw new Error("O link da coleção não abriu uma rota específica de coleção (" + page.url() + "). A página geral /saved/ não será aceita como pasta. Nenhuma publicação será processada.");
   }
   let stableRounds = 0;
-  let previousCount = 0;
+  const collectionLinks=page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]');
   for (let round = 0; round < 80 && stableRounds < 5; round++) {
-    const count = await page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]').count();
-    stableRounds = count > previousCount ? 0 : stableRounds + 1;
-    previousCount = count;
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    const beforeCount=await collectionLinks.count();
+    const scrollState=await scrollSavedCollectionToEnd(page);
     await page.waitForTimeout(650);
+    const afterCount=await collectionLinks.count();
+    stableRounds=afterCount>beforeCount?0:scrollState.atBottom?stableRounds+1:0;
   }
-  if (stableRounds < 5) throw new Error("O inventário da coleção não estabilizou após 80 tentativas de rolagem. A coleção não será considerada completa.");
+  if (stableRounds < 5) throw new Error("O inventário da coleção não alcançou um fim estável após 80 tentativas de rolagem. A coleção não será considerada completa.");
   const items = await page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]').evaluateAll(anchors => {
     const map = new Map();
     for (const anchor of anchors) {
