@@ -106,7 +106,8 @@ function renderPreliminary(summary, request) {
   }
   const note = document.createElement("p");
   note.className = "hint";
-  note.textContent = `Coleção “${request.collectionName || "não informada"}” · Grupo coletivo “${request.destinationGroupName || "não informado"}” · ${summary.savedCollectionInventoryAvailable ? "Inventário da coleção confirmado" : "Inventário da coleção indisponível"}.`;
+  const destination = summary.destinationGroupVerification || {};
+  note.textContent = `Coleção “${request.collectionName || "não informada"}” · ${summary.savedCollectionInventoryAvailable ? "Inventário da coleção confirmado" : "Inventário da coleção indisponível"} · Grupo coletivo “${request.destinationGroupName || "não informado"}”: ${destination.verified ? "confirmado" : destination.reason || "não verificado"}.`;
   preliminaryMetrics.append(note);
 }
 
