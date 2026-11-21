@@ -181,6 +181,10 @@ function isAtHistoryStart(state) {
   return top <= 8;
 }
 
+export function didReachHistoryStart(after, progressed) {
+  return Boolean(progressed && isAtHistoryStart(after));
+}
+
 async function scrollToOlderMessages(page) {
   const before = await readConversationScrollState(page, true);
   await page.waitForTimeout(900);
@@ -348,7 +352,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     // Só confirma o início quando o contêiner de mensagens está no topo.
     // Falta de movimento fora do topo não encerra a varredura: o diagnóstico
     // permanece incompleto até o limite global, em vez de declarar fim do histórico.
-    if (isAtHistoryStart(scroll.after)) {
+    if (didReachHistoryStart(scroll.after, scroll.progressed)) {
       historyBoundaryReached = true;
       break;
     }
@@ -394,7 +398,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   }
 
   const milestoneList = [...milestones.values()];
-  historyBoundaryReached = historyBoundaryReached || dateBoundaryReached || isAtHistoryStart(lastScrollState?.after);
+  historyBoundaryReached = historyBoundaryReached || dateBoundaryReached;
   const collectionDiagnostics = {
     historyRounds,
     scrollProgressRounds,
