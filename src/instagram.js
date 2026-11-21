@@ -691,8 +691,49 @@ export function selectSavedCollectionHref(anchors, collectionName, baseUrl) {
 }
 
 // Inspeciona uma coleção dos Salvos. Nunca segue links que saiam dessa área.
-export async function inspectSavedCollection(page, collectionName) {
-  const name = String(collectionName || "").trim();
+export async function inspectSavedCollection(page, collectionNameOrUrl) {
+  const suppliedCollectionUrl = String(collectionNameOrUrl || "").trim();
+  const directCollectionMatch = suppliedCollectionUrl.match(/^https:\/\/www\.instagram\.com\/([^/]+)\/saved\/([^/]+)\/(\d+)\/?(?:[?#].*)?$/i);
+  if (suppliedCollectionUrl && /^https?:\/\//i.test(suppliedCollectionUrl)) {
+    if (!directCollectionMatch) throw new Error("URL inválida. Informe a URL específica da coleção no formato /usuario/saved/slug/ID/.");
+    const [, expectedUsername, expectedSlug, expectedCollectionId] = directCollectionMatch;
+    await page.goto(suppliedCollectionUrl, { waitUntil:"domcontentloaded", timeout:60000 });
+    await page.waitForTimeout(1600);
+    if (/\/accounts\/login/.test(page.url())) throw new Error("Faça login no Instagram antes de acessar a coleção.");
+    const opened = new URL(page.url());
+    const parts = opened.pathname.split("/").filter(Boolean);
+    if (opened.origin !== "https://www.instagram.com" || parts.length !== 4 ||
+        parts[0].toLowerCase() !== expectedUsername.toLowerCase() || parts[1].toLowerCase() !== "saved" ||
+        parts[2].toLowerCase() !== expectedSlug.toLowerCase() || parts[3] !== expectedCollectionId) {
+      throw new Error("A URL não abriu a coleção específica solicitada. Nenhuma publicação será processada.");
+    }
+    const headingTexts = await page.locator("h1,h2,header,[role='main'] header,main").evaluateAll(nodes =>
+      nodes.filter(node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; })
+        .map(node => (node.innerText || "").trim()).filter(value => value && value.length < 180)
+    ).catch(() => []);
+    const slugLabel = decodeURIComponent(expectedSlug).replace(/[-_]+/g," ").trim();
+    const collectionName = headingTexts.flatMap(value => value.split("\\n")).map(value => value.trim())
+      .find(value => value && !/^salvos$|^saved$|^coleções$|^collections$/i.test(value) && value.length < 100) || slugLabel;
+    let stableRounds = 0, previousCount = 0;
+    for (let round=0; round<80 && stableRounds<5; round++) {
+      const count = await page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]').count();
+      stableRounds = count > previousCount ? 0 : stableRounds + 1; previousCount = count;
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await page.waitForTimeout(650);
+    }
+    const items = await page.locator('main a[href*="/p/"],main a[href*="/reel/"],main a[href*="/tv/"]').evaluateAll(anchors => {
+      const map = new Map();
+      for (const anchor of anchors) { try {
+        const url = new URL(anchor.href);
+        if (!/^\\/(p|reel|tv)\\//.test(url.pathname)) continue;
+        const clean = url.origin + url.pathname.replace(/\\/$/,"");
+        if (!map.has(clean)) map.set(clean,{url:clean,contentType:url.pathname.includes("/reel/")?"reel":"feed"});
+      } catch {} }
+      return [...map.values()];
+    });
+    return { collectionName, collectionUrl:page.url(), items, collectionId:expectedCollectionId };
+  }
+  const name = suppliedCollectionUrl;
   if (!name) throw new Error("Informe o nome exato da coleção que será usada como origem.");
   // Descobre o perfil da sessão autenticada pela navegação do próprio Instagram.
   // Não fixa username de exemplo nem assume /saved/ sem o segmento do perfil.
@@ -973,9 +1014,7 @@ export async function executeComment(page, url, comment) {
   return { commented: true, status: "comentário publicado e verificado" };
 }
 
-export async function inspectDestinationGroup(page, destinationGroupName, destinationGroupUrl = "") {
-  const groupName = String(destinationGroupName || "").trim();
-  if (!groupName) return { verified:false, reason:"Nome do grupo coletivo não informado.", threadId:"" };
+export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
   const suppliedUrl = String(destinationGroupUrl || "").trim();
   const directMatch = suppliedUrl.match(/^https:\/\/www\.instagram\.com\/direct\/t\/(\d+)\/?(?:[?#].*)?$/i);
   if (suppliedUrl && !directMatch) {
@@ -997,11 +1036,9 @@ export async function inspectDestinationGroup(page, destinationGroupName, destin
         .map(node => (node.innerText || "").trim()).filter(Boolean)
     ).catch(() => []);
     const normalized = value => String(value || "").normalize("NFKC").replace(/[\s\u200B-\u200D\uFEFF]+/g," ").trim().toLocaleLowerCase();
-    const expectedName = normalized(groupName);
-    const nameConfirmed = headerEvidence.some(value => normalized(value).split("\n").some(line => normalized(line) === expectedName));
-    if (!nameConfirmed) {
-      return { verified:false, reason:`A conversa de ID ${expectedThreadId} abriu, mas o cabeçalho não confirmou o nome exato “${groupName}”. Inventário e envios bloqueados.`, threadId:openedThreadId, headerEvidence:headerEvidence.slice(0,5) };
-    }
+    const groupName = headerEvidence.flatMap(value => value.split("\\n")).map(value => value.trim())
+      .find(value => value && value.length < 120 && !/^(instagram|mensagens|messages|detalhes|details)$/i.test(value)) || "";
+    if (!groupName) return { verified:false, reason:"A conversa abriu, mas não foi possível ler seu nome no cabeçalho. Inventário e envios bloqueados.", threadId:openedThreadId, headerEvidence:headerEvidence.slice(0,5) };
   } else {
     await page.goto("https://www.instagram.com/direct/inbox/", { waitUntil:"domcontentloaded", timeout:60000 });
     await page.waitForTimeout(1200);
@@ -1045,17 +1082,17 @@ export async function inspectDestinationGroup(page, destinationGroupName, destin
     stalledRounds = scroll.progressed ? 0 : stalledRounds + 1;
   }
   return {
-    verified:true,
+    verified:true, groupName,
     reason: sharedInventoryComplete
-      ? `Grupo “${groupName}” localizado; histórico percorrido até o início e links inventariados.`
-      : `Grupo “${groupName}” localizado, mas o histórico não foi percorrido integralmente; envio bloqueado para evitar duplicidade.`,
+      ? `Grupo “${groupName}” localizado pela URL; histórico percorrido até o início e links inventariados.`
+      : `Grupo “${groupName}” localizado pela URL, mas o histórico não foi percorrido integralmente; envio bloqueado para evitar duplicidade.`,
     threadId, sharedUrls:[...sharedUrls], sharedInventoryComplete, stalledRounds
   };
 }
 
 export async function executeShareToGroup(page, url, destinationGroupName, onBeforeSend = async () => {}, groupInventory = null) {
   const groupName = String(destinationGroupName || "").trim();
-  if (!groupName) throw new Error("Informe o nome exato do grupo coletivo de envios.");
+  if (!groupName) throw new Error("O nome do grupo não foi identificado a partir da URL informada.");
   if (getGroupShareState(url, groupInventory) === "unknown") throw new Error("Histórico do grupo coletivo não foi conferido integralmente; envio bloqueado para evitar duplicidade.");
   if (getGroupShareState(url, groupInventory) === "already-shared") {
     return { sharedToGroup:true, status:"publicação já encontrada no grupo coletivo — não reenviada" };
