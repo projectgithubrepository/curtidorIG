@@ -697,7 +697,7 @@ app.post("/api/start", async (req, res) => {
         generatedAt: new Date().toISOString(),
         startedAt,
         finishedAt: new Date().toISOString(),
-        outcome: error.collectionIncomplete ? "parcial" : "erro",
+        outcome: error.collectionIncomplete || error.executionPreflightIncomplete ? "parcial" : "erro",
         request: { groupName, collectionName, destinationGroupName, mode, startDate, endDate },
         summary: {
           publicationsFound: results.length,
