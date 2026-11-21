@@ -118,7 +118,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     ...(summary.destinationGroupVerification ? [`GRUPO COLETIVO: ${summary.destinationGroupVerification.verified ? "confirmado" : "não confirmado"} — ${summary.destinationGroupVerification.reason}`] : []),
     `Publicações: ${summary.publicationsFound ?? report.publications?.length ?? 0} | Feed/Reels: ${summary.feedsAndReels ?? "?"} | Stories: ${summary.stories ?? "?"} | Marcos administrativos: ${summary.administrativeMilestones ?? "?"} | Sem data: ${summary.itemsWithoutDate ?? "?"} | Sem identidade: ${summary.itemsWithoutIdentity ?? "?"}`,
     ...(summary.collectionCoverage?.available ? [`COBERTURA DA DATA: Feed ${summary.collectionCoverage.actualFeed}/${summary.collectionCoverage.expectedFeed} (faltam ${summary.collectionCoverage.missingFeed}, excedentes ${summary.collectionCoverage.excessFeed}); Stories ${summary.collectionCoverage.actualStories}/${summary.collectionCoverage.expectedStories} (faltam ${summary.collectionCoverage.missingStories}, excedentes ${summary.collectionCoverage.excessStories}); total ${summary.collectionCoverage.actualTotal}/${summary.collectionCoverage.expectedTotal}; ${summary.collectionCoverage.matches ? "contagens conferem" : "DIVERGÊNCIA — coleta incompleta ou excedente"}`] : []),
-    ...(summary.collectionDiagnostics ? [`VARREDURA: ${summary.collectionDiagnostics.historyRounds} rodadas; limite por data=${summary.collectionDiagnostics.dateBoundaryReached ? "sim" : "não"}; limite atingido=${summary.collectionDiagnostics.scanLimitReached ? "sim" : "não"}; limite estável=${summary.collectionDiagnostics.stableBoundaryReached ? "sim" : "não"}; data mais antiga=${summary.collectionDiagnostics.oldestVisibleDate || "não identificada"}; contêiner encontrado=${summary.collectionDiagnostics.scrollTargetFound ? "sim" : "não"}`] : []),
+    ...(summary.collectionDiagnostics ? [`VARREDURA: ${summary.collectionDiagnostics.historyRounds} rodadas; limite por data=${summary.collectionDiagnostics.dateBoundaryReached ? "sim" : "não"}; rolagem travada=${summary.collectionDiagnostics.historyStalled ? "sim" : "não"}; limite estável=${summary.collectionDiagnostics.stableBoundaryReached ? "sim" : "não"}; data mais antiga=${summary.collectionDiagnostics.oldestVisibleDate || "não identificada"}; contêiner encontrado=${summary.collectionDiagnostics.scrollTargetFound ? "sim" : "não"}`] : []),
     ...(report.request?.mode === "test" ? ["", "RESUMO PRELIMINAR — AÇÕES POR TIPO", ...(Object.entries(summary.actionTotals || {}).map(([key,value]) => `- ${({like:"Curtidas",saveToCollection:"Salvamentos na coleção",comment:"Comentários",shareToGroup:"Envios ao grupo coletivo",completionReaction:"Reações na mensagem original",commentStory:"Comentários públicos em Stories",shareStoryToGroup:"Envios de Stories ao grupo coletivo"})[key] || key}: ${value.total} previstas | ${value.simulated} simuladas aptas | ${value.unverified} não verificadas | ${value.blocked} bloqueadas | ${value.done} já concluídas`)), "", `PLANO DE TESTE: ${summary.publicationsInspected ?? 0} itens processados | ${summary.inspectionFailures ?? 0} inspeções interrompidas | ${summary.captionUnavailable ?? 0} sem legenda legível | ${summary.storiesBlocked ?? 0} Stories com etapas bloqueadas/não verificadas | ${summary.mappedActions ?? 0} ações simuladas/aptas, mas NÃO EXECUTADAS | ${summary.candidateActions ?? 0} candidatas aguardando verificação/pré-requisitos | ${summary.alreadyDoneActions ?? 0} já concluídas | ${summary.blockedActions ?? 0} bloqueadas | ${summary.unverifiedActions ?? 0} estados não verificados | ${summary.plannedActions ?? 0} etapas no plano | Inventário da coleção: ${summary.savedCollectionInventoryAvailable ? "confirmado" : "indisponível"}`] : []),
     "",
     "CAPTURA DE REDE",
@@ -380,17 +380,15 @@ app.post("/api/start", async (req, res) => {
       const collectionDiagnostics = collected[0]?.collectionDiagnostics || null;
       const collectionScanComplete = Boolean(collectionDiagnostics?.stableBoundaryReached &&
         (collectionDiagnostics?.dateBoundaryReached || collectionDiagnostics?.scrollTargetFound) &&
-        !collectionDiagnostics?.scanLimitReached && !collectionDiagnostics?.stoppedByUser);
-      const networkResponseLimitReached = Boolean(collectionDiagnostics?.networkResponseLimitReached);
+        !collectionDiagnostics?.stoppedByUser);
       const collectionIncomplete = !collectionScanComplete || withoutDate > 0 || withoutIdentity > 0 ||
-        networkResponseLimitReached || (collectionCoverage.available && !collectionCoverage.matches);
+        (collectionCoverage.available && !collectionCoverage.matches);
       const executionPreflightIncomplete = collectionIncomplete || !destinationGroupVerification.verified;
       if (mode === "automatic" && executionPreflightIncomplete) {
         const reasons = [];
         if (!collectionScanComplete) reasons.push("o limite do histórico não foi confirmado");
         if (withoutDate > 0) reasons.push(`${withoutDate} itens estão sem data verificável`);
         if (withoutIdentity > 0) reasons.push(`${withoutIdentity} itens não têm vínculo com a mensagem original`);
-        if (networkResponseLimitReached) reasons.push("o limite de respostas capturadas foi atingido");
         if (!destinationGroupVerification.verified) reasons.push(destinationGroupVerification.reason);
         if (collectionCoverage.available && !collectionCoverage.matches) {
           reasons.push(`meta administrativa divergente: Feed ${actualFeedForDate}/${collectionCoverage.expectedFeed}, Stories ${actualStoriesForDate}/${collectionCoverage.expectedStories}`);
@@ -400,13 +398,12 @@ app.post("/api/start", async (req, res) => {
           administrativeTarget, destinationGroupVerification, collectionIncomplete, executionPreflightIncomplete, itemsWithoutDate: withoutDate, itemsWithoutIdentity: withoutIdentity
         });
       }
-      const usedFallback = collected.some(item => item.collectionMode === "last-300-fallback");
       const milestoneCount = new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size;
       const network = collected[0]?.networkDiagnostics;
       const networkStatus = network
         ? `Rede Instagram: ${network.capturedResponses} respostas; ${network.messageLikeObjects} objetos de mensagem; reações ${network.hasReactionFields ? "presentes" : "não detectadas"}; compartilhamentos ${network.hasShareFields ? "presentes" : "não detectados"}.`
         : "Diagnóstico de rede indisponível.";
-      progress.message = `${collected.length} links encontrados${usedFallback ? " pela varredura de recuperação" : ""}; ${withoutDate} sem data identificável; ${milestoneCount} marcos administrativos identificados; ${withoutIdentity} itens sem vínculo comprovado com mensagem. ${networkStatus} Verificando histórico...`;
+      progress.message = `${collected.length} links encontrados; ${withoutDate} sem data identificável; ${milestoneCount} marcos administrativos identificados; ${withoutIdentity} itens sem vínculo comprovado com mensagem. ${networkStatus} Verificando histórico...`;
       const previous = getRecentComments(200);
       logDiagnostic("INFO", "Iniciando inspeção e planejamento das publicações", { total: collected.length, mode });
       for (const item of collected) {
@@ -662,7 +659,6 @@ app.post("/api/start", async (req, res) => {
           feedsAndReels: collected.filter(item => item.contentType !== "story").length,
           itemsWithoutDate: collected.filter(item => item.dateUnknown).length,
           itemsWithoutIdentity: withoutIdentity,
-          networkResponseLimitReached,
           inspectionFailures,
           captionUnavailable,
           storiesBlocked,
