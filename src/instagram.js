@@ -580,7 +580,7 @@ export async function inspectPost(page, url) {
 export function extractInstagramUsernameFromProfileHref(value, base = "https://www.instagram.com/") {
   try {
     const url = new URL(value, base);
-    if (!/(^|\\.)instagram\\.com$/i.test(url.hostname)) return "";
+    if (!/(^|\.)instagram\.com$/i.test(url.hostname)) return "";
     const parts = url.pathname.split("/").filter(Boolean);
     if (parts.length !== 1) return "";
     const reserved = new Set(["accounts", "direct", "explore", "reels", "stories", "p", "reel", "tv", "saved"]);
@@ -598,7 +598,7 @@ export function isInstagramSavedUrl(value, base = "https://www.instagram.com/") 
   try {
     const url = new URL(value, base);
     const segments = url.pathname.split("/").filter(Boolean);
-    return /(^|\\.)instagram\\.com$/i.test(url.hostname) &&
+    return /(^|\.)instagram\.com$/i.test(url.hostname) &&
       segments.length >= 2 &&
       segments[segments.length - 1].toLowerCase() === "saved" &&
       Boolean(extractInstagramUsernameFromProfileHref("/" + segments[0] + "/", base));
