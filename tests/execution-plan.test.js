@@ -42,11 +42,8 @@ test("sending to the collective destination group is always mandatory", () => {
 });
 
 test("completed actions are never repeated", () => {
-  const plan = buildExecutionPlan({ mode: "test", collectionName: "Curtido", taskState: { liked: true, saved: true, savedFolderVerified: true, commented: true, groupCheck: true } });
-  assert.equal(plan[0].status, "já concluída — não repetir");
-  assert.equal(plan[1].status, "já concluída — não repetir");
-  assert.equal(plan[2].status, "já concluída — não repetir");
-  assert.equal(plan[4].status, "já concluída — não repetir");
+  const plan = buildExecutionPlan({ mode: "test", collectionName: "Curtido", taskState: { liked: true, saved: true, savedFolderVerified: true, commented: true, sharedToGroup: true, groupCheck: true } });
+  for (const action of plan) assert.equal(action.status, "já concluída — não repetir");
 });
 
 test("completion flower waits for all mandatory and requested actions", () => {
