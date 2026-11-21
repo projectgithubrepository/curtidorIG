@@ -7,7 +7,7 @@ test("like and collection are mandatory; optional comment is still prepared and 
   assert.match(plan[0].status, /^simulada/);
   assert.match(plan[1].status, /^simulada/);
   assert.match(plan[2].status, /^simulada/);
-  assert.match(plan[3].status, /^opcional/);
+  assert.match(plan[3].status, /^simulada/);
 });
 
 test("explicit no-comment instruction always suppresses commenting", () => {
@@ -26,9 +26,11 @@ test("requested comment and group send are included", () => {
   assert.match(plan[3].status, /^simulada/);
 });
 
-test("explicit no-send instruction suppresses group sharing", () => {
-  const instructions = interpretGroupInstructions("Curtir, salvar, comentar e NÃO ENVIAR.");
-  assert.equal(instructions.shareToGroup, "forbidden");
+test("sending to the collective destination group is always mandatory", () => {
+  const instructions = interpretGroupInstructions("Curtir e salvar. NÃO ENVIAR.");
+  assert.equal(instructions.shareToGroup, "required");
+  const plan = buildExecutionPlan({ mode: "test", collectionName: "Curtido", comment: "Comentário válido 🌸", instructions });
+  assert.match(plan[3].status, /^simulada/);
 });
 
 test("completed actions are never repeated", () => {
@@ -44,10 +46,10 @@ test("completion flower waits for all mandatory and requested actions", () => {
     mode: "test",
     collectionName: "Curtido",
     taskState: { liked: true, saved: true, savedFolderVerified: true, commented: true },
-    instructions: { comment: "required", shareToGroup: "optional" }
+    instructions: { comment: "required", shareToGroup: "required" }
   });
-  assert.match(plan[4].status, /^simulada/);
-  assert.equal(summarizeExecutionPlan(plan).optional, 1);
+  assert.match(plan[4].status, /^aguardando/);
+  assert.equal(summarizeExecutionPlan(plan).optional, 0);
 });
 
 test("missing destination collection blocks mandatory save and completion reaction", () => {
