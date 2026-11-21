@@ -228,3 +228,7 @@ npm install
 npx playwright install chromium
 npm start
 ```
+
+### Identificação da área Salvos
+
+A rota de Salvos é construída dinamicamente a partir do perfil da sessão autenticada, no formato `/{usuario}/saved/`. O nome de usuário não pode ser fixado no código nem inferido de um link aleatório da página. A aplicação identifica o link de perfil na navegação do Instagram e só então abre a rota de Salvos correspondente. Dentro dela, a coleção é identificada pelo rótulo exato exibido na interface; não se deve tratar uma rota genérica `/saved/`, outro perfil ou uma página aleatória como a coleção solicitada. Se o perfil ou a coleção não puderem ser identificados sem ambiguidade, a operação é interrompida e registrada no diagnóstico.
