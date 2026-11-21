@@ -21,6 +21,7 @@ test("TESTE explica cada estado desconhecido e não chama ação de apta", () =>
       collectionMembership: false,
       commented: false,
       destinationGroupVerified: false,
+      messageIdentityVerified: true,
       reasons: {
         liked: "Botão Curtir não localizado.",
         saveToCollection: "Inventário da coleção não carregou.",
@@ -49,6 +50,7 @@ test("TESTE só considera aptos os estados conhecidos e a coleção validada", (
       collectionMembership: false,
       commented: true,
       destinationGroupVerified: false,
+      messageIdentityVerified: true,
       reasons: { shareToGroup: "Destino não validado." }
     }
   });
