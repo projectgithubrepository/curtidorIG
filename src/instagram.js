@@ -14,6 +14,16 @@ export async function openInstagram() {
   });
 }
 
+function sameInstagramContentUrl(actualValue, requestedValue) {
+  try {
+    const actual=new URL(actualValue);
+    const requested=new URL(requestedValue);
+    return /(^|\\.)instagram\\.com$/i.test(actual.hostname) &&
+      /(^|\\.)instagram\\.com$/i.test(requested.hostname) &&
+      actual.pathname.replace(/\\/$/,"")===requested.pathname.replace(/\\/$/,"");
+  } catch { return false; }
+}
+
 function dateInRange(sharedAt, startDate, endDate) {
   if (!sharedAt) return { known: false, inRange: false, iso: "" };
   const parsed = new Date(sharedAt);
@@ -543,6 +553,9 @@ export function interpretPostSnapshot(snapshot) {
   };
 
   const finalPath = (() => { try { return new URL(finalUrl).pathname; } catch { return finalUrl; } })();
+  if (snapshot.requestedUrl && !sameInstagramContentUrl(finalUrl,snapshot.requestedUrl)) {
+    throw Object.assign(new Error("O Instagram redirecionou a publicação para outro endereço; nenhuma ação pode ser planejada para o conteúdo solicitado."), { inspectionDiagnostics:{...diagnostics,reason:"content-redirect"} });
+  }
   if (finalPath.startsWith("/accounts/login") || finalPath.startsWith("/accounts/signup") || /entrar na sua conta|log in to instagram|log in to continue/i.test(combined)) {
     throw Object.assign(new Error("Instagram redirecionou para login; a sessão precisa ser autenticada."), { inspectionDiagnostics: { ...diagnostics, reason: "login" } });
   }
@@ -1048,6 +1061,7 @@ async function uniqueButton(page, patterns, root = "article,main,[role='dialog']
 export async function executeLike(page, url) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
+  if (!sameInstagramContentUrl(page.url(),url)) throw new Error("O Instagram não abriu a publicação solicitada; curtida bloqueada.");
   const likeState = await page.locator("article,main,[role='dialog']").first().evaluate(root => {
     const labels = [...root.querySelectorAll("button,[role=button]")].map(node => {
       const own=[node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,node.getAttribute("data-testid")];
@@ -1076,6 +1090,7 @@ function savedCollectionKey(url) {
 export async function executeSaveToCollection(page, url, collectionName, knownCollectionUrls = null) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
+  if (!sameInstagramContentUrl(page.url(),url)) throw new Error("O Instagram não abriu a publicação solicitada; salvamento bloqueado.");
   const key = savedCollectionKey(url);
   const root = page.locator("article,main,[role='dialog']").first();
   const labels = await root.locator("button,[role='button']").evaluateAll(nodes => nodes.map(node => {
@@ -1226,6 +1241,7 @@ export async function executeShareToGroup(page, url, destinationGroupName, onBef
   }
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1000);
+  if (!sameInstagramContentUrl(page.url(),url)) throw new Error("O Instagram não abriu a publicação solicitada; compartilhamento bloqueado.");
   const share = await uniqueButton(page, ["compartilhar publicação", "share post", "^compartilhar$", "^share$"]);
   await share.click();
   await page.waitForTimeout(700);
@@ -1285,6 +1301,7 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
 export async function inspectStory(page, url) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
+  if (!sameInstagramContentUrl(page.url(),url)) throw new Error("O Instagram não abriu o Story solicitado; nenhuma ação será planejada para outro conteúdo.");
   await expandVisibleCommentThreads(page);
   if (/accounts\/login/.test(page.url())) throw new Error("Sessão do Instagram não autenticada.");
   const snapshot = await page.evaluate(() => {
