@@ -1239,17 +1239,20 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
   const sharedUrls = new Set();
   let sharedInventoryComplete = false;
   let stalledRounds = 0;
-  for (let round = 0; round < 150 && stalledRounds < MAX_STALLED_SCROLL_ROUNDS; round++) {
-    for (const item of await readVisiblePostLinks(page)) sharedUrls.add(item.url);
-    const scroll = await scrollToOlderMessages(page);
-    if (didReachHistoryStart(scroll.after, scroll.progressed) || (!scroll.progressed && scroll.before?.found && isAtHistoryStart(scroll.before))) {
-      sharedInventoryComplete = true;
+  try {
+    for (let round = 0; round < 150 && stalledRounds < MAX_STALLED_SCROLL_ROUNDS; round++) {
       for (const item of await readVisiblePostLinks(page)) sharedUrls.add(item.url);
-      break;
+      const scroll = await scrollToOlderMessages(page);
+      if (didReachHistoryStart(scroll.after, scroll.progressed) || (!scroll.progressed && scroll.before?.found && isAtHistoryStart(scroll.before))) {
+        sharedInventoryComplete = true;
+        for (const item of await readVisiblePostLinks(page)) sharedUrls.add(item.url);
+        break;
+      }
+      stalledRounds = scroll.progressed ? 0 : stalledRounds + 1;
     }
-    stalledRounds = scroll.progressed ? 0 : stalledRounds + 1;
+  } finally {
+    await networkCapture.stop();
   }
-  await networkCapture.stop();
   const networkRecords=networkCapture.records();
   for(const record of networkRecords){
     if(String(record.threadId||"")!==String(threadId))continue;
