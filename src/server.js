@@ -403,7 +403,8 @@ app.post("/api/start", async (req, res) => {
           const commentSource = inspection.caption?.trim() ? "legenda" : "fallback sem legenda";
           const stateKnown = {
             liked: inspection.stateKnown?.liked === true,
-            saved: inspection.stateKnown?.saved === true,
+            savedStateKnown: inspection.stateKnown?.saved === true,
+            saved: inspection.observedState.saved === true,
             collectionMembership: Boolean(savedCollectionInventoryAvailable && savedCollectionUrls?.has(collectionKey)),
             collectionInventoryAvailable: Boolean(savedCollectionInventoryAvailable),
             commented: inspection.stateKnown?.commented === true,
