@@ -34,3 +34,27 @@ test("does not declare history complete when the selected container starts at th
   assert.equal(didReachHistoryStart(top, false), false);
   assert.equal(didReachHistoryStart(top, true), true);
 });
+
+
+import { oldestCapturedMessageDate } from "../src/instagram.js";
+
+test("uses the oldest timestamp from the selected conversation to detect the date boundary", () => {
+  const records = [
+    { threadId: "thread-1", timestamp: "2026-11-21T18:00:00.000Z" },
+    { threadId: "thread-1", timestamp: "2026-11-20T23:30:00.000Z" },
+    { threadId: "thread-2", timestamp: "2026-11-18T12:00:00.000Z" }
+  ];
+  assert.equal(oldestCapturedMessageDate(records, "thread-1"), "2026-11-20");
+});
+
+test("does not use timestamps from another conversation as the selected date boundary", () => {
+  const records = [
+    { threadId: "other-thread", timestamp: "2026-11-18T12:00:00.000Z" },
+    { threadId: "selected-thread", timestamp: "2026-11-21T09:00:00.000Z" }
+  ];
+  assert.equal(oldestCapturedMessageDate(records, "selected-thread"), "2026-11-21");
+});
+
+test("returns no date when the selected conversation has no valid timestamps", () => {
+  assert.equal(oldestCapturedMessageDate([{ threadId: "selected-thread", timestamp: "" }], "selected-thread"), "");
+});
