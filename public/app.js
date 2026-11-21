@@ -80,7 +80,7 @@ function renderPreliminary(summary, request) {
     ? `Meta administrativa: Feed ${coverage.actualFeed}/${coverage.expectedFeed} (faltam ${coverage.missingFeed}, excedentes ${coverage.excessFeed}) · Stories ${coverage.actualStories}/${coverage.expectedStories} (faltam ${coverage.missingStories}, excedentes ${coverage.excessStories}) · ${coverage.matches ? "contagens conferem" : "COLETA INCOMPLETA — divergência"}.`
     : "Sem meta administrativa correspondente à data para validar a quantidade.";
   const scanText = scan.historyRounds !== undefined
-    ? `Varredura: ${scan.historyRounds} rodadas · ${scan.dateBoundaryReached ? "mensagem anterior à data inicial encontrada" : scan.stableBoundaryReached ? "topo do histórico detectado" : "fim do histórico não confirmado"} · ${summary.itemsWithoutDate ?? 0} itens sem data mantidos como candidatos.`
+    ? `Varredura: ${scan.historyRounds} rodadas · ${scan.dateBoundaryReached ? "mensagem anterior à data inicial encontrada" : scan.stableBoundaryReached ? "topo do histórico detectado" : "fim do histórico não confirmado"} · ${summary.itemsWithoutDate ?? 0} itens sem data mantidos como candidatos · ${summary.itemsWithoutIdentity ?? 0} sem vínculo com mensagem.`
     : "Diagnóstico de varredura indisponível.";
   preliminaryIntro.textContent = `${summary.publicationsFound ?? 0} itens encontrados · ${summary.publicationsInspected ?? 0} inspecionados. ${coverageText} ${scanText} Os quantitativos abaixo mostram o que o sistema avaliou; não são ações realizadas.`;
   preliminaryMetrics.replaceChildren();
