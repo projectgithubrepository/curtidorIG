@@ -116,3 +116,8 @@ A função **Dessalvar publicações em lote, individualmente** deve navegar at�
 - Antes de enviar ao grupo coletivo, percorre o histórico do grupo de destino e compara a URL canônica da publicação (incluindo Reels e Stories). Link encontrado significa envio já concluído e não deve ser repetido. Se o histórico não puder ser percorrido até o início e o link não for encontrado, o estado é desconhecido e a execução automática é bloqueada.
 - Tentativa de envio sem confirmação permanece bloqueada até conferência manual; não repetir automaticamente.
 - O histórico local é uma proteção adicional, não substitui a conferência do estado atual no Instagram.
+
+
+### Identificação do grupo coletivo por URL direta
+
+Quando configurada, a URL `https://www.instagram.com/direct/t/ID/` é o localizador primário da conversa coletiva. A aplicação deve confirmar o ID aberto e o nome exato no cabeçalho antes de inventariar o histórico ou permitir envios. Se a confirmação falhar, bloquear a etapa; não selecionar outra conversa por aproximação.
