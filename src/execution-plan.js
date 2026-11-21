@@ -1,11 +1,28 @@
-const ACTIONS = ["like", "comment", "shareToGroup", "saveToCollection", "completionReaction"];
+const ACTIONS = ["like", "saveToCollection", "comment", "shareToGroup", "completionReaction"];
+
+export function interpretGroupInstructions(messageText = "") {
+  const text = String(messageText ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+  const noComment = /\\b(nao comentar|nao comente|sem comentario|proibido comentar|comentario proibido)\\b/.test(text);
+  const optionalComment = /\\b(comentario opcional|se quiser comentar|opcional comentar|pode comentar se quiser)\\b/.test(text);
+  const commentRequested = !noComment && !optionalComment &&
+    /\\b(comentar|comente|comentario)\\b/.test(text);
+  const noShare = /\\b(nao enviar|nao envie|nao compartilhar|nao compartilhe|sem envio)\\b/.test(text);
+  const shareRequested = !noShare &&
+    /\\b(enviar|envie|compartilhar|compartilhe|mandar|mande)\\b/.test(text);
+  return {
+    comment: noComment ? "forbidden" : commentRequested ? "required" : "optional",
+    shareToGroup: noShare ? "forbidden" : shareRequested ? "required" : "optional",
+    sourceText: String(messageText ?? "")
+  };
+}
 
 export function buildExecutionPlan({
   taskState = {},
   comment = "",
   collectionName = "",
   completionEmoji = "🌸",
-  mode = "test"
+  mode = "test",
+  instructions = {}
 } = {}) {
   const state = {
     liked: Boolean(taskState.liked),
@@ -15,24 +32,38 @@ export function buildExecutionPlan({
     savedFolderVerified: Boolean(taskState.savedFolderVerified),
     groupCheck: Boolean(taskState.groupCheck)
   };
+  const policy = {
+    comment: ["required", "optional", "forbidden"].includes(instructions.comment) ? instructions.comment : "optional",
+    shareToGroup: ["required", "optional", "forbidden"].includes(instructions.shareToGroup) ? instructions.shareToGroup : "optional"
+  };
   const plan = [
-    { action: "like", label: "Curtir", alreadyDone: state.liked, eligible: true },
-    { action: "comment", label: "Comentar", alreadyDone: state.commented, eligible: Boolean(comment) },
-    { action: "shareToGroup", label: "Enviar no grupo", alreadyDone: state.sharedToGroup, eligible: true },
-    { action: "saveToCollection", label: "Salvar na coleção", alreadyDone: state.saved && state.savedFolderVerified, eligible: Boolean(collectionName) },
-    { action: "completionReaction", label: `Marcar mensagem com ${completionEmoji}`, alreadyDone: state.groupCheck, eligible: true, requiresAllPrevious: true }
+    { action: "like", label: "Curtir", alreadyDone: state.liked, eligible: true, required: true },
+    { action: "saveToCollection", label: `Salvar na coleção “${collectionName || "Curtido"}”`, alreadyDone: state.saved && state.savedFolderVerified, eligible: Boolean(collectionName), required: true },
+    { action: "comment", label: "Comentar", alreadyDone: state.commented, eligible: policy.comment === "required" && Boolean(comment), required: policy.comment === "required", policy: policy.comment },
+    { action: "shareToGroup", label: "Enviar para o grupo de destino", alreadyDone: state.sharedToGroup, eligible: policy.shareToGroup === "required", required: policy.shareToGroup === "required", policy: policy.shareToGroup },
+    { action: "completionReaction", label: `Reagir à mensagem original com ${completionEmoji}`, alreadyDone: state.groupCheck, eligible: true, required: true, requiresAllPrevious: true }
   ];
-  const prerequisitesDone = plan.slice(0, 4).every(item => item.alreadyDone);
+  const requiredStepsDone = plan.slice(0, 4).every(item =>
+    !item.required || item.alreadyDone || (!item.eligible && item.action !== "comment" && item.action !== "shareToGroup")
+  );
   return plan.map((item, index) => {
     let status = "pendente";
     let reason = "";
     if (item.alreadyDone) status = "já concluída — não repetir";
-    else if (!item.eligible) {
+    else if (item.action === "comment" && item.policy === "forbidden") {
+      status = "dispensada — pedido explícito para não comentar";
+    } else if (item.action === "comment" && item.policy === "optional") {
+      status = "opcional — não comentar sem solicitação explícita";
+    } else if (item.action === "shareToGroup" && item.policy === "forbidden") {
+      status = "dispensada — pedido explícito para não enviar";
+    } else if (item.action === "shareToGroup" && item.policy === "optional") {
+      status = "opcional — envio não solicitado";
+    } else if (!item.eligible) {
       status = "bloqueada";
-      reason = item.action === "comment" ? "Não foi possível preparar um comentário." : "Informe a coleção de destino.";
-    } else if (item.requiresAllPrevious && !prerequisitesDone) {
-      status = "aguardando etapas anteriores";
-      reason = "A flor só pode ser aplicada depois da conclusão das demais etapas.";
+      reason = item.action === "saveToCollection" ? "Informe a coleção obrigatória de destino." : "Não foi possível preparar o comentário solicitado.";
+    } else if (item.requiresAllPrevious && !requiredStepsDone) {
+      status = "aguardando etapas obrigatórias";
+      reason = "A reação só pode ser aplicada após concluir as ações obrigatórias e as solicitadas.";
     } else if (mode === "test") status = "simulada — nenhuma ação executada";
     else if (mode === "manual") status = "aguardando ação manual";
     else status = "pronta para execução";
@@ -47,7 +78,8 @@ export function summarizeExecutionPlan(plan = []) {
     simulated: plan.filter(item => item.status.startsWith("simulada")).length,
     pending: plan.filter(item => item.status === "pendente").length,
     blocked: plan.filter(item => item.status === "bloqueada").length,
-    waiting: plan.filter(item => item.status === "aguardando etapas anteriores").length
+    optional: plan.filter(item => item.status.startsWith("opcional") || item.status.startsWith("dispensada")).length,
+    waiting: plan.filter(item => item.status.startsWith("aguardando etapas")).length
   };
 }
 
