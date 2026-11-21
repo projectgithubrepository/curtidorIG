@@ -151,18 +151,18 @@ function collectStoryUrls(value, output, seen = new WeakSet(), depth = 0, storyC
     collectStoryUrls(child, output, seen, depth + 1, childStoryContext);
   }
 }
-function collectMediaCodes(value, output, seen = new WeakSet(), depth = 0, insideShare = false) {
+function collectMediaCodes(value, output, seen = new WeakSet(), depth = 0, insideShare = false, insideStory = false) {
   if (!value || typeof value !== "object" || depth > MAX_DEPTH || seen.has(value)) return;
   seen.add(value);
   if (Array.isArray(value)) {
-    value.forEach(item => collectMediaCodes(item, output, seen, depth + 1, insideShare));
+    value.forEach(item => collectMediaCodes(item, output, seen, depth + 1, insideShare, insideStory));
     return;
   }
   const code = value.code ?? value.shortcode ?? value.short_code;
   const ownMediaContext = Boolean(value.media || value.media_share || value.xma ||
     value.product_type || value.media_type != null || value.image_versions2 ||
     value.video_versions || value.carousel_media || value.__typename === "XDTMedia");
-  if (code && (ownMediaContext || insideShare) && /^[A-Za-z0-9_-]{5,}$/.test(String(code))) {
+  if (code && !insideStory && (ownMediaContext || insideShare) && /^[A-Za-z0-9_-]{5,}$/.test(String(code))) {
     const productType = String(value.product_type || "").toLowerCase();
     // Story IDs não são shortcodes de Feed. Só criamos URLs de Story quando
     // há uma estrutura explícita de story_share/shared_story com perfil e ID.
@@ -173,8 +173,9 @@ function collectMediaCodes(value, output, seen = new WeakSet(), depth = 0, insid
     }
   }
   for (const [key, child] of Object.entries(value)) {
+    const childIsStory = insideStory || /^(story|stories|story_share|shared_story|story_media|story_item|story_items|shared_story_media)$/i.test(key);
     const childIsShare = insideShare || /^(share|media_share|xma|shared_media|media)$/i.test(key);
-    collectMediaCodes(child, output, seen, depth + 1, childIsShare);
+    collectMediaCodes(child, output, seen, depth + 1, childIsShare, childIsStory);
   }
 }
 
