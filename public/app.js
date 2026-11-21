@@ -176,7 +176,8 @@ function render(items) {
       ["Salvamento no Instagram",verification.saved,"saved"],
       ["Presença na coleção escolhida",verification.collectionMembership,"saveToCollection"],
       ["Comentário anterior",verification.commented,"commented"],
-      ["Grupo coletivo",verification.destinationGroupVerified,"shareToGroup"]
+      ["Grupo coletivo",verification.destinationGroupVerified,"shareToGroup"],
+      ["Mensagem original do grupo",verification.messageIdentityVerified,"messageIdentityVerified"]
     ]) {
       const li=document.createElement("li");
       const known=key==="liked" ? verification.likedKnown : key==="saved" ? verification.savedKnown : key==="commented" ? verification.commentedKnown : value===true;
