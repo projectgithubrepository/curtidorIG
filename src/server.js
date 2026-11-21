@@ -94,7 +94,7 @@ app.get("/api/diagnostic-log", (_req, res) => {
     `Grupo: ${report.request?.groupName || "não informado"} | Período: ${report.request?.startDate || "?"} a ${report.request?.endDate || "?"}`,
     `Coleção de destino: ${report.request?.collectionName || "não informada"}`,
     `Publicações: ${summary.publicationsFound ?? report.publications?.length ?? 0} | Feed/Reels: ${summary.feedsAndReels ?? "?"} | Stories: ${summary.stories ?? "?"} | Marcos administrativos: ${summary.administrativeMilestones ?? "?"} | Sem data: ${summary.itemsWithoutDate ?? "?"}`,
-    ...(report.request?.mode === "test" ? [`PLANO DE TESTE: ${summary.publicationsInspected ?? 0} itens processados | ${summary.inspectionFailures ?? 0} inspeções interrompidas | ${summary.captionUnavailable ?? 0} sem legenda legível | ${summary.storiesBlocked ?? 0} Stories bloqueadas | ${summary.plannedActions ?? 0} etapas planejadas | Inventário da coleção: ${summary.savedCollectionInventoryAvailable ? "confirmado" : "indisponível"}`] : []),
+    ...(report.request?.mode === "test" ? [`PLANO DE TESTE: ${summary.publicationsInspected ?? 0} itens processados | ${summary.inspectionFailures ?? 0} inspeções interrompidas | ${summary.captionUnavailable ?? 0} sem legenda legível | ${summary.storiesBlocked ?? 0} Stories bloqueadas | ${summary.plannedActions ?? 0} etapas planejadas | ${summary.unverifiedActions ?? 0} ações não verificadas | Inventário da coleção: ${summary.savedCollectionInventoryAvailable ? "confirmado" : "indisponível"}`] : []),
     "",
     "CAPTURA DE REDE",
     `Respostas: ${network.capturedResponses ?? 0} | Lidas: ${network.parsedResponses ?? 0} | Não interpretadas: ${network.unparsedResponses ?? 0}`,
@@ -428,18 +428,21 @@ app.post("/api/start", async (req, res) => {
       const captionUnavailable = results.filter(item => item.inspectionDiagnostics?.captionAvailable === false).length;
       const storiesBlocked = results.filter(item => item.contentType === "story").length;
       const plannedActions = results.reduce((sum,item) => sum + (item.plan?.length || 0), 0);
+      const unverifiedActions = results.filter(item => item.contentType !== "story").reduce((sum,item) =>
+        sum + (item.plan || []).filter(action => /^(não verificada|bloqueada)/.test(action.status)).length, 0);
+      const testIncomplete = mode === "test" && (inspectionFailures > 0 || captionUnavailable > 0 || unverifiedActions > 0 || !savedCollectionInventoryAvailable);
       progress.message = mode === "test"
-        ? `TESTE finalizado: ${results.length}/${collected.length} publicações listadas; ${inspectionFailures} inspeções incompletas; ${storiesBlocked} Stories bloqueadas; ${plannedActions} etapas exibidas no planejamento. Nenhuma ação foi executada.`
+        ? `TESTE ${testIncomplete ? "PARCIAL" : "CONCLUÍDO"}: ${results.length}/${collected.length} publicações listadas; ${inspectionFailures} inspeções interrompidas; ${captionUnavailable} sem legenda legível; ${unverifiedActions} ações sem verificação suficiente; ${storiesBlocked} Stories bloqueadas; ${plannedActions} etapas exibidas. Nenhuma ação foi executada.`
         : mode === "manual" ? `Coleta concluída: ${results.length} itens preparados para execução manual.`
         : `Execução automática finalizada: ${results.length} itens analisados. Consulte o resultado de cada ação.`;
-      logDiagnostic("INFO", "Coleta concluída", { listed: results.length, networkResponses: network?.capturedResponses ?? 0 });
+      logDiagnostic("INFO", "Coleta concluída", { listed: results.length, inspectionFailures, captionUnavailable, unverifiedActions, savedCollectionInventoryAvailable, networkResponses: network?.capturedResponses ?? 0 });
       diagnosticReport = {
         schemaVersion: 1,
         application: "curtidorIG",
         generatedAt: new Date().toISOString(),
         startedAt,
         finishedAt: new Date().toISOString(),
-        outcome: stopRequested ? "interrompida" : "concluída",
+        outcome: stopRequested ? "interrompida" : testIncomplete ? "parcial" : "concluída",
         request: { groupName, collectionName, destinationGroupName, mode, completionEmoji, startDate, endDate },
         summary: {
           publicationsFound: collected.length,
@@ -452,6 +455,7 @@ app.post("/api/start", async (req, res) => {
           captionUnavailable,
           storiesBlocked,
           plannedActions,
+          unverifiedActions,
           savedCollectionInventoryAvailable
         },
         networkDiagnostics: collected[0]?.networkDiagnostics || null,
