@@ -76,6 +76,9 @@ export function buildExecutionPlan({
     } else if (mode === "test" && !item.alreadyDone && item.action === "shareToGroup" && stateKnown.destinationGroupVerified !== true) {
       status = "não verificada — grupo coletivo não validado";
       reason = stateKnown.reasons?.shareToGroup || "O grupo coletivo não foi localizado e confirmado; não é possível classificar o envio como apto.";
+    } else if (mode === "test" && !item.alreadyDone && item.required && stateKnown.messageIdentityVerified !== true) {
+      status = "não verificada — mensagem original não identificada";
+      reason = stateKnown.reasons?.messageIdentityVerified || "A publicação não está vinculada com segurança à mensagem e ao pedido de origem; não pode ser considerada apta.";
     } else if (item.requiresAllPrevious && !requiredStepsDone) {
       status = "aguardando etapas obrigatórias";
       reason = "A reação só pode ser aplicada após concluir as ações obrigatórias e as solicitadas.";
