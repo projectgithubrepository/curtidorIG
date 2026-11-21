@@ -599,7 +599,7 @@ async function verifyPostInCollection(page, url, collectionName) {
   const collection = await inspectSavedCollection(page, collectionName);
   const target = new URL(url);
   const found = collection.items.some(item => {
-    try { const candidate = new URL(item.url); return candidate.pathname.replace(/\\/$/,"") === target.pathname.replace(/\\/$/,""); }
+    try { const candidate = new URL(item.url); return candidate.pathname.replace(/\/$/,"") === target.pathname.replace(/\/$/,""); }
     catch { return false; }
   });
   return found;
