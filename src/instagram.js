@@ -1210,6 +1210,9 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
   const threadId = page.url().match(/\/direct\/t\/(\d+)/)?.[1] || "";
   if (!threadId) return { verified:false, reason:`A conversa “${groupName}” abriu, mas o ID da conversa não foi confirmado.`, threadId:"", sharedUrls:[], sharedInventoryComplete:false };
   // Percorre o histórico do destino antes de decidir se um link ainda precisa ser enviado.
+  // A captura de rede complementa os links visíveis do DOM, pois cartões/anexos
+  // do Direct nem sempre expõem o permalink como <a href>.
+  const networkCapture=createInstagramNetworkCapture(page);
   const sharedUrls = new Set();
   let sharedInventoryComplete = false;
   let stalledRounds = 0;
@@ -1222,6 +1225,12 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
       break;
     }
     stalledRounds = scroll.progressed ? 0 : stalledRounds + 1;
+  }
+  await networkCapture.stop();
+  const networkRecords=networkCapture.records();
+  for(const record of networkRecords){
+    if(String(record.threadId||"")!==String(threadId))continue;
+    for(const url of record.urls||[]) if(/\\/stories\\/|\\/(?:p|reel|tv)\\//i.test(url)) sharedUrls.add(url);
   }
   return {
     verified:true, groupName,
