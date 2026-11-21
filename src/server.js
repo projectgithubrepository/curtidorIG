@@ -368,10 +368,22 @@ app.post("/api/start", async (req, res) => {
       } : { available: false };
       const collectionDiagnostics = collected[0]?.collectionDiagnostics || null;
       const collectionScanComplete = Boolean(collectionDiagnostics?.stableBoundaryReached &&
-        collectionDiagnostics?.scrollTargetFound && !collectionDiagnostics?.scanLimitReached &&
-        !collectionDiagnostics?.stoppedByUser);
+        (collectionDiagnostics?.dateBoundaryReached || collectionDiagnostics?.scrollTargetFound) &&
+        !collectionDiagnostics?.scanLimitReached && !collectionDiagnostics?.stoppedByUser);
       const collectionIncomplete = !collectionScanComplete || withoutDate > 0 ||
         (collectionCoverage.available && !collectionCoverage.matches);
+      if (mode === "automatic" && collectionIncomplete) {
+        const reasons = [];
+        if (!collectionScanComplete) reasons.push("o limite do histórico não foi confirmado");
+        if (withoutDate > 0) reasons.push(`${withoutDate} itens estão sem data verificável`);
+        if (collectionCoverage.available && !collectionCoverage.matches) {
+          reasons.push(`meta administrativa divergente: Feed ${actualFeedForDate}/${collectionCoverage.expectedFeed}, Stories ${actualStoriesForDate}/${collectionCoverage.expectedStories}`);
+        }
+        throw Object.assign(new Error("Execução automática cancelada antes de qualquer ação: coleta incompleta — " + reasons.join("; ") + "."), {
+          collectionCoverage, collectionDiagnostics, networkDiagnostics: collected[0]?.networkDiagnostics || null,
+          administrativeTarget, collectionIncomplete, itemsWithoutDate: withoutDate
+        });
+      }
       const usedFallback = collected.some(item => item.collectionMode === "last-300-fallback");
       const milestoneCount = new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size;
       const network = collected[0]?.networkDiagnostics;
@@ -652,10 +664,19 @@ app.post("/api/start", async (req, res) => {
         generatedAt: new Date().toISOString(),
         startedAt,
         finishedAt: new Date().toISOString(),
-        outcome: "erro",
-        request: { groupName, startDate, endDate },
-        summary: { publicationsFound: results.length, publicationsInspected: results.length },
+        outcome: error.collectionIncomplete ? "parcial" : "erro",
+        request: { groupName, collectionName, destinationGroupName, mode, startDate, endDate },
+        summary: {
+          publicationsFound: results.length,
+          publicationsInspected: results.length,
+          administrativeTarget: error.administrativeTarget || null,
+          collectionCoverage: error.collectionCoverage || null,
+          collectionDiagnostics: error.collectionDiagnostics || null,
+          collectionIncomplete: Boolean(error.collectionIncomplete),
+          itemsWithoutDate: error.itemsWithoutDate ?? 0
+        },
         networkDiagnostics: error.networkDiagnostics || results[0]?.networkDiagnostics || null,
+        collectionDiagnostics: error.collectionDiagnostics || null,
         pageDiagnostics: error.pageDiagnostics || null,
         scrollDiagnostics: error.scrollDiagnostics || null,
         publications: results.map(reportItem),
