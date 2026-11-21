@@ -98,7 +98,7 @@ function render(items) {
     for (const [key,label] of actions) {
       if (task[key] || (key==="savedFolderVerified" && !task.saved)) continue;
       const button=document.createElement("button"); button.type="button"; button.className="secondary small-action";
-      button.textContent=label; button.dataset.action=key; button.dataset.url=item.url;
+      button.textContent=label; button.dataset.action=key; button.dataset.url=item.url; button.dataset.messageId=item.messageId || ""; button.dataset.threadId=item.threadId || "";
       button.disabled=!item.identityVerified;
       controls.append(button);
     }
@@ -133,7 +133,7 @@ results.addEventListener("click", async event => {
   if (!window.confirm(labels[action] + "\n\nA aplicação apenas registrará sua confirmação; não executará a ação no Instagram.")) return;
   button.disabled=true;
   try {
-    const response=await fetch("/api/confirm-action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:button.dataset.url,action})});
+    const response=await fetch("/api/confirm-action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:button.dataset.url,messageId:button.dataset.messageId,threadId:button.dataset.threadId,action})});
     const data=await response.json();
     if (!response.ok) throw new Error(data.error || "Não foi possível registrar a confirmação.");
     await refresh();
