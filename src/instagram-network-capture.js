@@ -139,7 +139,7 @@ function collectStoryUrls(value, output, seen = new WeakSet(), depth = 0, storyC
   const entries = Object.entries(value);
   const typename = String(value.__typename || value.type || "").toLowerCase();
   const productType = String(value.product_type || value.productType || "").toLowerCase();
-  const ownStoryMarker = /story|stories/.test(typename) || /^(story|stories)$/.test(productType) || entries.some(([key]) => /^(story_id|story_pk|story_media_id)$/i.test(key));
+  const ownStoryMarker = /story|stories/.test(typename) || /^(story|stories)$/.test(productType) || value.is_story === true || String(value.media_type || "").toLowerCase() === "story" || entries.some(([key]) => /^(story_id|story_pk|story_media_id)$/i.test(key));
   const identity = storyIdentity(value);
   if ((storyContext || ownStoryMarker) && identity.username && identity.storyId) {
     const url = "https://www.instagram.com/stories/" + identity.username + "/" + identity.storyId;
@@ -147,7 +147,7 @@ function collectStoryUrls(value, output, seen = new WeakSet(), depth = 0, storyC
   }
   for (const [key, child] of entries) {
     if (!child || typeof child !== "object") continue;
-    const childStoryContext = storyContext || /^(story|stories|story_share|shared_story|story_media|story_item|shared_story_media)$/i.test(key);
+    const childStoryContext = storyContext || /^(story|stories|story_share|shared_story|story_media|story_item|story_items|shared_story_media)$/i.test(key);
     collectStoryUrls(child, output, seen, depth + 1, childStoryContext);
   }
 }
