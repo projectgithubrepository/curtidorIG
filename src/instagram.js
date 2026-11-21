@@ -643,7 +643,7 @@ export async function inspectSavedCollection(page, collectionName) {
       // Recolhe somente rótulos dos ancestrais próximos, sem usar o texto
       // global da página, e mantém o href real do link dentro de Salvos.
       const ancestorLabels = [];
-      for (let node = anchor, depth = 0; node && depth < 4; node = node.parentElement, depth++) {
+      for (let node = anchor, depth = 0; node && depth < 8; node = node.parentElement, depth++) {
         if (node === document.body || node === document.documentElement) break;
         const text = (node.innerText || "").trim();
         if (text && text.length <= 500) ancestorLabels.push(text);
@@ -661,7 +661,34 @@ export async function inspectSavedCollection(page, collectionName) {
         labels: [...new Set(ancestorLabels)]
       };
     }));
-  const collectionHref = selectSavedCollectionHref(anchors, name, page.url());
+  // Alguns layouts renderizam o nome em um ramo irmão do link da miniatura.
+  // Procura o texto exato e associa somente um link descendente na área Salvos.
+  const siblingLabelLinks = await page.locator("body *").evaluateAll((nodes, targetName) => {
+    const normalize = value => String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/\\s+/g, " ").trim().toLocaleLowerCase();
+    const target = normalize(targetName);
+    const found = [];
+    for (const node of nodes) {
+      const text = (node.innerText || node.textContent || "").trim();
+      if (!text || !text.split(/[\\r\\n]+/).some(line => normalize(line) === target)) continue;
+      for (let parent = node, depth = 0; parent && depth < 8; parent = parent.parentElement, depth++) {
+        const links = [...parent.querySelectorAll("a[href]")].filter(anchor => {
+          try { const url = new URL(anchor.href, location.href); return url.origin === location.origin && url.pathname.split("/").some(part => part.toLowerCase() === "saved"); } catch { return false; }
+        });
+        if (links.length) {
+          for (const anchor of links) found.push({ href: anchor.href, text: anchor.innerText || "", ariaLabel: anchor.getAttribute("aria-label") || "", title: anchor.getAttribute("title") || "", labels: [text] });
+          break;
+        }
+      }
+    }
+    return found;
+  }, name);
+  anchors.push(...siblingLabelLinks);
+  let collectionHref;
+  try { collectionHref = selectSavedCollectionHref(anchors, name, page.url()); }
+  catch (error) {
+    const diagnostics = await page.evaluate(() => ({ url: location.href, title: document.title, visibleText: (document.body?.innerText || "").slice(0, 1200), savedLinks: [...document.querySelectorAll("a[href]")].filter(a => /\\/saved\\//i.test(a.getAttribute("href") || "")).length })).catch(() => ({}));
+    throw new Error(error.message + " Diagnóstico da página Salvos: " + JSON.stringify(diagnostics));
+  }
   await page.goto(collectionHref, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1400);
   if (!isInstagramSavedUrl(page.url())) {
