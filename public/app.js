@@ -1,5 +1,8 @@
 const groupName = document.querySelector("#groupName");
 const collectionName = document.querySelector("#collectionName");
+const destinationGroupName = document.querySelector("#destinationGroupName");
+const mode = document.querySelector("#mode");
+const completionEmoji = document.querySelector("#completionEmoji");
 const startDate = document.querySelector("#startDate");
 const endDate = document.querySelector("#endDate");
 const start = document.querySelector("#start");
@@ -47,7 +50,9 @@ connect.addEventListener("click", async () => {
 start.addEventListener("click", async () => {
   start.disabled = true;
   try {
-    const response = await fetch("/api/start", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ groupName:groupName.value, collectionName:collectionName.value, startDate:startDate.value, endDate:endDate.value }) });
+    const confirmed = mode.value === "automatic" ? window.confirm("AUTOMÁTICO: o app poderá curtir, salvar, comentar e compartilhar publicações, além de reagir às mensagens originais. Confirme que o grupo coletivo e a coleção estão corretos. Continuar?") : false;
+  if (mode.value === "automatic" && !confirmed) { start.disabled = false; return; }
+  const response = await fetch("/api/start", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ groupName:groupName.value, collectionName:collectionName.value, destinationGroupName:destinationGroupName.value, mode:mode.value, completionEmoji:completionEmoji.value, confirm:confirmed, startDate:startDate.value, endDate:endDate.value }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Não foi possível iniciar.");
     message.textContent = data.message;
@@ -66,7 +71,7 @@ function render(items) {
     const type=document.createElement("small"); type.textContent=item.contentType === "story" ? "Story · fluxo específico ainda não automatizado" : "Feed / Reel";
     const stateLine=document.createElement("small");
     const task=item.taskState || { saved:false, savedFolderVerified:false, liked:false, commented:false, groupCheck:false };
-    stateLine.textContent = [`Salva: ${task.saved ? "confirmada" : "pendente"}`, `Pasta: ${task.savedFolderVerified ? "confirmada" : "pendente"}`, `Curtida: ${task.liked ? "confirmada" : "pendente"}`, `Comentário: ${task.commented ? "confirmado" : "pendente"}`, `Check no grupo: ${task.groupCheck ? "confirmado" : "pendente"}`].join(" · ");
+    stateLine.textContent = [`Salva: ${task.saved ? "confirmada" : "pendente"}`, `Pasta: ${task.savedFolderVerified ? "confirmada" : "pendente"}`, `Curtida: ${task.liked ? "confirmada" : "pendente"}`, `Comentário: ${task.commented ? "confirmado" : task.commentForbidden ? "dispensado pelo pedido" : "pendente"}`, `Enviado ao grupo: ${task.sharedToGroup ? "confirmado" : "pendente"}`, `Reação na mensagem: ${task.groupCheck ? "confirmada" : "pendente"}`].join(" · ");
     const date=document.createElement("small"); date.textContent=item.sharedAt ? new Date(item.sharedAt).toLocaleString("pt-BR") : "Data não identificada";
     const markers=document.createElement("small");
     const milestoneCount=(item.administrativeMilestones || []).length;
@@ -84,7 +89,8 @@ function render(items) {
       ["savedFolderVerified","Confirmar pasta correta"],
       ["liked","Confirmar curtida"],
       ["commented","Confirmar comentário"],
-      ["groupCheck","Confirmar check no grupo"]
+      ["sharedToGroup","Confirmar envio ao grupo"],
+      ["groupCheck","Confirmar reação na mensagem"]
     ];
     for (const [key,label] of actions) {
       if (task[key] || (key==="savedFolderVerified" && !task.saved)) continue;
@@ -117,7 +123,8 @@ results.addEventListener("click", async event => {
     savedFolderVerified:"Você conferiu que ela está na coleção/pasta correta?",
     liked:"Você já curtiu esta publicação?",
     commented:"Você já publicou o comentário no Instagram?",
-    groupCheck:"Você confirmou o check na mensagem exata do grupo?"
+    sharedToGroup:"Você enviou esta publicação ao grupo coletivo de envios?",
+    groupCheck:"Você aplicou a reação na mensagem exata do grupo?"
   };
   const action=button.dataset.action;
   if (!window.confirm(labels[action] + "\n\nA aplicação apenas registrará sua confirmação; não executará a ação no Instagram.")) return;
