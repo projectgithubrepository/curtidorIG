@@ -1301,9 +1301,10 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
 export async function inspectStory(page, url) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
+  if (/accounts\/login/.test(page.url())) throw new Error("Sessão do Instagram não autenticada.");
+  if (/challenge|checkpoint|suspended/i.test(page.url())) throw new Error("Instagram apresentou uma etapa de segurança; Story não analisado.");
   if (!sameInstagramContentUrl(page.url(),url)) throw new Error("O Instagram não abriu o Story solicitado; nenhuma ação será planejada para outro conteúdo.");
   await expandVisibleCommentThreads(page);
-  if (/accounts\/login/.test(page.url())) throw new Error("Sessão do Instagram não autenticada.");
   const snapshot = await page.evaluate(() => {
     const visible = node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; };
     const fields = [...document.querySelectorAll('textarea,input,[contenteditable="true"],[role="textbox"]')].filter(visible);
@@ -1315,8 +1316,12 @@ export async function inspectStory(page, url) {
       [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ").trim()
     );
     const bodyText=(document.body?.innerText||"").slice(0,4000);
-    const profile=[...document.querySelectorAll("nav a[href],a[href]")].find(a=>/perfil|profile/i.test([a.getAttribute("aria-label"),a.innerText].filter(Boolean).join(" ")));
-    const username=(profile?.getAttribute("href")||"").split("/").filter(Boolean)[0]||"";
+    const profile=[...document.querySelectorAll("nav a[href],a[href]")].filter(a=>{
+      const labels=[a.getAttribute("aria-label"),a.getAttribute("title"),a.innerText,...[...a.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title")])].filter(Boolean).join(" ");
+      return /perfil|profile|your profile/i.test(labels);
+    });
+    const usernames=[...new Set(profile.map(a=>(a.getAttribute("href")||"").split("/").filter(Boolean)[0]).filter(Boolean))];
+    const username=usernames.length===1?usernames[0]:"";
     const commentNodes=[...document.querySelectorAll("li,[role='listitem']")].filter(node=>node.querySelector("a[href]"));
     const alreadyCommented=Boolean(username && commentNodes.some(node =>
       [...node.querySelectorAll("a[href]")].some(a=>a.getAttribute("href")==="/"+username+"/") &&
