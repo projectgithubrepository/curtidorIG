@@ -429,6 +429,7 @@ app.post("/api/start", async (req, res) => {
       const captionUnavailable = results.filter(item => item.inspectionDiagnostics?.captionAvailable === false).length;
       const storiesBlocked = results.filter(item => item.contentType === "story").length;
       const plannedActions = results.reduce((sum,item) => sum + (item.plan?.length || 0), 0);
+      const inspectedFeedReels = results.filter(item => item.contentType !== "story" && Boolean(item.stateVerification)).length;
       const unverifiedActions = results.filter(item => item.contentType !== "story").reduce((sum,item) =>
         sum + (item.plan || []).filter(action => /^(não verificada|bloqueada)/.test(action.status)).length, 0);
       const testIncomplete = mode === "test" && (inspectionFailures > 0 || captionUnavailable > 0 || unverifiedActions > 0 || !savedCollectionInventoryAvailable);
@@ -447,7 +448,7 @@ app.post("/api/start", async (req, res) => {
         request: { groupName, collectionName, destinationGroupName, mode, completionEmoji, startDate, endDate },
         summary: {
           publicationsFound: collected.length,
-          publicationsInspected: results.length,
+          publicationsInspected: inspectedFeedReels,
           administrativeMilestones: new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size,
           stories: collected.filter(item => item.contentType === "story").length,
           feedsAndReels: collected.filter(item => item.contentType !== "story").length,
