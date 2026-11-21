@@ -658,7 +658,7 @@ export async function inspectSavedCollection(page, collectionName) {
       // Recolhe somente rótulos dos ancestrais próximos, sem usar o texto
       // global da página, e mantém o href real do link dentro de Salvos.
       const ancestorLabels = [];
-      for (let node = anchor, depth = 0; node && depth < 8; node = node.parentElement, depth++) {
+      for (let node = anchor, depth = 0; node && depth < 5; node = node.parentElement, depth++) {
         if (node === document.body || node === document.documentElement) break;
         const text = (node.innerText || "").trim();
         if (text && text.length <= 500) ancestorLabels.push(text);
@@ -689,8 +689,10 @@ export async function inspectSavedCollection(page, collectionName) {
         const links = [...parent.querySelectorAll("a[href]")].filter(anchor => {
           try { const url = new URL(anchor.href, location.href); return url.origin === location.origin && /\/saved(?:\/|$)/i.test(url.pathname); } catch { return false; }
         });
-        if (links.length) {
-          for (const anchor of links) found.push({ href: anchor.href, text: anchor.innerText || "", ariaLabel: anchor.getAttribute("aria-label") || "", title: anchor.getAttribute("title") || "", labels: [text] });
+        const uniqueLinks = [...new Map(links.map(anchor => [anchor.href, anchor])).values()];
+        if (uniqueLinks.length === 1) {
+          const anchor = uniqueLinks[0];
+          found.push({ href: anchor.href, text: anchor.innerText || "", ariaLabel: anchor.getAttribute("aria-label") || "", title: anchor.getAttribute("title") || "", labels: [text] });
           break;
         }
       }
