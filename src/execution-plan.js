@@ -1,5 +1,11 @@
 const ACTIONS = ["like", "saveToCollection", "comment", "shareToGroup", "completionReaction"];
 
+export function isValidComment(value) {
+  const comment = String(value ?? "").trim();
+  const words = comment.match(/[\\p{L}\\p{N}]+/gu) || [];
+  return words.length >= 2 && /\\p{Extended_Pictographic}/u.test(comment);
+}
+
 export function interpretGroupInstructions(messageText = "") {
   const text = String(messageText ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const noComment = /\b(nao comentar|nao comente|sem comentario|proibido comentar|comentario proibido)\b/.test(text);
@@ -36,7 +42,7 @@ export function buildExecutionPlan({
   const plan = [
     { action: "like", label: "Curtir", alreadyDone: state.liked, eligible: true, required: true },
     { action: "saveToCollection", label: \`Salvar na coleção “\${collectionName || "Curtido"}”\`, alreadyDone: state.saved && state.savedFolderVerified, eligible: Boolean(collectionName), required: true },
-    { action: "comment", label: "Comentar", alreadyDone: state.commented, eligible: policy.comment !== "forbidden" && Boolean(comment), required: policy.comment !== "forbidden", policy: policy.comment },
+    { action: "comment", label: "Comentar", alreadyDone: state.commented, eligible: policy.comment !== "forbidden" && isValidComment(comment), required: policy.comment !== "forbidden", policy: policy.comment },
     { action: "shareToGroup", label: "Enviar para o grupo de destino", alreadyDone: state.sharedToGroup, eligible: policy.shareToGroup === "required", required: policy.shareToGroup === "required", policy: policy.shareToGroup },
     { action: "completionReaction", label: \`Reagir à mensagem original com \${completionEmoji}\`, alreadyDone: state.groupCheck, eligible: true, required: true, requiresAllPrevious: true }
   ];
