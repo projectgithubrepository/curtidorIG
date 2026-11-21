@@ -203,6 +203,36 @@ test("extracts shortcodes nested in media-share payloads without explicit media_
 });
 
 
+test("extracts canonical Story permalink from explicit story_share payload", async () => {
+  const page = new EventEmitter();
+  page.url = () => "https://www.instagram.com/direct/t/1783131735658148";
+  const capture = createInstagramNetworkCapture(page);
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql",
+    status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({
+      postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: {} }),
+      url: () => "https://www.instagram.com/api/graphql"
+    }),
+    json: async () => ({
+      data: { thread: { items: [{
+        message_id: "story-share-3",
+        timestamp_ms: 1795021200000,
+        sender: { username: "member" },
+        content: { story_share: { media: {
+          pk: "390000000000000003",
+          user: { username: "story.owner" },
+          product_type: "story"
+        } } }
+      }] } }
+    })
+  });
+  await capture.stop();
+  const [record] = capture.records();
+  assert.deepEqual(record.urls, ["https://www.instagram.com/stories/story.owner/390000000000000003"]);
+});
+
 test("keeps distinct Story IDs from the same Instagram profile", async () => {
   const page = new EventEmitter();
   const capture = createInstagramNetworkCapture(page);
