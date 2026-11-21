@@ -296,6 +296,13 @@ app.post("/api/start", async (req, res) => {
         administrativeMilestones: new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size,
         networkResponses: collected[0]?.networkDiagnostics?.capturedResponses ?? 0
       });
+      let savedCollectionUrls = null;
+      if (mode === "automatic") {
+        progress.message = `Validando a coleção “${collectionName}” antes de qualquer interação...`;
+        const savedCollection = await inspectSavedCollection(page, collectionName);
+        savedCollectionUrls = new Set(savedCollection.items.map(item => new URL(item.url).pathname.replace(/\/$/, "")));
+        logDiagnostic("INFO", "Coleção de destino localizada e inventariada", { collectionName, existingItems: savedCollectionUrls.size });
+      }
       progress.total = collected.length;
       const withoutDate = collected.filter(item => item.dateUnknown).length;
       const withoutIdentity = collected.filter(item => !item.identityVerified).length;
@@ -330,7 +337,7 @@ app.post("/api/start", async (req, res) => {
           } else if (mode === "automatic") {
             const steps = [
               ["like", !taskState.liked, async () => executeLike(page,item.url), "liked"],
-              ["saveToCollection", !(taskState.saved && taskState.savedFolderVerified), async () => executeSaveToCollection(page,item.url,collectionName), "saved"],
+              ["saveToCollection", !(taskState.saved && taskState.savedFolderVerified), async () => executeSaveToCollection(page,item.url,collectionName,savedCollectionUrls), "saved"],
               ["comment", instructions.comment !== "forbidden" && !taskState.commented, async () => executeComment(page,item.url,comment), "commented"],
               ["shareToGroup", !taskState.sharedToGroup, async () => executeShareToGroup(page,item.url,destinationGroupName), "sharedToGroup"]
             ];
