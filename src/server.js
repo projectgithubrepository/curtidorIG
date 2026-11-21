@@ -335,7 +335,7 @@ app.post("/api/start", async (req, res) => {
         const previousState = mergeTaskState(getTaskState(item.url, item.threadId, item.messageId, completionEmoji), {});
         const instructions = interpretGroupInstructions(item.messageText || "");
         if (item.contentType === "story") {
-          const plan = buildExecutionPlan({ mode, collectionName, completionEmoji, taskState: previousState, instructions });
+          const plan = buildExecutionPlan({ mode, collectionName, destinationGroupName, completionEmoji, taskState: previousState, instructions });
           const result = { ...item, taskState: previousState, caption: "", comment: "", plan: plan.map(action => ({...action,status:"bloqueada",reason:"Publicações do tipo Story ainda exigem fluxo específico; nenhuma ação foi executada."})), status: "Story identificada — ações automáticas indisponíveis nesta versão" };
           results.push(result);
           appendHistory({ url:item.url, groupThreadId:item.threadId, messageId:item.messageId, status:result.status, groupName, collectionName, sharedAt:item.sharedAt, saved:previousState.saved, savedFolderVerified:previousState.savedFolderVerified, liked:previousState.liked, commented:previousState.commented, sharedToGroup:previousState.sharedToGroup, groupCheck:previousState.groupCheck, completionEmoji, commentForbidden:instructions.comment==="forbidden", detail:result.status });
@@ -398,7 +398,7 @@ app.post("/api/start", async (req, res) => {
               actionLog.push({action:"completionReaction",status:"aguardando etapas obrigatórias"});
             }
           }
-          let plan = buildExecutionPlan({ mode, collectionName, completionEmoji, taskState, comment, instructions, stateKnown });
+          let plan = buildExecutionPlan({ mode, collectionName, destinationGroupName, completionEmoji, taskState, comment, instructions, stateKnown });
           if (mode === "automatic") {
             plan = plan.map(entry => {
               const logged = actionLog.find(record => record.action === entry.action);
