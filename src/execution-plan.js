@@ -7,7 +7,7 @@ export function isValidComment(value) {
 }
 
 export function interpretGroupInstructions(messageText = "") {
-  const text = String(messageText ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const text = String(messageText ?? "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const noComment = /\b(nao comentar|nao comente|sem comentario|sem comentar|nao faca comentario|nao deixe comentario|proibido comentar|comentario proibido)\b/.test(text);
   const commentRequested = /\b(comentar|comente|comentario)\b/.test(text);
   return {
