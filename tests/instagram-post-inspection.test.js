@@ -27,19 +27,18 @@ test("classifies login redirects separately from unavailable posts", () => {
   }), error => error.inspectionDiagnostics.reason === "login");
 });
 
-test("does not label a media-only page as private or unavailable", () => {
-  assert.throws(() => interpretPostSnapshot({
+test("keeps a media-only page available for planning without calling it private", () => {
+  const result = interpretPostSnapshot({
     requestedUrl: "https://www.instagram.com/reel/ABC123",
     url: "https://www.instagram.com/reel/ABC123/",
     httpStatus: 200,
     bodyText: "",
     hasVideo: true,
     selectors: { video: true }
-  }), error => {
-    assert.equal(error.inspectionDiagnostics.reason, "media-without-readable-caption");
-    assert.match(error.message, /carregou mídia/);
-    return true;
   });
+  assert.equal(result.caption, "");
+  assert.equal(result.diagnostics.reason, "media-without-readable-caption");
+  assert.equal(result.diagnostics.captionAvailable, false);
 });
 
 test("classifies HTTP errors with their response status", () => {
