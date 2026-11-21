@@ -6,8 +6,8 @@
 <section class="panel">
 <label for="groupName">Nome exato do grupo no Instagram</label><input id="groupName" placeholder="Ex.: Grupo de ofertas e novidades">
 <label for="collectionName" style="margin-top:14px">Nome exato da coleção semanal de destino</label><input id="collectionName" value="Curtido" placeholder="Ex.: Semana 47 / Novembro 2026" required>
-<label for="destinationGroupName" style="margin-top:14px">Nome exato do grupo coletivo de envios</label><input id="destinationGroupName" value="TESTEHOJE" required>
-<label for="destinationGroupUrl" style="margin-top:10px">URL direta da conversa (opcional, preferencial)</label><input id="destinationGroupUrl" type="url" value="https://www.instagram.com/direct/t/1411376350866237/" placeholder="https://www.instagram.com/direct/t/ID/">
+<label for="destinationGroupName" style="margin-top:14px">Nome exato do grupo coletivo de envios</label><input id="destinationGroupName" placeholder="Ex.: TESTEHOJE" required>
+<label for="destinationGroupUrl" style="margin-top:10px">URL direta da conversa (obrigatória para verificar o grupo)</label><input id="destinationGroupUrl" type="url" placeholder="https://www.instagram.com/direct/t/ID/" required>
 <div class="dates"><div><label for="mode">Modo de execução</label><select id="mode"><option value="test">TESTE — não altera nada</option><option value="automatic">AUTOMÁTICO — executar ações</option><option value="manual">MANUAL — apenas organizar</option></select></div><div><label for="completionEmoji">Emoji de check no grupo</label><input id="completionEmoji" value="🌸" maxlength="8"></div></div>
 <div class="dates"><div><label for="startDate">Data inicial</label><input id="startDate" type="date"></div><div><label for="endDate">Data final</label><input id="endDate" type="date"></div></div>
 <div class="actions"><button id="connect" class="secondary">Conectar Instagram / fazer login</button><button id="start">Coletar publicações</button><button id="stop" class="secondary" disabled>Parar coleta</button></div>
