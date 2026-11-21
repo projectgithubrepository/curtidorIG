@@ -70,7 +70,7 @@ function render(items) {
     const status=document.createElement("strong"); status.textContent=item.status || "Pendente";
     const type=document.createElement("small"); type.textContent=item.contentType === "story" ? "Story · fluxo específico ainda não automatizado" : "Feed / Reel";
     const stateLine=document.createElement("small");
-    const task=item.taskState || { saved:false, savedFolderVerified:false, liked:false, commented:false, groupCheck:false };
+    const task=item.taskState || { saved:false, savedFolderVerified:false, liked:false, commented:false, sharedToGroup:false, groupCheck:false };
     stateLine.textContent = [`Salva: ${task.saved ? "confirmada" : "pendente"}`, `Pasta: ${task.savedFolderVerified ? "confirmada" : "pendente"}`, `Curtida: ${task.liked ? "confirmada" : "pendente"}`, `Comentário: ${task.commented ? "confirmado" : task.commentForbidden ? "dispensado pelo pedido" : "pendente"}`, `Enviado ao grupo: ${task.sharedToGroup ? "confirmado" : "pendente"}`, `Reação na mensagem: ${task.groupCheck ? "confirmada" : "pendente"}`].join(" · ");
     const date=document.createElement("small"); date.textContent=item.sharedAt ? new Date(item.sharedAt).toLocaleString("pt-BR") : "Data não identificada";
     const markers=document.createElement("small");
@@ -78,6 +78,9 @@ function render(items) {
     markers.textContent=milestoneCount ? "Marcos visíveis: " + (item.administrativeMilestones || []).map(marker => `${marker.date || "data não identificada"} · ${marker.feedCount ?? "?"} Feed · ${marker.storiesCount ?? "?"} Stories`).join(" | ") : "";
     const caption=document.createElement("p"); caption.textContent=item.caption || item.detail || "";
     const comment=document.createElement("p"); comment.className="comment"; comment.textContent=item.comment ? "Comentário sugerido: "+item.comment : "";
+    const actionDetails=document.createElement("div"); actionDetails.className="action-details";
+    for (const action of (item.actionLog || [])) { const line=document.createElement("small"); line.textContent=`${action.action}: ${action.status}${action.reason ? " — "+action.reason : ""}`; actionDetails.append(line); }
+    for (const action of (item.plan || [])) { const line=document.createElement("small"); line.textContent=`${action.label}: ${action.status}${action.reason ? " — "+action.reason : ""}`; actionDetails.append(line); }
     if (item.comment) {
       const copyComment=document.createElement("button"); copyComment.type="button"; copyComment.className="secondary small-action";
       copyComment.textContent="Copiar comentário"; copyComment.dataset.copyComment=item.comment;
@@ -102,7 +105,7 @@ function render(items) {
     if (!item.identityVerified) {
       const warning=document.createElement("small"); warning.textContent="Sem vínculo seguro com a mensagem original: confirmações bloqueadas."; controls.append(warning);
     }
-    card.append(status,type,stateLine,date,markers,link,caption,comment,controls); results.append(card);
+    card.append(status,type,stateLine,date,markers,link,caption,comment,actionDetails,controls); results.append(card);
   }
 }
 results.addEventListener("click", async event => {
