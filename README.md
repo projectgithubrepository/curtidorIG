@@ -122,6 +122,15 @@ A proibição explícita de comentar prevalece sobre a regra padrão de comentá
 - Ao terminar o TESTE, exibir imediatamente um **relatório preliminar na própria interface** com totais separados por tipo de ação (curtidas, salvamentos na coleção, comentários em publicações, envios ao grupo coletivo, reações na mensagem original, comentários públicos em Stories e envios de Stories). Para cada tipo, separar ocorrências analisadas, aptas no plano, aguardando pré-requisitos, já concluídas, bloqueadas e não verificadas. Esses números nunca podem ser apresentados como ações executadas.
 - Em cada publicação, mostrar também o texto original do pedido capturado no grupo, o link, o tipo, a data do compartilhamento, o comentário preparado e a decisão individual de cada etapa.
 
+#### Cobertura da coleta por data
+
+- Quando houver mensagem administrativa com quantitativos para a data, usar esses números como referência de cobertura, sem presumir que a varredura encontrou tudo.
+- Comparar separadamente Feed/Reels e Stories, exibindo esperado, encontrado, faltante e excedente. Exemplo de referência: 18/11 = 66 Feed/Reels + 34 Stories = 100 itens.
+- A coleta só pode ser considerada completa quando o limite do histórico estiver efetivamente confirmado e as contagens corresponderem à referência administrativa. Chegar ao limite de tentativas de rolagem não comprova que o início do histórico foi alcançado.
+- Preservar o identificador completo de Stories (/stories/usuário/ID). Nunca reduzir o link ao nome do perfil, pois isso colapsa Stories diferentes da mesma pessoa.
+- Mensagens com link e identidade, mas sem timestamp, não podem ser descartadas. Mantê-las como candidatas com data desconhecida, informar a quantidade e não executar ações nelas até confirmar que pertencem ao período.
+- A quantidade de mensagens/pedidos não deve ser confundida com a quantidade de URLs únicas. Deduplicar URLs não pode apagar pedidos distintos identificados por message_id.
+
 #### Diagnóstico obrigatório no relatório preliminar
 
 - “Não verificada” nunca pode aparecer sem uma causa específica por publicação e por ação. O detalhe deve informar o controle/elemento procurado, o que foi encontrado, a limitação observada e a evidência que faltou.
