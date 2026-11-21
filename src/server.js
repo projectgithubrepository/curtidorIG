@@ -42,6 +42,7 @@ function reportItem(item) {
     collectionMode: item.collectionMode || "",
     status: item.status || "",
     taskState: item.taskState || null,
+    stateVerification: item.stateVerification || null,
     identityVerified: Boolean(item.identityVerified),
     inspectionDiagnostics: item.inspectionDiagnostics || null,
     plan: item.plan || [],
@@ -407,7 +408,7 @@ app.post("/api/start", async (req, res) => {
               return entry;
             });
           }
-          const result = { ...item, caption:inspection.caption, comment, taskState, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
+          const result = { ...item, caption:inspection.caption, comment, taskState, stateVerification:{ ...stateKnown, controlCount:inspection.observedState.controlCount || 0, controlLabels:inspection.observedState.controlLabels || "" }, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
           results.push(result);
           appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,completionEmoji,commentForbidden:instructions.comment==="forbidden",complete:taskState.complete,milestone:item.administrativeMilestones,detail:mode==="test"?"Simulação sem ações":"Planejamento e execução da publicação"});
         } catch (error) {
