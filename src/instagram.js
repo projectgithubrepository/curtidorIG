@@ -637,7 +637,7 @@ export async function executeComment(page, url, comment) {
   for (let i=0;i<count;i++) if (await boxes.nth(i).isVisible().catch(()=>false)) { editor=boxes.nth(i); break; }
   if (!editor) throw new Error("Campo de comentário não identificado.");
   await editor.fill(text);
-  const post = page.getByRole("button", { name: /publicar|postar|send|enviar/i }).last();
+  const post = page.getByRole("button", { name: /publicar|postar|^post$/i }).last();
   if (!(await post.count())) throw new Error("Botão de publicar comentário não identificado.");
   await post.click();
   await page.waitForTimeout(900);
@@ -655,7 +655,7 @@ export async function executeShareToGroup(page, url, destinationGroupName) {
   await share.click();
   await page.waitForTimeout(700);
   const dialog = page.getByRole("dialog").last();
-  const search = dialog.locator('input,[role="combobox"],textarea').first();
+  const search = dialog.locator('input,[role="combobox"]').first();
   if (!(await search.count())) throw new Error("Busca de destinatários do compartilhamento não identificada.");
   await search.fill(groupName);
   await page.waitForTimeout(1000);
