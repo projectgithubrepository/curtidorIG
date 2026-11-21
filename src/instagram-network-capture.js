@@ -1,4 +1,4 @@
-const MAX_RESPONSES = 500;
+const MAX_DIAGNOSTIC_RESPONSES = 500;
 const MAX_DEPTH = 20;
 const MAX_URLS_PER_MESSAGE = 12;
 const URL_PATTERN = /(?:https?:\/\/(?:www\.)?instagram\.com)?\/(?:p|reel|tv|stories)\/[A-Za-z0-9._-]+(?:\/[^\s"'<>]*)?/gi;
@@ -334,7 +334,7 @@ export function createInstagramNetworkCapture(page) {
   };
 
   const onResponse = response => {
-    if (stopped || responses.length >= MAX_RESPONSES) return;
+    if (stopped) return;
     let url;
     try { url = new URL(response.url()); } catch { return; }
     if (!/(^|\.)instagram\.com$/i.test(url.hostname)) return;
@@ -370,7 +370,7 @@ export function createInstagramNetworkCapture(page) {
         entry.payload = extractPayload(payload, context);
         mergeRecords(entry.payload.records, context);
       } catch { entry.parseError = true; }
-      if (responses.length < MAX_RESPONSES) responses.push(entry);
+      responses.push(entry);
     })();
     pending.add(task);
     task.finally(() => pending.delete(task));
@@ -434,7 +434,8 @@ export function createInstagramNetworkCapture(page) {
         hasShareFields: aggregate.hasShareFields || websocketStats.hasShareFields,
         hasPermalinkOrUrl: parsed.some(item => item.payload.hasPermalinkOrUrl) || websocketStats.hasPermalinkOrUrl,
         structures: allStructures,
-        responseDetails: responses.map(item => ({
+        responseDetailsTruncated: Math.max(0, responses.length - MAX_DIAGNOSTIC_RESPONSES),
+        responseDetails: responses.slice(0, MAX_DIAGNOSTIC_RESPONSES).map(item => ({
           endpoint: item.endpoint, path: item.path, method: item.method, operation: item.operation, threadIdPresent: Boolean(item.threadId),
           status: item.status, contentType: item.contentType, parseError: item.parseError,
           ...(item.payload ? { payload: {
