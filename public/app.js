@@ -21,8 +21,20 @@ let lastResultsSignature = "";
 
 const connect = document.querySelector("#connect");
 const copyDiagnostic = document.querySelector("#copyDiagnostic");
+const copyDiagnosticSummary = document.querySelector("#copyDiagnosticSummary");
 const diagnosticCopyStatus = document.querySelector("#diagnosticCopyStatus");
 const downloadDiagnostic = document.querySelector("#downloadDiagnostic");
+
+copyDiagnosticSummary.addEventListener("click", async () => {
+  try {
+    const response = await fetch("/api/diagnostic-summary");
+    if (!response.ok) throw new Error("Faça uma coleta antes de copiar o resumo.");
+    await navigator.clipboard.writeText(await response.text());
+    diagnosticCopyStatus.textContent = "Resumo filtrado copiado. Cole o texto aqui na conversa.";
+  } catch (error) {
+    diagnosticCopyStatus.textContent = error.message;
+  }
+});
 
 copyDiagnostic.addEventListener("click", async () => {
   try {
@@ -348,6 +360,7 @@ async function refresh() {
     cleanupTest.disabled = data.running; cleanupAutomatic.disabled = data.running;
     renderCleanup(cleanup.results || []);
     copyDiagnostic.disabled = data.running || !data.hasDiagnostic;
+    copyDiagnosticSummary.disabled = data.running || !data.hasDiagnostic;
     downloadDiagnostic.style.pointerEvents = copyDiagnostic.disabled ? "none" : "auto";
     downloadDiagnostic.style.opacity = copyDiagnostic.disabled ? "0.5" : "1";
   } catch {}
