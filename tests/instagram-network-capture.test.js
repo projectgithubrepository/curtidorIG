@@ -129,6 +129,27 @@ test("captures JSON WebSocket frames and inherits the enclosing thread id", asyn
 });
 
 
+test("associates unscoped WebSocket frames with the active Direct thread", async () => {
+  const page = new EventEmitter();
+  page.url = () => "https://www.instagram.com/direct/t/1783131735658148";
+  const socket = new EventEmitter();
+  socket.url = () => "wss://www.instagram.com/ws";
+  const capture = createInstagramNetworkCapture(page);
+  page.emit("websocket", socket);
+  socket.emit("framereceived", JSON.stringify({
+    data: { items: [{
+      message_id: "ws-unscoped-1",
+      timestamp_ms: 1795021200000,
+      sender: { username: "member" },
+      share: { url: "https://www.instagram.com/p/WSUNSCOPED1/" }
+    }] }
+  }));
+  await capture.stop();
+  const [record] = capture.records();
+  assert.equal(record.threadId, "1783131735658148");
+  assert.deepEqual(record.urls, ["https://www.instagram.com/p/WSUNSCOPED1"]);
+});
+
 test("associates message-list response with the active Direct thread when request omits thread id", async () => {
   const page = new EventEmitter();
   page.url = () => "https://www.instagram.com/direct/t/1783131735658148";
