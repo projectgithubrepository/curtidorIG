@@ -438,6 +438,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     stoppedByUser: Boolean(shouldStop()),
     visibleItems: found.size,
     unknownDateCandidates: fallback.size,
+    storyNetwork: networkMerge.storyCollection,
   };
   // Não descartar silenciosamente mensagens com link e identidade, mas sem timestamp.
   // Elas seguem para inspeção como candidatas com data desconhecida e não entram na contagem
@@ -455,7 +456,8 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
       unknownDateCandidates: networkMerge.unknownDateCandidates,
       rejectedOtherThreads: networkMerge.rejectedThread,
       rejectedUnscopedMessages: networkMerge.rejectedUnscoped,
-      rejectedMessagesWithoutId: networkMerge.rejectedIdentity
+      rejectedMessagesWithoutId: networkMerge.rejectedIdentity,
+      storyCollection: networkMerge.storyCollection
     }
   })).sort((a, b) => {
     if (!a.sharedAt) return 1;
