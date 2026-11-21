@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { openInstagram, collectGroupPosts, inspectPost, inspectStory, inspectSavedCollection, unsaveSavedCollectionItem, executeLike, executeSaveToCollection, executeComment, executeStoryComment, executeShareToGroup, executeCompletionReaction } from "./instagram.js";
+import { openInstagram, collectGroupPosts, inspectPost, inspectStory, inspectSavedCollection, inspectDestinationGroup, unsaveSavedCollectionItem, executeLike, executeSaveToCollection, executeComment, executeStoryComment, executeShareToGroup, executeCompletionReaction } from "./instagram.js";
 import { createComment } from "./comments.js";
 import { appendHistory, getTaskState, getRecentComments, readHistory } from "./history.js";
 import { mergeTaskState, taskStateLabel, administrativeTargetsForRange } from "./group-state.js";
@@ -343,6 +343,16 @@ app.post("/api/start", async (req, res) => {
           if (mode === "automatic") throw error;
         }
       }
+      let destinationGroupVerification = { verified:false, reason:"Grupo coletivo não verificado nesta execução.", threadId:"" };
+      if (mode === "test" || mode === "automatic") {
+        try {
+          destinationGroupVerification = await inspectDestinationGroup(page, destinationGroupName);
+          logDiagnostic(destinationGroupVerification.verified ? "INFO" : "WARN", "Verificação do grupo coletivo", destinationGroupVerification);
+        } catch (error) {
+          destinationGroupVerification = { verified:false, reason:"Falha ao verificar grupo coletivo: " + error.message, threadId:"" };
+          logDiagnostic("WARN", "Falha ao verificar grupo coletivo", { error:error.message });
+        }
+      }
       progress.total = collected.length;
       const withoutDate = collected.filter(item => item.dateUnknown).length;
       const withoutIdentity = collected.filter(item => !item.identityVerified).length;
@@ -384,7 +394,7 @@ app.post("/api/start", async (req, res) => {
         }
         throw Object.assign(new Error("Execução automática cancelada antes de qualquer ação: coleta incompleta — " + reasons.join("; ") + "."), {
           collectionCoverage, collectionDiagnostics, networkDiagnostics: collected[0]?.networkDiagnostics || null,
-          administrativeTarget, collectionIncomplete, itemsWithoutDate: withoutDate, itemsWithoutIdentity: withoutIdentity
+          administrativeTarget, destinationGroupVerification, collectionIncomplete, itemsWithoutDate: withoutDate, itemsWithoutIdentity: withoutIdentity
         });
       }
       const usedFallback = collected.some(item => item.collectionMode === "last-300-fallback");
@@ -473,7 +483,7 @@ app.post("/api/start", async (req, res) => {
             collectionMembership: Boolean(savedCollectionInventoryAvailable && savedCollectionUrls?.has(collectionKey)),
             collectionInventoryAvailable: Boolean(savedCollectionInventoryAvailable),
             commented: inspection.stateKnown?.commented === true,
-            destinationGroupVerified: false,
+            destinationGroupVerified: destinationGroupVerification.verified,
             reasons: {
               liked: inspection.stateKnown?.liked
                 ? "Controle identificado; estado atual: " + (inspection.observedState.liked ? "já curtida" : "não curtida") + "."
@@ -490,7 +500,7 @@ app.post("/api/start", async (req, res) => {
                   ? "Perfil @" + inspection.inspectionDiagnostics.stateVerification.identifiedUsername + " identificado; " + (inspection.observedState.commented ? "comentário encontrado entre os comentários visíveis." : "nenhum comentário correspondente encontrado entre os comentários visíveis; conteúdo não carregado pode não ter sido examinado.")
                   : "Perfil identificado; comentários visíveis examinados.")
                 : (inspection.inspectionDiagnostics?.stateVerification?.commentInspectionReason || "Perfil do usuário não identificado; não foi possível verificar comentários anteriores."),
-              shareToGroup: "O grupo coletivo “" + destinationGroupName + "” não foi aberto/localizado para confirmar o destino nesta etapa."
+              shareToGroup: destinationGroupVerification.reason
             }
           };
           const actionLog = [];
@@ -562,7 +572,7 @@ app.post("/api/start", async (req, res) => {
             saved:inspection.observedState.saved, savedKnown:Boolean(inspection.stateKnown?.saved),
             collectionMembershipKnown:Boolean(savedCollectionInventoryAvailable), collectionMembership:stateKnown.collectionMembership,
             commented:inspection.observedState.commented, commentedKnown:Boolean(inspection.stateKnown?.commented),
-            destinationGroupVerified:stateKnown.destinationGroupVerified, reasons:stateKnown.reasons,
+            destinationGroupVerified:stateKnown.destinationGroupVerified, destinationGroupReason:destinationGroupVerification.reason, reasons:stateKnown.reasons,
             controlCount:inspection.observedState.controlCount || 0, controlLabels:inspection.observedState.controlLabels || "",
             diagnostics:inspection.inspectionDiagnostics?.stateVerification || null
           }, plan, actionLog, inspectionDiagnostics:inspection.inspectionDiagnostics||null, status:taskStateLabel(taskState) };
@@ -683,7 +693,7 @@ app.post("/api/start", async (req, res) => {
         summary: {
           publicationsFound: results.length,
           publicationsInspected: results.length,
-          administrativeTarget: error.administrativeTarget || null,
+          administrativeTarget: error.administrativeTarget || null,\n          destinationGroupVerification: error.destinationGroupVerification || null,
           collectionCoverage: error.collectionCoverage || null,
           collectionDiagnostics: error.collectionDiagnostics || null,
           collectionIncomplete: Boolean(error.collectionIncomplete),
