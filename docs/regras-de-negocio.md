@@ -33,8 +33,8 @@ Cada link deve ser associado ao texto do pedido da mensagem do grupo. As ações
 
 - **Curtir:** obrigatório em todas as publicações.
 - **Salvar:** obrigatório em todas as publicações, sempre na coleção/pasta semanal informada (por exemplo, “Curtido”). A confirmação deve validar a coleção correta, não apenas o estado genérico de salvo.
-- **Comentar:** somente quando o pedido solicitar. Se estiver marcado como opcional, não comentar por padrão. Se houver instrução para não comentar, essa proibição prevalece e o comentário não pode ser publicado.
-- **Enviar para outro grupo/conversa:** somente quando solicitado. Se houver instrução para não enviar, não enviar. Não confundir esse envio com o salvamento obrigatório na coleção.
+- **Comentar:** comentar também quando o pedido disser que é opcional. Só não comentar quando houver proibição explícita. Todo comentário deve ter pelo menos duas palavras e um emoji; priorizar texto contextual e estruturado.
+- **Enviar para o grupo coletivo de envios:** obrigatório para toda publicação, independentemente do texto do pedido. Não confundir esse envio com o salvamento obrigatório na coleção.
 - **Reação de conclusão:** reagir com o emoji configurado à mensagem exata que compartilhou o link, uma reação por mensagem, depois de concluídas as ações obrigatórias e as ações explicitamente solicitadas. Se a reação já existir, não repetir.
 
 O modo TESTE deve simular as mesmas decisões sem modificar a conta. O modo AUTOMÁTICO só pode executar ações pendentes após verificar novamente o estado e as instruções. O modo MANUAL apenas organiza o que falta. Em caso de instrução ambígua, identidade de mensagem não comprovada ou bloqueio do Instagram, interromper a ação correspondente e informar o motivo.
@@ -64,3 +64,8 @@ O histórico continua local, sem banco de dados ou envio a serviços externos.
 ## Fora do escopo desta etapa
 
 A coleta direta da conversa, seleção do grupo, filtro por período, organização em coleção e integração com o histórico ainda precisam ser implementados e validados no Instagram real. Este documento registra a regra de negócio desejada; não significa que essas funções já estejam disponíveis.
+
+
+## Limpeza posterior dos Salvos
+
+A função **Dessalvar publicações em lote, individualmente** deve navegar até os Salvos, abrir a coleção selecionada (a coleção `laranja antigos` pode ser usada para teste), listar Feed, Reels e carrosséis e processar cada publicação individualmente. A operação remove o estado de salvo da publicação por completo, não apenas a associação a uma coleção. Não apagar a coleção nem a publicação. O modo TESTE apenas lista e classifica, sem clicar em salvar/dessalvar. O modo AUTOMÁTICO exige confirmação explícita, revalida cada publicação e só aciona o controle quando o estado atual comprovar que está salva; após o clique, verifica que o estado passou a não salva. Se a interface não permitir comprovar o resultado, interrompe e informa o item, sem adivinhar.
