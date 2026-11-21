@@ -75,7 +75,7 @@ test("uncertain previous send is blocked to prevent duplicates", () => {
 });
 
 
-test("test mode marks state as unverifiable instead of assuming pending", () => {
+test("test mode keeps unverifiable states out of executable candidates", () => {
   const plan = buildExecutionPlan({
     mode: "test",
     collectionName: "Laranja Girls",
@@ -83,7 +83,7 @@ test("test mode marks state as unverifiable instead of assuming pending", () => 
     stateKnown: { liked: false, saveToCollection: false, commented: false }
   });
   assert.equal(plan[0].testMode.mapped, false);
-  assert.equal(plan[0].testMode.candidate, true);
+  assert.equal(plan[0].testMode.candidate, false);
   assert.equal(plan[0].testMode.executed, false);
   assert.match(plan[0].status, /^não verificada/);
   assert.match(plan[1].status, /^não verificada/);
@@ -113,7 +113,7 @@ test("unverified actions are candidates, never counted as mapped executable acti
   assert.equal(plan[0].testMode.mapped, false);
   assert.equal(plan[1].testMode.mapped, false);
   assert.equal(plan[2].testMode.mapped, false);
-  assert.equal(plan[0].testMode.candidate, true);
+  assert.equal(plan[0].testMode.candidate, false);
   assert.equal(plan[3].testMode.mapped, true);
   assert.equal(plan[3].testMode.candidate, false);
 });
