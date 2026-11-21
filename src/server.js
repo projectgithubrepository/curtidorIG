@@ -137,9 +137,9 @@ app.get("/api/diagnostic-log", (_req, res) => {
       `ITEM ${index+1} | ${item.contentType || "publicação"} | ${item.url || "URL não informada"}`,
       `Status: ${item.status || "sem status"} | Identidade da mensagem: ${item.identityVerified ? "confirmada" : "não confirmada"}`,
       `Regra: comentário ${item.instructionSummary?.comment === "forbidden" ? "proibido" : "obrigatório"}; envio ao grupo coletivo obrigatório`,
-      `Legenda/conteúdo: ${item.caption?.trim() || "não disponível"}`,
-      `Comentário preparado: ${item.comment || "não preparado"} | Origem: ${item.commentSource || "não informada"}`,
-      `Pedido original no grupo: ${item.requestText?.trim() || "texto do pedido não capturado"}`,
+      `Legenda/conteúdo: ${item.caption?.trim() ? "texto legível disponível" : "não disponível"}`,
+      `Comentário preparado: ${item.comment ? "sim" : "não"} | Origem: ${item.commentSource || "não informada"}`,
+      `Pedido original no grupo: ${item.requestText?.trim() ? "texto capturado (omitido do diagnóstico)" : "não capturado"}`,
       `Estado atual: curtida=${item.stateVerification?.likedKnown ? (item.stateVerification.liked ? "sim" : "não") : "não verificado"}; coleção=${item.stateVerification?.savedKnown ? (item.stateVerification.saved ? "sim" : "não") : "não verificada"}; comentário anterior=${item.stateVerification?.commentedKnown ? (item.stateVerification.commented ? "sim" : "não") : "não verificado"}`,
       ...actions
     ].join("\n");
