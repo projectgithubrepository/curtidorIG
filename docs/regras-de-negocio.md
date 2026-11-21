@@ -106,3 +106,13 @@ A função **Dessalvar publicações em lote, individualmente** deve navegar at�
 - A aplicação deve localizar o link do próprio perfil na navegação do Instagram antes de construir a URL de Salvos.
 - A coleção de destino/origem é identificada pelo nome exato exibido na interface dentro dessa área. O endereço-base `/{usuario}/saved/` não comprova, sozinho, que uma coleção específica foi localizada.
 - Se não for possível identificar o perfil autenticado ou associar o nome da coleção a um elemento inequívoco, interromper a operação e registrar o diagnóstico; nunca escolher uma página aleatória.
+
+
+## Proteção contra ações duplicadas
+
+- Antes de curtir, a aplicação identifica explicitamente o estado do controle. Se já estiver curtido, não clica novamente; se o estado for desconhecido, bloqueia a ação para não desfazer a curtida.
+- Antes de comentar em posts/Reels ou Stories, identifica o perfil autenticado e confere a lista de comentários. Comentário do próprio perfil encontrado significa ação concluída. Ausência só é considerada confirmada quando a lista está integralmente carregada (contagem visível compatível ou indicação explícita de lista vazia); sem essa evidência, não comenta.
+- Antes de salvar, distingue publicação não salva, salva na coleção solicitada e salva fora dela. Se já estiver salva em outra coleção ou a pasta não puder ser comprovada, não alterna o botão Salvar.
+- Antes de enviar ao grupo coletivo, percorre o histórico do grupo de destino e compara a URL canônica da publicação (incluindo Reels e Stories). Link encontrado significa envio já concluído e não deve ser repetido. Se o histórico não puder ser percorrido até o início e o link não for encontrado, o estado é desconhecido e a execução automática é bloqueada.
+- Tentativa de envio sem confirmação permanece bloqueada até conferência manual; não repetir automaticamente.
+- O histórico local é uma proteção adicional, não substitui a conferência do estado atual no Instagram.

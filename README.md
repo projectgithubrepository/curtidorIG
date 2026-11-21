@@ -232,3 +232,13 @@ npm start
 ### Identificação da área Salvos
 
 A rota de Salvos é construída dinamicamente a partir do perfil da sessão autenticada, no formato `/{usuario}/saved/`. O nome de usuário não pode ser fixado no código nem inferido de um link aleatório da página. A aplicação identifica o link de perfil na navegação do Instagram e só então abre a rota de Salvos correspondente. Dentro dela, a coleção é identificada pelo rótulo exato exibido na interface; não se deve tratar uma rota genérica `/saved/`, outro perfil ou uma página aleatória como a coleção solicitada. Se o perfil ou a coleção não puderem ser identificados sem ambiguidade, a operação é interrompida e registrada no diagnóstico.
+
+
+## Proteção contra ações duplicadas
+
+- Antes de curtir, a aplicação identifica explicitamente o estado do controle. Se já estiver curtido, não clica novamente; se o estado for desconhecido, bloqueia a ação para não desfazer a curtida.
+- Antes de comentar em posts/Reels ou Stories, identifica o perfil autenticado e confere a lista de comentários. Comentário do próprio perfil encontrado significa ação concluída. Ausência só é considerada confirmada quando a lista está integralmente carregada (contagem visível compatível ou indicação explícita de lista vazia); sem essa evidência, não comenta.
+- Antes de salvar, distingue publicação não salva, salva na coleção solicitada e salva fora dela. Se já estiver salva em outra coleção ou a pasta não puder ser comprovada, não alterna o botão Salvar.
+- Antes de enviar ao grupo coletivo, percorre o histórico do grupo de destino e compara a URL canônica da publicação (incluindo Reels e Stories). Link encontrado significa envio já concluído e não deve ser repetido. Se o histórico não puder ser percorrido até o início e o link não for encontrado, o estado é desconhecido e a execução automática é bloqueada.
+- Tentativa de envio sem confirmação permanece bloqueada até conferência manual; não repetir automaticamente.
+- O histórico local é uma proteção adicional, não substitui a conferência do estado atual no Instagram.

@@ -352,7 +352,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
     // Só confirma o início quando o contêiner de mensagens está no topo.
     // Falta de movimento fora do topo não encerra a varredura: o diagnóstico
     // permanece incompleto até o limite global, em vez de declarar fim do histórico.
-    if (didReachHistoryStart(scroll.after, scroll.progressed)) {
+    if (didReachHistoryStart(scroll.after, scroll.progressed) || (!scroll.progressed && scroll.before?.found && isAtHistoryStart(scroll.before))) {
       historyBoundaryReached = true;
       break;
     }
@@ -485,6 +485,28 @@ export function interpretPostSnapshot(snapshot) {
   return { caption: caption.slice(0, 5000), diagnostics };
 }
 
+async function expandVisibleCommentThreads(page) {
+  const more = page.getByText(/ver todos os? \d+ comentários|view all \d+ comments|ver mais comentários|view more comments|carregar mais comentários|load more comments|ver comentários anteriores|view previous comments/i).first();
+  for (let attempt = 0; attempt < 20; attempt++) {
+    if (!(await more.count().catch(() => 0)) || !(await more.isVisible().catch(() => false))) break;
+    await more.click().catch(() => {});
+    await page.waitForTimeout(250);
+  }
+}
+
+export function isCommentStateVerified({ usernameKnown = false, alreadyCommented = false, commentListComplete = false } = {}) {
+  return Boolean(usernameKnown && (alreadyCommented || commentListComplete));
+}
+
+export function getGroupShareState(url, inventory = {}) {
+  const canonical = value => {
+    try { const parsed = new URL(value); return parsed.origin + parsed.pathname.replace(/\/$/, ""); }
+    catch { return String(value || ""); }
+  };
+  if ((inventory.sharedUrls || []).some(value => canonical(value) === canonical(url))) return "already-shared";
+  return inventory.inventoryComplete === true ? "not-shared" : "unknown";
+}
+
 export async function inspectPost(page, url) {
   let response = null;
   try {
@@ -538,6 +560,7 @@ export async function inspectPost(page, url) {
     httpStatus: response?.status?.() ?? null
   });
 
+  await expandVisibleCommentThreads(page);
   const rootSelector = snapshot.selectors.article ? "article" : snapshot.selectors.dialog ? '[role="dialog"]' : "main";
   let observedState;
   let stateReadError = "";
@@ -549,16 +572,24 @@ export async function inspectPost(page, url) {
       const profileLinks = [...document.querySelectorAll("nav a[href],a[href]")].filter(node => /perfil|profile/i.test([node.getAttribute("aria-label"), node.innerText].filter(Boolean).join(" ")));
       const usernames = [...new Set(profileLinks.map(node => (node.getAttribute("href") || "").split("/").filter(Boolean)[0]).filter(Boolean))];
       const username = usernames.length === 1 ? usernames[0] : "";
-      const commentRows = [...element.querySelectorAll("li")];
+      const commentRows = [...element.querySelectorAll("li")].filter(item => item.querySelector("a[href]"));
       const commented = username ? commentRows.some(item => [...item.querySelectorAll("a[href]")].some(link => link.getAttribute("href") === "/" + username + "/") && (item.innerText || "").trim().length > username.length) : false;
+      const visibleText = (element.innerText || "").toLowerCase();
+      const totalMatch = visibleText.match(/(?:ver todos os|view all)\s+(\d+)\s+(?:comentários|comments)|(\d+)\s+(?:comentários|comments)/i);
+      const expectedComments = totalMatch ? Number(totalMatch[1] || totalMatch[2]) : null;
+      const explicitEmpty = /ainda não há comentários|seja o primeiro a comentar|no comments yet|be the first to comment/i.test(visibleText);
+      const hasMoreComments = /ver todos os|view all|ver mais comentários|view more comments|carregar mais comentários|load more comments|comentários anteriores|previous comments/i.test(visibleText);
+      const commentListComplete = explicitEmpty || (expectedComments !== null && commentRows.length >= expectedComments && !hasMoreComments);
+      const commentStateVerified = Boolean(username && (commented || commentListComplete));
       return {
         liked: /descurtir|unlike/i.test(labels), saved: /remover dos salvos|remove from saved/i.test(labels), commented,
-        stateKnown: { liked: /curtir|like|descurtir|unlike/i.test(labels), saved: /salvar|save|remover dos salvos|remove from saved/i.test(labels), commented: Boolean(username) },
+        stateKnown: { liked: /curtir|like|descurtir|unlike/i.test(labels), saved: /salvar|save|remover dos salvos|remove from saved/i.test(labels), commented: commentStateVerified },
         verificationDiagnostics: {
           rootSelector, controlCount: controls.length, controlLabels: controlLabels.slice(0, 30),
           likeControlFound: /curtir|like|descurtir|unlike/i.test(labels), saveControlFound: /salvar|save|remover dos salvos|remove from saved/i.test(labels),
           profileLinkCount: profileLinks.length, identifiedUsername: username || null, commentRowsInspected: commentRows.length,
-          commentInspectionReason: username ? "Perfil identificado; somente comentários atualmente carregados foram examinados." : profileLinks.length > 1 ? "Mais de um link de perfil compatível; identidade ambígua." : "Link do perfil do usuário não identificado na página."
+          expectedCommentCount: expectedComments, commentListComplete, alreadyCommented: commented,
+          commentInspectionReason: !username ? (profileLinks.length > 1 ? "Mais de um link de perfil compatível; identidade ambígua." : "Link do perfil do usuário não identificado na página.") : commented ? "Comentário do perfil encontrado; ação já concluída." : commentListComplete ? "Lista de comentários integralmente conferida; comentário do perfil não encontrado." : "Lista de comentários incompleta; ação bloqueada para evitar duplicidade."
         },
         controlCount: controls.length, controlLabels: controlLabels.join(" | ").slice(0, 1600)
       };
@@ -864,11 +895,14 @@ async function uniqueButton(page, patterns, root = "article,main,[role='dialog']
 export async function executeLike(page, url) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
-  const liked = await page.locator("article,main,[role='dialog']").first().evaluate(root => {
+  const likeState = await page.locator("article,main,[role='dialog']").first().evaluate(root => {
     const labels = [...root.querySelectorAll("button,[role=button]")].map(node => [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ")).join(" ");
-    return /descurtir|unlike/i.test(labels);
-  }).catch(() => false);
-  if (liked) return { liked: true, status: "já curtida — não repetida" };
+    if (/descurtir|unlike/i.test(labels)) return true;
+    if (/curtir|^like$/im.test(labels)) return false;
+    return null;
+  }).catch(() => null);
+  if (likeState === null) throw new Error("Estado da curtida não identificado com segurança; clique bloqueado para não desfazer uma curtida existente.");
+  if (likeState) return { liked: true, status: "já curtida — não repetida" };
   const button = await uniqueButton(page, ["curtir", "like"]);
   await button.click();
   await page.waitForTimeout(700);
@@ -913,8 +947,9 @@ export async function executeSaveToCollection(page, url, collectionName, knownCo
   return { saved:true,savedFolderVerified:true,status:"salva na coleção e verificada pelo seletor e estado salvo" };
 }
 export async function executeComment(page, url, comment) {
-  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-  await page.waitForTimeout(1000);
+  const current = await inspectPost(page, url);
+  if (current.stateKnown?.commented !== true) throw new Error("Estado dos comentários não confirmado integralmente; comentário bloqueado para evitar duplicidade.");
+  if (current.observedState.commented) return { commented:true, status:"comentário já identificado — não repetido" };
   const text = String(comment || "").trim();
   const words = text.match(/[\p{L}\p{N}]+/gu) || [];
   if (words.length < 2 || !/\p{Extended_Pictographic}/u.test(text)) throw new Error("Comentário bloqueado: precisa ter pelo menos duas palavras e um emoji.");
@@ -961,14 +996,37 @@ export async function inspectDestinationGroup(page, destinationGroupName) {
   await exact.first().click();
   await page.waitForTimeout(1000);
   const threadId = page.url().match(/\/direct\/t\/(\d+)/)?.[1] || "";
-  return threadId
-    ? { verified:true, reason:`Grupo “${groupName}” localizado e conversa aberta (ID confirmado).`, threadId }
-    : { verified:false, reason:`O resultado “${groupName}” abriu, mas o ID da conversa não foi confirmado.`, threadId:"" };
+  if (!threadId) return { verified:false, reason:`O resultado “${groupName}” abriu, mas o ID da conversa não foi confirmado.`, threadId:"", sharedUrls:[], sharedInventoryComplete:false };
+  // Percorre o histórico do destino antes de decidir se um link ainda precisa ser enviado.
+  const sharedUrls = new Set();
+  let sharedInventoryComplete = false;
+  let stalledRounds = 0;
+  for (let round = 0; round < 150 && stalledRounds < MAX_STALLED_SCROLL_ROUNDS; round++) {
+    for (const item of await readVisiblePostLinks(page)) sharedUrls.add(item.url);
+    const scroll = await scrollToOlderMessages(page);
+    if (didReachHistoryStart(scroll.after, scroll.progressed)) {
+      sharedInventoryComplete = true;
+      for (const item of await readVisiblePostLinks(page)) sharedUrls.add(item.url);
+      break;
+    }
+    stalledRounds = scroll.progressed ? 0 : stalledRounds + 1;
+  }
+  return {
+    verified:true,
+    reason: sharedInventoryComplete
+      ? `Grupo “${groupName}” localizado; histórico percorrido até o início e links inventariados.`
+      : `Grupo “${groupName}” localizado, mas o histórico não foi percorrido integralmente; envio bloqueado para evitar duplicidade.`,
+    threadId, sharedUrls:[...sharedUrls], sharedInventoryComplete, stalledRounds
+  };
 }
 
-export async function executeShareToGroup(page, url, destinationGroupName, onBeforeSend = async () => {}) {
+export async function executeShareToGroup(page, url, destinationGroupName, onBeforeSend = async () => {}, groupInventory = null) {
   const groupName = String(destinationGroupName || "").trim();
   if (!groupName) throw new Error("Informe o nome exato do grupo coletivo de envios.");
+  if (getGroupShareState(url, groupInventory) === "unknown") throw new Error("Histórico do grupo coletivo não foi conferido integralmente; envio bloqueado para evitar duplicidade.");
+  if (getGroupShareState(url, groupInventory) === "already-shared") {
+    return { sharedToGroup:true, status:"publicação já encontrada no grupo coletivo — não reenviada" };
+  }
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1000);
   const share = await uniqueButton(page, ["compartilhar publicação", "share post", "^compartilhar$", "^share$"]);
@@ -1025,6 +1083,7 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
 export async function inspectStory(page, url) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
+  await expandVisibleCommentThreads(page);
   if (/accounts\/login/.test(page.url())) throw new Error("Sessão do Instagram não autenticada.");
   const snapshot = await page.evaluate(() => {
     const visible = node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; };
@@ -1039,13 +1098,20 @@ export async function inspectStory(page, url) {
     const bodyText=(document.body?.innerText||"").slice(0,4000);
     const profile=[...document.querySelectorAll("nav a[href],a[href]")].find(a=>/perfil|profile/i.test([a.getAttribute("aria-label"),a.innerText].filter(Boolean).join(" ")));
     const username=(profile?.getAttribute("href")||"").split("/").filter(Boolean)[0]||"";
-    const alreadyCommented=Boolean(username && [...document.querySelectorAll("li,[role='listitem']")].some(node =>
+    const commentNodes=[...document.querySelectorAll("li,[role='listitem']")].filter(node=>node.querySelector("a[href]"));
+    const alreadyCommented=Boolean(username && commentNodes.some(node =>
       [...node.querySelectorAll("a[href]")].some(a=>a.getAttribute("href")==="/"+username+"/") &&
       (node.innerText||"").trim().length>username.length
     ));
-    return { publicCommentAvailable:Boolean(publicField), publicCommentLabel:publicField ? [publicField.getAttribute("placeholder"),publicField.getAttribute("aria-label")].filter(Boolean).join(" ") : "", alreadyCommented, usernameKnown:Boolean(username), controls, bodyText };
+    const lower=bodyText.toLowerCase();
+    const totalMatch=lower.match(/(?:ver todos os|view all)\s+(\d+)\s+(?:comentários|comments)|(\d+)\s+(?:comentários|comments)/i);
+    const expectedComments=totalMatch?Number(totalMatch[1]||totalMatch[2]):null;
+    const explicitEmpty=/ainda não há comentários|seja o primeiro a comentar|no comments yet|be the first to comment/i.test(lower);
+    const hasMoreComments=/ver todos os|view all|ver mais comentários|view more comments|carregar mais comentários|load more comments|comentários anteriores|previous comments/i.test(lower);
+    const commentListComplete=explicitEmpty||(expectedComments!==null&&commentNodes.length>=expectedComments&&!hasMoreComments);
+    return { publicCommentAvailable:Boolean(publicField), publicCommentLabel:publicField ? [publicField.getAttribute("placeholder"),publicField.getAttribute("aria-label")].filter(Boolean).join(" ") : "", alreadyCommented, usernameKnown:Boolean(username), commentListComplete, expectedComments, commentRowsInspected:commentNodes.length, controls, bodyText };
   });
-  return { ...snapshot, stateKnown:{ publicCommentAvailable:true, alreadyCommented:snapshot.usernameKnown } };
+  return { ...snapshot, stateKnown:{ publicCommentAvailable:true, alreadyCommented:isCommentStateVerified({usernameKnown:snapshot.usernameKnown,alreadyCommented:snapshot.alreadyCommented,commentListComplete:snapshot.commentListComplete}) } };
 }
 
 export async function executeStoryComment(page, url, comment) {
@@ -1054,7 +1120,7 @@ export async function executeStoryComment(page, url, comment) {
   if(words.length<2 || !/\p{Extended_Pictographic}/u.test(text)) throw new Error("Comentário do Story precisa ter pelo menos duas palavras e um emoji.");
   const state=await inspectStory(page,url);
   if(!state.publicCommentAvailable) throw new Error("Comentário público indisponível neste Story; nenhuma resposta privada será enviada.");
-  if(!state.usernameKnown) throw new Error("Não foi possível confirmar a identidade do perfil para evitar comentário duplicado.");
+  if(!state.usernameKnown || state.stateKnown?.alreadyCommented !== true) throw new Error("A lista de comentários do Story não foi conferida integralmente; comentário bloqueado para evitar duplicidade.");
   if(state.alreadyCommented) return {commented:true,status:"comentário público já identificado — não repetido"};
   const fields=page.locator('textarea,input,[contenteditable="true"],[role="textbox"]');
   let editor=null;

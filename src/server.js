@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { openInstagram, collectGroupPosts, inspectPost, inspectStory, inspectSavedCollection, inspectDestinationGroup, unsaveSavedCollectionItem, executeLike, executeSaveToCollection, executeComment, executeStoryComment, executeShareToGroup, executeCompletionReaction } from "./instagram.js";
+import { openInstagram, collectGroupPosts, inspectPost, inspectStory, inspectSavedCollection, inspectDestinationGroup, unsaveSavedCollectionItem, executeLike, executeSaveToCollection, executeComment, executeStoryComment, executeShareToGroup, executeCompletionReaction, getGroupShareState } from "./instagram.js";
 import { createComment } from "./comments.js";
 import { appendHistory, getTaskState, getRecentComments, readHistory } from "./history.js";
 import { mergeTaskState, taskStateLabel, administrativeTargetsForRange } from "./group-state.js";
@@ -423,13 +423,13 @@ app.post("/api/start", async (req, res) => {
         !collectionDiagnostics?.stoppedByUser);
       const collectionIncomplete = !collectionScanComplete || withoutDate > 0 || withoutIdentity > 0 ||
         (collectionCoverage.available && !collectionCoverage.matches);
-      const executionPreflightIncomplete = collectionIncomplete || !destinationGroupVerification.verified;
+      const executionPreflightIncomplete = collectionIncomplete || !destinationGroupVerification.verified || !destinationGroupVerification.sharedInventoryComplete;
       if (mode === "automatic" && executionPreflightIncomplete) {
         const reasons = [];
         if (!collectionScanComplete) reasons.push("o limite do histórico não foi confirmado");
         if (withoutDate > 0) reasons.push(`${withoutDate} itens estão sem data verificável`);
         if (withoutIdentity > 0) reasons.push(`${withoutIdentity} itens não têm vínculo com a mensagem original`);
-        if (!destinationGroupVerification.verified) reasons.push(destinationGroupVerification.reason);
+        if (!destinationGroupVerification.verified || !destinationGroupVerification.sharedInventoryComplete) reasons.push(destinationGroupVerification.reason);
         if (collectionCoverage.available && !collectionCoverage.matches) {
           reasons.push(`meta administrativa divergente: Feed ${actualFeedForDate}/${collectionCoverage.expectedFeed}, Stories ${actualStoriesForDate}/${collectionCoverage.expectedStories}`);
         }
@@ -448,7 +448,9 @@ app.post("/api/start", async (req, res) => {
       logDiagnostic("INFO", "Iniciando inspeção e planejamento das publicações", { total: collected.length, mode });
       for (const item of collected) {
         if (stopRequested) break;
-        const previousState = mergeTaskState(getTaskState(item.url, item.threadId, item.messageId, completionEmoji), {});
+        const groupShareState = getGroupShareState(item.url, destinationGroupVerification);
+        const alreadyInDestinationGroup = groupShareState === "already-shared";
+        const previousState = mergeTaskState(getTaskState(item.url, item.threadId, item.messageId, completionEmoji), { sharedToGroup: alreadyInDestinationGroup });
         const instructions = interpretGroupInstructions(item.messageText || "");
         if (item.dateUnknown) {
           const reason = "A mensagem e o link foram extraídos, mas o Instagram não forneceu um timestamp válido. O item foi mantido como candidato, porém não pode ser atribuído com segurança ao período selecionado nem executado.";
@@ -523,7 +525,7 @@ app.post("/api/start", async (req, res) => {
             collectionMembership: Boolean(savedCollectionInventoryAvailable && savedCollectionUrls?.has(collectionKey)),
             collectionInventoryAvailable: Boolean(savedCollectionInventoryAvailable),
             commented: inspection.stateKnown?.commented === true,
-            destinationGroupVerified: destinationGroupVerification.verified,
+            destinationGroupVerified: destinationGroupVerification.verified && destinationGroupVerification.sharedInventoryComplete,
             messageIdentityVerified: Boolean(item.identityVerified && item.threadId && item.messageId),
             reasons: {
               liked: inspection.stateKnown?.liked
@@ -557,7 +559,7 @@ app.post("/api/start", async (req, res) => {
               ["shareToGroup", !taskState.sharedToGroup && !taskState.shareAttempted, async () => executeShareToGroup(page,item.url,destinationGroupName, async () => {
   taskState = mergeTaskState(taskState,{shareAttempted:true});
   appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedToGroup:false,shareAttempted:true,liked:taskState.liked,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,commented:taskState.commented,commentForbidden:instructions.comment==="forbidden",completionEmoji,groupCheck:taskState.groupCheck,status:"envio iniciado — aguardando confirmação",detail:"Tentativa de envio registrada antes do clique final"});
-}), "sharedToGroup"]
+}), "sharedToGroup", { sharedUrls:destinationGroupVerification.sharedUrls || [], inventoryComplete:destinationGroupVerification.sharedInventoryComplete })]
             ];
             let blocked = false;
             for (const [action,needed,run,key] of steps) {
