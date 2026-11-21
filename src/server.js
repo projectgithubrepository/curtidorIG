@@ -298,11 +298,18 @@ app.post("/api/start", async (req, res) => {
         networkResponses: collected[0]?.networkDiagnostics?.capturedResponses ?? 0
       });
       let savedCollectionUrls = null;
-      if (mode === "automatic") {
-        progress.message = `Validando a coleção “${collectionName}” antes de qualquer interação...`;
-        const savedCollection = await inspectSavedCollection(page, collectionName);
-        savedCollectionUrls = new Set(savedCollection.items.map(item => new URL(item.url).pathname.replace(/\/$/, "")));
-        logDiagnostic("INFO", "Coleção de destino localizada e inventariada", { collectionName, existingItems: savedCollectionUrls.size });
+      let savedCollectionInventoryAvailable = false;
+      if (mode === "automatic" || mode === "test") {
+        progress.message = `Conferindo a coleção “${collectionName}” para validar o destino do salvamento...`;
+        try {
+          const savedCollection = await inspectSavedCollection(page, collectionName);
+          savedCollectionUrls = new Set(savedCollection.items.map(item => new URL(item.url).pathname.replace(/\/$/, "")));
+          savedCollectionInventoryAvailable = true;
+          logDiagnostic("INFO", "Coleção de destino localizada e inventariada", { collectionName, existingItems: savedCollectionUrls.size, mode });
+        } catch (error) {
+          logDiagnostic(mode === "test" ? "WARN" : "ERROR", "Não foi possível inventariar a coleção de destino", { collectionName, mode, error: error.message });
+          if (mode === "automatic") throw error;
+        }
       }
       progress.total = collected.length;
       const withoutDate = collected.filter(item => item.dateUnknown).length;
@@ -330,8 +337,15 @@ app.post("/api/start", async (req, res) => {
         }
         try {
           const inspection = await inspectPost(page, item.url);
-          let taskState = mergeTaskState(previousState, { ...inspection.observedState, commentForbidden: instructions.comment === "forbidden" });
-          const comment = taskState.commented || instructions.comment === "forbidden" ? "" : createComment(inspection.caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
+          const collectionKey = new URL(item.url).pathname.replace(/\/$/, "");
+          const savedFolderVerified = Boolean(inspection.observedState.saved && savedCollectionInventoryAvailable && savedCollectionUrls?.has(collectionKey));
+          let taskState = mergeTaskState(previousState, { ...inspection.observedState, savedFolderVerified, commentForbidden: instructions.comment === "forbidden" });
+          const comment = taskState.commented || instructions.comment === "forbidden" || !inspection.caption ? "" : createComment(inspection.caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
+          const stateKnown = {
+            liked: inspection.stateKnown?.liked ?? false,
+            saveToCollection: Boolean(savedCollectionInventoryAvailable && inspection.stateKnown?.saved),
+            commented: inspection.stateKnown?.commented ?? false
+          };
           const actionLog = [];
           if (mode === "automatic" && !item.identityVerified) {
             actionLog.push({action:"all",status:"bloqueada",reason:"A publicação não está vinculada a uma mensagem original identificada; nenhuma ação foi executada."});
@@ -377,7 +391,7 @@ app.post("/api/start", async (req, res) => {
               actionLog.push({action:"completionReaction",status:"aguardando etapas obrigatórias"});
             }
           }
-          let plan = buildExecutionPlan({ mode, collectionName, completionEmoji, taskState, comment, instructions });
+          let plan = buildExecutionPlan({ mode, collectionName, completionEmoji, taskState, comment, instructions, stateKnown });
           if (mode === "automatic") {
             plan = plan.map(entry => {
               const logged = actionLog.find(record => record.action === entry.action);
@@ -392,7 +406,9 @@ app.post("/api/start", async (req, res) => {
           appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:taskState.groupCheck,completionEmoji,commentForbidden:instructions.comment==="forbidden",complete:taskState.complete,milestone:item.administrativeMilestones,detail:mode==="test"?"Simulação sem ações":"Planejamento e execução da publicação"});
         } catch (error) {
           logDiagnostic("ERROR", "Falha ao inspecionar publicação", { url:item.url,error:error.message,inspectionDiagnostics:error.inspectionDiagnostics||null });
-          const result={...item,caption:"",comment:"",taskState:previousState,status:"não foi possível analisar",detail:error.message};
+          const blockedPlan = buildExecutionPlan({ mode, collectionName, completionEmoji, taskState:previousState, instructions })
+            .map(action => ({ ...action, status:"bloqueada — inspeção não concluída", reason:error.message }));
+          const result={...item,caption:"",comment:"",taskState:previousState,plan:blockedPlan,actionLog:[],inspectionDiagnostics:error.inspectionDiagnostics||null,status:"inspeção não concluída — ações não verificadas",detail:error.message};
           results.push(result);
           appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,status:"erro na análise",groupName,collectionName,sharedAt:item.sharedAt,completionEmoji,detail:error.message});
         }
@@ -402,7 +418,13 @@ app.post("/api/start", async (req, res) => {
       const finalNetworkStatus = finalNetwork
         ? ` Captura de rede: ${finalNetwork.capturedResponses} respostas, ${finalNetwork.messageLikeObjects} objetos de mensagem; reações ${finalNetwork.hasReactionFields ? "detectadas" : "não detectadas"}.`
         : "";
-      progress.message = mode === "test" ? `Teste concluído: ${results.length} itens analisados. Nenhuma ação foi executada.` : mode === "manual" ? `Coleta concluída: ${results.length} itens preparados para execução manual.` : `Execução automática finalizada: ${results.length} itens analisados. Consulte o resultado de cada ação.`;
+      const inspectionFailures = results.filter(item => item.status === "inspeção não concluída — ações não verificadas").length;
+      const storiesBlocked = results.filter(item => item.contentType === "story").length;
+      const plannedActions = results.reduce((sum,item) => sum + (item.plan?.length || 0), 0);
+      progress.message = mode === "test"
+        ? `TESTE finalizado: ${results.length}/${collected.length} publicações listadas; ${inspectionFailures} inspeções incompletas; ${storiesBlocked} Stories bloqueadas; ${plannedActions} etapas exibidas no planejamento. Nenhuma ação foi executada.`
+        : mode === "manual" ? `Coleta concluída: ${results.length} itens preparados para execução manual.`
+        : `Execução automática finalizada: ${results.length} itens analisados. Consulte o resultado de cada ação.`;
       logDiagnostic("INFO", "Coleta concluída", { listed: results.length, networkResponses: network?.capturedResponses ?? 0 });
       diagnosticReport = {
         schemaVersion: 1,
@@ -418,7 +440,11 @@ app.post("/api/start", async (req, res) => {
           administrativeMilestones: new Set(collected.flatMap(item => (item.administrativeMilestones || []).map(marker => marker.text))).size,
           stories: collected.filter(item => item.contentType === "story").length,
           feedsAndReels: collected.filter(item => item.contentType !== "story").length,
-          itemsWithoutDate: collected.filter(item => item.dateUnknown).length
+          itemsWithoutDate: collected.filter(item => item.dateUnknown).length,
+          inspectionFailures,
+          storiesBlocked,
+          plannedActions,
+          savedCollectionInventoryAvailable
         },
         networkDiagnostics: collected[0]?.networkDiagnostics || null,
         pageDiagnostics: null,
