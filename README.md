@@ -50,11 +50,11 @@ Esta seção consolida as regras funcionais que a aplicação deve seguir. As re
 ### 1. Configuração e origem do trabalho
 
 - A pessoa seleciona/informa o **grupo de origem** do Instagram e o período de coleta.
-- Informa a **coleção de destino** dos Salvos pelo nome exato. O valor inicial é `Curtido`, mas pode ser alterado.
-- Informa o **grupo coletivo de envios** pelo nome exato. O valor inicial é `grupo de envios`, mas pode ser alterado.
+- Informa a **URL direta da coleção de destino** dos Salvos (`/usuario/saved/slug/ID/`). A aplicação abre e valida a coleção específica; o nome exibido é extraído da própria página para uso interno no seletor de salvamento.
+- Informa a **URL direta da conversa do grupo coletivo** (`/direct/t/ID/`). A aplicação abre a conversa pelo ID, confirma o cabeçalho e extrai o nome para uso interno no compartilhamento.
 - Escolhe um dos modos: **TESTE**, **AUTOMÁTICO** ou **MANUAL**. TESTE é o modo padrão. AUTOMÁTICO exige confirmação explícita.
 - O fluxo normal começa pela conversa/grupo e pelo período; não depende de colar URLs individualmente.
-- Não escolher outro grupo, coleção ou conversa por aproximação quando o nome exato não puder ser confirmado.
+- Não escolher outro grupo ou coleção por aproximação. As URLs diretas informadas são obrigatórias e devem abrir exatamente a conversa ou coleção correspondente; se a identidade não puder ser confirmada, bloquear as operações dependentes.
 
 ### 2. Coleta, período e vínculo com a mensagem
 
