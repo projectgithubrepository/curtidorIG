@@ -137,7 +137,7 @@ app.get("/api/history", (_req, res) => res.type("text/csv; charset=utf-8").send(
 app.post("/api/confirm-action", (req, res) => {
   const url = String(req.body.url ?? "");
   const action = String(req.body.action ?? "");
-  const allowed = new Set(["saved", "savedFolderVerified", "liked", "commented", "groupCheck"]);
+  const allowed = new Set(["saved", "savedFolderVerified", "liked", "commented", "sharedToGroup", "groupCheck"]);
   if (!url || !allowed.has(action)) return res.status(400).json({ error: "Publicação ou ação inválida." });
 
   const item = results.find(entry => entry.url === url);
@@ -160,7 +160,8 @@ app.post("/api/confirm-action", (req, res) => {
     savedFolderVerified: "pasta de destino conferida",
     liked: "curtida",
     commented: "comentário publicado",
-    groupCheck: "check confirmado na mensagem do grupo"
+    sharedToGroup: "enviado ao grupo coletivo",
+    groupCheck: "reação aplicada à mensagem original"
   };
   item.taskState = taskState;
   item.status = taskStateLabel(taskState);
@@ -178,6 +179,8 @@ app.post("/api/confirm-action", (req, res) => {
     savedFolderVerified: taskState.savedFolderVerified,
     liked: taskState.liked,
     commented: taskState.commented,
+    sharedToGroup: taskState.sharedToGroup,
+    commentForbidden: taskState.commentForbidden,
     groupCheck: taskState.groupCheck,
     milestone: item.administrativeMilestones,
     detail: "Confirmação manual: " + labels[action]
@@ -326,6 +329,7 @@ app.post("/api/start", async (req, res) => {
             ];
             let blocked = false;
             for (const [action,needed,run,key] of steps) {
+              if (stopRequested) { actionLog.push({action,status:"interrompida pelo usuário"}); blocked=true; break; }
               if (!needed) continue;
               if (action === "comment" && !comment) { actionLog.push({action,status:"bloqueada",reason:"Comentário não passou na validação."}); blocked=true; break; }
               try {
@@ -340,7 +344,7 @@ app.post("/api/start", async (req, res) => {
               }
             }
             const requiredDone = taskState.liked && taskState.saved && taskState.savedFolderVerified && (taskState.commented || instructions.comment==="forbidden") && taskState.sharedToGroup;
-            if (requiredDone && !taskState.groupCheck) {
+            if (requiredDone && !taskState.groupCheck && !stopRequested) {
               try {
                 const outcome = await executeCompletionReaction(page,item,completionEmoji);
                 taskState = mergeTaskState(taskState,{groupCheck:true});
