@@ -1213,7 +1213,7 @@ export async function executeComment(page, url, comment) {
   if (!(await post.count())) throw new Error("Botão de publicar comentário não identificado.");
   await post.click();
   await page.waitForTimeout(900);
-  const body = await page.locator("article,main").first().innerText().catch(() => "");
+  const body = await page.locator("main,article").first().innerText().catch(() => "");
   if (!body.includes(text)) throw new Error("O comentário não apareceu na publicação após o envio.");
   return { commented: true, status: "comentário publicado e verificado" };
 }
