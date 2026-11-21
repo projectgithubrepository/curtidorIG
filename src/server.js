@@ -92,7 +92,7 @@ app.get("/api/diagnostic-summary", (_req, res) => {
     "Operações de rede:",
     ...(operations.length ? operations : ["- Nenhuma identificada"]),
     `Coleção de destino "${report.request?.collectionName || "?"}": ${summary.savedCollectionInventoryAvailable ? "inventariada" : "NÃO localizada/inventariada"}`,
-    ...(summary.savedCollectionInventoryError ? [`Falha da coleção: ${String(summary.savedCollectionInventoryError).replace(/\\s+/g, " ").slice(0, 350)}`] : []),
+    ...(summary.savedCollectionInventoryError ? [`Falha da coleção: ${String(summary.savedCollectionInventoryError).replace(/\s+/g, " ").slice(0, 350)}`] : []),
     `Grupo coletivo: ${summary.destinationGroupVerification?.verified ? "confirmado" : "não confirmado"}`,
     `Plano: ${summary.plannedActions ?? 0} etapas | aptas: ${summary.mappedActions ?? 0} | bloqueadas: ${summary.blockedActions ?? 0} | não verificadas: ${summary.unverifiedActions ?? 0} | inspeções interrompidas: ${summary.inspectionFailures ?? 0}`,
     ...(warnings.length ? ["Avisos relevantes:", ...warnings] : ["Avisos relevantes: nenhum"]),
