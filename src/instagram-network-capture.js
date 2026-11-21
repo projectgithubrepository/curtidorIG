@@ -1,6 +1,5 @@
 const MAX_DIAGNOSTIC_RESPONSES = 500;
 const MAX_DEPTH = 20;
-const MAX_URLS_PER_MESSAGE = 12;
 const URL_PATTERN = /(?:https?:\/\/(?:www\.)?instagram\.com)?\/(?:p|reel|tv|stories)\/[A-Za-z0-9._-]+(?:\/[^\s"'<>]*)?/gi;
 
 function requestBody(request) {
@@ -102,7 +101,7 @@ function collectUrls(value, output, seen = new WeakSet(), depth = 0) {
         } else {
           url = "https://www.instagram.com/" + match[1].toLowerCase() + "/" + match[2];
         }
-        if (!output.includes(url) && output.length < MAX_URLS_PER_MESSAGE) output.push(url);
+        if (!output.includes(url)) output.push(url);
       } catch {}
     }
     return;
@@ -130,25 +129,28 @@ function storyIdentity(value, depth = 0, seen = new WeakSet()) {
   return { username: username || nested.username, storyId: storyId || nested.storyId };
 }
 
-function collectStoryUrls(value, output, seen = new WeakSet(), depth = 0) {
+function collectStoryUrls(value, output, seen = new WeakSet(), depth = 0, storyContext = false) {
   if (!value || typeof value !== "object" || depth > MAX_DEPTH || seen.has(value)) return;
   seen.add(value);
   if (Array.isArray(value)) {
-    value.forEach(item => collectStoryUrls(item, output, seen, depth + 1));
+    value.forEach(item => collectStoryUrls(item, output, seen, depth + 1, storyContext));
     return;
   }
-  for (const [key, child] of Object.entries(value)) {
-    if (/^(story_share|shared_story|story_media|story_item)$/i.test(key) && child && typeof child === "object") {
-      const identity = storyIdentity(child);
-      if (identity.username && identity.storyId) {
-        const url = "https://www.instagram.com/stories/" + identity.username + "/" + identity.storyId;
-        if (!output.includes(url) && output.length < MAX_URLS_PER_MESSAGE) output.push(url);
-      }
-    }
-    if (child && typeof child === "object") collectStoryUrls(child, output, seen, depth + 1);
+  const entries = Object.entries(value);
+  const typename = String(value.__typename || value.type || "").toLowerCase();
+  const productType = String(value.product_type || value.productType || "").toLowerCase();
+  const ownStoryMarker = /story|stories/.test(typename) || /^(story|stories)$/.test(productType) || entries.some(([key]) => /^(story_id|story_pk|story_media_id)$/i.test(key));
+  const identity = storyIdentity(value);
+  if ((storyContext || ownStoryMarker) && identity.username && identity.storyId) {
+    const url = "https://www.instagram.com/stories/" + identity.username + "/" + identity.storyId;
+    if (!output.includes(url)) output.push(url);
+  }
+  for (const [key, child] of entries) {
+    if (!child || typeof child !== "object") continue;
+    const childStoryContext = storyContext || /^(story|stories|story_share|shared_story|story_media|story_item|shared_story_media)$/i.test(key);
+    collectStoryUrls(child, output, seen, depth + 1, childStoryContext);
   }
 }
-
 function collectMediaCodes(value, output, seen = new WeakSet(), depth = 0, insideShare = false) {
   if (!value || typeof value !== "object" || depth > MAX_DEPTH || seen.has(value)) return;
   seen.add(value);
@@ -167,7 +169,7 @@ function collectMediaCodes(value, output, seen = new WeakSet(), depth = 0, insid
     if (productType !== "story" && productType !== "stories") {
       const path = productType === "clips" ? "reel" : "p";
       const url = "https://www.instagram.com/" + path + "/" + String(code);
-      if (!output.includes(url) && output.length < MAX_URLS_PER_MESSAGE) output.push(url);
+      if (!output.includes(url)) output.push(url);
     }
   }
   for (const [key, child] of Object.entries(value)) {
@@ -285,7 +287,7 @@ export function createInstagramNetworkCapture(page) {
       if (!previous || previous.urls.length < record.urls.length || (!previous.timestamp && record.timestamp)) {
         recordsByKey.set(key, { ...record, responseThreadId: context.threadId || "" });
       } else {
-        previous.urls = [...new Set([...previous.urls, ...record.urls])].slice(0, MAX_URLS_PER_MESSAGE);
+        previous.urls = [...new Set([...previous.urls, ...record.urls])];
         if (!previous.timestamp) previous.timestamp = record.timestamp;
         if (!previous.text) previous.text = record.text;
         if (!previous.sender) previous.sender = record.sender;
