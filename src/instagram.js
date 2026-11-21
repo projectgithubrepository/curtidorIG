@@ -246,13 +246,20 @@ function addNetworkMessages(records, { groupThreadId, startDate, endDate, found,
       // A identidade é a mensagem, não apenas a URL do post.
       const identityKey = String(record.messageId) + "::" + url;
       if (date.known) {
-        const previous = found.get(identityKey) || found.get(url) || {};
+        const previous = found.get(identityKey) || found.get(url) || fallback.get(identityKey) || {};
+        fallback.delete(identityKey);
         found.delete(url);
         found.set(identityKey, { ...previous, ...item, sharedAt: date.iso, dateUnknown: false, collectionMode: "network-date" });
         accepted++;
       } else {
         const previous = fallback.get(identityKey) || found.get(identityKey) || found.get(url) || {};
         const merged = { ...previous, ...item, dateUnknown: true, collectionMode: "network-date-unknown" };
+        // Se o DOM forneceu uma data válida, ela prevalece sobre um timestamp ausente no payload.
+        if (previous.sharedAt && !previous.dateUnknown) {
+          merged.sharedAt = previous.sharedAt;
+          merged.dateUnknown = false;
+          merged.collectionMode = previous.collectionMode || "date";
+        }
         if (found.has(url)) { found.delete(url); found.set(identityKey, merged); }
         else if (found.has(identityKey)) found.set(identityKey, merged);
         else fallback.set(identityKey, merged);
