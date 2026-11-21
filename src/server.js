@@ -544,6 +544,7 @@ app.post("/api/start", async (req, res) => {
                     page,item.url,destinationGroupName,destinationGroupUrl,
                     async () => {
                       taskState = mergeTaskState(taskState,{shareAttempted:true});
+                      previousState.shareAttempted=true;
                       appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:story.bodyText||"",comment,groupName,collectionName,sharedAt:item.sharedAt,commented:taskState.commented,commentForbidden,sharedToGroup:false,shareAttempted:true,completionEmoji,status:"envio de Story iniciado — aguardando confirmação",detail:"Tentativa de compartilhamento de Story registrada antes do envio"});
                     },
                     destinationGroupVerification
@@ -658,6 +659,7 @@ app.post("/api/start", async (req, res) => {
                 page, item.url, destinationGroupName,
                 async () => {
                   taskState = mergeTaskState(taskState,{shareAttempted:true});
+                  previousState.shareAttempted=true;
                   appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedToGroup:false,shareAttempted:true,liked:taskState.liked,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,commented:taskState.commented,commentForbidden:instructions.comment==="forbidden",completionEmoji,groupCheck:taskState.groupCheck,status:"envio iniciado — aguardando confirmação",detail:"Tentativa de envio registrada antes do clique final"});
                 },
                 destinationGroupVerification
