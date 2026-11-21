@@ -631,7 +631,7 @@ export function isInstagramSavedUrl(value, base = "https://www.instagram.com/") 
     const segments = url.pathname.split("/").filter(Boolean);
     return /(^|\.)instagram\.com$/i.test(url.hostname) &&
       segments.length >= 2 &&
-      segments[segments.length - 1].toLowerCase() === "saved" &&
+      segments[1].toLowerCase() === "saved" &&
       Boolean(extractInstagramUsernameFromProfileHref("/" + segments[0] + "/", base));
   } catch { return false; }
 }
