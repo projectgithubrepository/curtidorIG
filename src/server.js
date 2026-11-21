@@ -89,11 +89,14 @@ app.get("/api/diagnostic-summary", (_req, res) => {
     `Rede: ${network.capturedResponses ?? 0} respostas / ${network.parsedResponses ?? 0} interpretadas / ${network.unparsedResponses ?? 0} não interpretadas`,
     `Direct: ${network.websocketConnections ?? 0} WebSockets / ${network.websocketFrames ?? 0} quadros | IDs de mensagens: ${network.distinctMessageIds ?? 0}`,
     `Stories extraídas da rede: ${network.storyUrlsExtracted ?? 0} ocorrências / ${network.uniqueStoryUrls ?? 0} URLs únicas (WebSocket: ${network.webSocketStoryUrls ?? 0}) | objetos compartilhados: ${network.sharedMediaObjects ?? 0}`,
+    ...(scan.storyNetwork ? [
+      `Reconciliação de Stories: ${scan.storyNetwork.uniqueNetworkStoryUrls ?? 0} URLs únicas observadas | ${scan.storyNetwork.acceptedInDateRange ?? 0} aceitas na data | ${scan.storyNetwork.pendingDateVerification ?? 0} aguardando data | ${scan.storyNetwork.rejectedOtherThread ?? 0} outra conversa | ${scan.storyNetwork.rejectedWithoutThread ?? 0} sem conversa | ${scan.storyNetwork.rejectedWithoutMessageId ?? 0} sem ID de mensagem | ${scan.storyNetwork.rejectedAdministrativeMessage ?? 0} administrativas | ${scan.storyNetwork.rejectedOutsideDateRange ?? 0} fora do período`
+    ] : ["Reconciliação de Stories: contadores por etapa indisponíveis"]),
     "Operações de rede:",
     ...(operations.length ? operations : ["- Nenhuma identificada"]),
     `Coleção de destino "${report.request?.collectionName || "?"}": ${summary.savedCollectionInventoryAvailable ? "inventariada" : "NÃO localizada/inventariada"}`,
     ...(summary.savedCollectionInventoryError ? [`Falha da coleção: ${String(summary.savedCollectionInventoryError).replace(/\s+/g, " ").slice(0, 350)}`] : []),
-    `Grupo coletivo: ${summary.destinationGroupVerification?.verified ? "confirmado" : "não confirmado"}`,
+    `Grupo coletivo: ${summary.destinationGroupVerification?.verified ? "confirmado" : "não confirmado"}${summary.destinationGroupVerification?.reason ? " — " + String(summary.destinationGroupVerification.reason).replace(/\s+/g, " ").slice(0, 300) : ""}`,
     `Plano: ${summary.plannedActions ?? 0} etapas | aptas: ${summary.mappedActions ?? 0} | bloqueadas: ${summary.blockedActions ?? 0} | não verificadas: ${summary.unverifiedActions ?? 0} | inspeções interrompidas: ${summary.inspectionFailures ?? 0}`,
     ...(warnings.length ? ["Avisos relevantes:", ...warnings] : ["Avisos relevantes: nenhum"]),
     `Gerado: ${report.generatedAt || "?"}`,
