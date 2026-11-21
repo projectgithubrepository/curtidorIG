@@ -529,7 +529,8 @@ app.post("/api/start", async (req, res) => {
               const verificationFailure =
                 action === "like" && !stateKnown.liked ? (stateKnown.reasons?.liked || "Estado da curtida não identificado.") :
                 action === "saveToCollection" && (!stateKnown.savedStateKnown || !savedCollectionInventoryAvailable) ? (stateKnown.reasons?.saveToCollection || "Estado do salvamento ou inventário da coleção não confirmado.") :
-                action === "comment" && !stateKnown.commented ? (stateKnown.reasons?.commented || "Não foi possível confirmar se o perfil já comentou.") :\n                action === "shareToGroup" && !stateKnown.destinationGroupVerified ? (stateKnown.reasons?.shareToGroup || "Grupo coletivo não verificado.") : "";
+                action === "comment" && !stateKnown.commented ? (stateKnown.reasons?.commented || "Não foi possível confirmar se o perfil já comentou.") :
+                action === "shareToGroup" && !stateKnown.destinationGroupVerified ? (stateKnown.reasons?.shareToGroup || "Grupo coletivo não verificado.") : "";
               if (verificationFailure) {
                 actionLog.push({action,status:"bloqueada — estado atual não verificado",reason:verificationFailure});
                 blocked=true;
@@ -651,6 +652,8 @@ app.post("/api/start", async (req, res) => {
           publicationsInspected: inspectedFeedReels,
           administrativeMilestones: new Set(administrativeMilestones.map(marker => marker.text)).size,
           administrativeTarget,
+          destinationGroupVerification,
+          executionPreflightIncomplete,
           collectionCoverage,
           collectionDiagnostics,
           collectionScanComplete,
@@ -699,10 +702,12 @@ app.post("/api/start", async (req, res) => {
         summary: {
           publicationsFound: results.length,
           publicationsInspected: results.length,
-          administrativeTarget: error.administrativeTarget || null,\n          destinationGroupVerification: error.destinationGroupVerification || null,
+          administrativeTarget: error.administrativeTarget || null,
+          destinationGroupVerification: error.destinationGroupVerification || null,
           collectionCoverage: error.collectionCoverage || null,
           collectionDiagnostics: error.collectionDiagnostics || null,
-          collectionIncomplete: Boolean(error.collectionIncomplete),\n          executionPreflightIncomplete: Boolean(error.executionPreflightIncomplete),
+          collectionIncomplete: Boolean(error.collectionIncomplete),
+          executionPreflightIncomplete: Boolean(error.executionPreflightIncomplete),
           itemsWithoutDate: error.itemsWithoutDate ?? 0,
           itemsWithoutIdentity: error.itemsWithoutIdentity ?? 0
         },
