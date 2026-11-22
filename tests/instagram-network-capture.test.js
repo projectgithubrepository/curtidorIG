@@ -512,3 +512,53 @@ test("does not confuse the Direct message id with the nested Story media id", as
     "https://www.instagram.com/stories/story.owner/390000000000000099"
   ]);
 });
+
+
+test("extracts Story when owner and media identity are sibling objects", async () => {
+  const page = new EventEmitter();
+  const capture = createInstagramNetworkCapture(page);
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql",
+    status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({
+      postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: { thread_id: "1783131735658148" } }),
+      url: () => "https://www.instagram.com/api/graphql"
+    }),
+    json: async () => ({ data: { thread: { items: [{
+      message_id: "message-not-story-id",
+      timestamp_ms: 1795021200000,
+      sender: { username: "member" },
+      content: { story_share: {
+        user: { username: "story.owner" },
+        media: { pk: "390000000000000099", product_type: "story" }
+      } }
+    }] } } })
+  });
+  await capture.stop();
+  const [record] = capture.records();
+  assert.deepEqual(record.urls, ["https://www.instagram.com/stories/story.owner/390000000000000099"]);
+});
+
+test("does not mistake generic message ID for a Story ID when media identity is absent", async () => {
+  const page = new EventEmitter();
+  const capture = createInstagramNetworkCapture(page);
+  page.emit("response", {
+    url: () => "https://www.instagram.com/api/graphql",
+    status: () => 200,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({
+      postDataJSON: () => ({ operationName: "IGDMessageListOffMsysQuery", variables: { thread_id: "1783131735658148" } }),
+      url: () => "https://www.instagram.com/api/graphql"
+    }),
+    json: async () => ({ data: { thread: { items: [{
+      message_id: "390000000000000100",
+      timestamp_ms: 1795021200000,
+      sender: { username: "member" },
+      content: { story_share: { user: { username: "story.owner" }, media: { product_type: "story" } } }
+    }] } } })
+  });
+  await capture.stop();
+  const [record] = capture.records();
+  assert.deepEqual(record.urls, []);
+});
