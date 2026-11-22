@@ -1228,7 +1228,7 @@ export async function executeSaveToCollection(page, url, collectionName, knownCo
   knownCollectionUrls?.add(key);
   return { saved:true,savedFolderVerified:true,status:"salva na coleção e verificada pelo seletor e estado salvo" };
 }
-export async function executeComment(page, url, comment) {
+export async function executeComment(page, url, comment, onBeforePublish = async () => {}) {
   const current = await inspectPost(page, url);
   if (current.stateKnown?.commented !== true) throw new Error("Estado dos comentários não confirmado integralmente; comentário bloqueado para evitar duplicidade.");
   if (current.observedState.commented) return { commented:true, status:"comentário já identificado — não repetido" };
@@ -1241,13 +1241,17 @@ export async function executeComment(page, url, comment) {
   for (let i=0;i<count;i++) if (await boxes.nth(i).isVisible().catch(()=>false)) { editor=boxes.nth(i); break; }
   if (!editor) throw new Error("Campo de comentário não identificado.");
   await editor.fill(text);
-  const post = page.getByRole("button", { name: /publicar|postar|^post$/i }).last();
-  if (!(await post.count())) throw new Error("Botão de publicar comentário não identificado.");
+  const post = page.getByRole("button", { name: /publicar|postar|^post$|comment|comentar/i }).last();
+  if (!(await post.count()) || !(await post.isVisible().catch(() => false))) throw new Error("Botão de publicar comentário não identificado.");
+  // Registra a tentativa antes do clique. Se a confirmação falhar, uma nova execução
+  // não repetirá o comentário automaticamente.
+  await onBeforePublish();
   await post.click();
-  await page.waitForTimeout(900);
-  const body = await page.locator("main,article").first().innerText().catch(() => "");
-  if (!body.includes(text)) throw new Error("O comentário não apareceu na publicação após o envio.");
-  return { commented: true, status: "comentário publicado e verificado" };
+  await page.waitForTimeout(1000);
+  const after = await inspectPost(page, url);
+  const confirmedByOwner = (after.ownCommentTexts || []).some(row => row.includes(text));
+  if (!confirmedByOwner) throw new Error("Envio solicitado, mas o texto exato não foi encontrado em comentário associado ao perfil autenticado. Tentativa registrada; não repetir automaticamente.");
+  return { commented: true, status: "comentário encontrado na lista e associado ao perfil autenticado" };
 }
 
 export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
