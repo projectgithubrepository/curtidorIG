@@ -1611,7 +1611,7 @@ export async function executeCompletionReaction(page, item, emoji = "🌸", onBe
 }
 
 
-function normalizeStoryControlLabel(value) {
+export function normalizeStoryControlLabel(value) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, " ").trim().toLocaleLowerCase();
 }
