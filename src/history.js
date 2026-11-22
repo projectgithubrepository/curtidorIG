@@ -128,12 +128,14 @@ export function appendHistory(entry) {
     commented: Boolean(previous.commented || entry.commented),
     groupCheck: Boolean(previous.groupCheck || (entry.groupCheck && entry.completionEmoji)),
     sharedToGroup: Boolean(previous.sharedToGroup || entry.sharedToGroup),
-    shareAttempted: Boolean(previous.shareAttempted || entry.shareAttempted),
+    shareAttempted: entry.sharedToGroup ? false : Boolean(previous.shareAttempted || entry.shareAttempted),
     commentForbidden: Boolean(previous.commentForbidden || entry.commentForbidden),
-    commentAttempted: Boolean(previous.commentAttempted || entry.commentAttempted),
-    likeAttempted: Boolean(previous.likeAttempted || entry.likeAttempted),
-    saveAttempted: Boolean(previous.saveAttempted || entry.saveAttempted),
-    reactionAttempted: Boolean(previous.reactionAttempted || entry.reactionAttempted),
+    // Tentativas são pendências, não um histórico eterno: confirmação posterior
+    // do estado real resolve a pendência e libera uma futura mudança legítima.
+    commentAttempted: entry.commented ? false : Boolean(previous.commentAttempted || entry.commentAttempted),
+    likeAttempted: entry.liked ? false : Boolean(previous.likeAttempted || entry.likeAttempted),
+    saveAttempted: entry.saved && entry.savedFolderVerified ? false : Boolean(previous.saveAttempted || entry.saveAttempted),
+    reactionAttempted: entry.groupCheck ? false : Boolean(previous.reactionAttempted || entry.reactionAttempted),
     reactionEmoji: entry.groupCheck && entry.completionEmoji ? entry.completionEmoji : (previous.reactionEmoji || "")
   };
   const complete = identityVerified && state.saved && state.savedFolderVerified && state.liked && (state.commented || state.commentForbidden) && state.sharedToGroup && state.groupCheck;
