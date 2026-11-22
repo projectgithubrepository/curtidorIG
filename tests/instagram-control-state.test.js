@@ -55,3 +55,23 @@ test("keeps contradictory evidence on one control unknown", () => {
   assert.equal(result.likedKnown, false);
   assert.equal(result.savedKnown, true);
 });
+
+test("does not infer an unsaved state from generic like_button/save_button identifiers alone", () => {
+  const result = classifyPostControls([
+    { testId: "like_button", labels: ["like_button"] },
+    { testId: "save_button", labels: ["save_button"] }
+  ]);
+  assert.equal(result.likedKnown, false);
+  assert.equal(result.savedKnown, false);
+});
+
+test("accepts explicit state-specific test IDs when accessible labels are absent", () => {
+  const result = classifyPostControls([
+    { testId: "unlike_button", labels: ["unlike_button"] },
+    { testId: "unsave_button", labels: ["unsave_button"] }
+  ]);
+  assert.equal(result.likedKnown, true);
+  assert.equal(result.liked, true);
+  assert.equal(result.savedKnown, true);
+  assert.equal(result.saved, true);
+});
