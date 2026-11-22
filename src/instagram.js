@@ -1259,11 +1259,11 @@ export async function executeComment(page, url, comment, onBeforePublish = async
   if (!editor) throw new Error(labeledEditors.length>1 || visibleEditors.length>1 ? "Mais de um campo pode receber texto; comentário bloqueado por ambiguidade." : "Campo de comentário não localizado pelas alternativas A (rótulo), B (data-placeholder) e C (campo único visível).");
   await editor.fill(text);
   // Botão: A) nome acessível; B) data-testid específico. Nunca usa botão genérico sem identificação.
-  let post = page.getByRole("button", { name: /publicar|postar|^post$|comment|comentar/i }).last();
-  if (!(await post.count()) || !(await post.isVisible().catch(() => false))) {
-    post = page.locator('button[data-testid*="comment" i],button[data-testid*="post" i]').last();
+  let post = page.getByRole("button", { name: /publicar|postar|^post$|comment|comentar/i });
+  if (await post.count() !== 1) {
+    post = page.locator('button[data-testid*="comment" i],button[data-testid*="post" i]');
   }
-  if (!(await post.count()) || !(await post.isVisible().catch(() => false))) throw new Error("Botão de publicar comentário não localizado pelas alternativas A (nome acessível) e B (data-testid).");
+  if (await post.count() !== 1 || !(await post.isVisible().catch(() => false))) throw new Error("Botão de publicar comentário não localizado de forma única pelas alternativas A (nome acessível) e B (data-testid).");
   // Registra a tentativa antes do clique. Se a confirmação falhar, uma nova execução
   // não repetirá o comentário automaticamente.
   await onBeforePublish();
@@ -1572,8 +1572,9 @@ export async function executeStoryComment(page, url, comment, onBeforePublish = 
   else if(labeled.length===0&&visible.length===1)editor=visible[0];
   if(!editor)throw new Error(labeled.length>1||visible.length>1?"Mais de um campo visível no Story; comentário bloqueado por ambiguidade.":"Campo de comentário público não localizado pelas alternativas A/B/C.");
   await editor.fill(text);
-  const publish=page.getByRole("button",{name:/publicar|postar|^post$|comentar|comment/i}).last();
-  if(!(await publish.count()) || !(await publish.isVisible().catch(()=>false))) throw new Error("Botão de publicação do comentário público não identificado.");
+  let publish=page.getByRole("button",{name:/publicar|postar|^post$|comentar|comment/i});
+  if(await publish.count()!==1)publish=page.locator('button[data-testid*="comment" i],button[data-testid*="post" i]');
+  if(await publish.count()!==1 || !(await publish.isVisible().catch(()=>false))) throw new Error("Botão de publicação do comentário público não localizado de forma única pelas alternativas A/B.");
   await onBeforePublish();
   await publish.click(); await page.waitForTimeout(1000);
   const after=await inspectStory(page,url);
