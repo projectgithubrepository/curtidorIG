@@ -630,12 +630,14 @@ export function interpretPostSnapshot(snapshot) {
     throw Object.assign(new Error("O Instagram exibiu uma mensagem de conteúdo indisponível. Não é possível concluir se a publicação é privada ou foi removida."), { inspectionDiagnostics: { ...diagnostics, reason: "unavailable-message" } });
   }
 
-  const caption = (articleText || dialogText || mainText || ogDescription).trim();
+  const caption = String(snapshot.captionText || "").trim();
   if (!caption) {
     diagnostics.reason = snapshot.hasVideo || snapshot.hasImage ? "media-without-readable-caption" : "post-content-not-rendered";
     diagnostics.captionAvailable = false;
+    diagnostics.captionSource = "not found — neutral fallback required";
   } else {
     diagnostics.captionAvailable = true;
+    diagnostics.captionSource = "caption-specific DOM";
   }
   return { caption: caption.slice(0, 5000), diagnostics };
 }
@@ -703,6 +705,12 @@ export async function inspectPost(page, url) {
       articleText: article?.innerText || "",
       mainText: main?.innerText || "",
       dialogText: dialog?.innerText || "",
+      // Capture only a caption-specific node; never use the whole page as caption.
+      captionText: (() => {
+        const nodes = [...document.querySelectorAll('article [data-testid*="caption" i], [role="dialog"] [data-testid*="caption" i]')];
+        const values = nodes.map(node => (node.innerText || node.textContent || "").trim()).filter(Boolean);
+        return values.length === 1 ? values[0] : "";
+      })(),
       ogDescription: meta?.content || "",
       hasVideo: Boolean(document.querySelector("video")),
       hasImage: Boolean(document.querySelector("article img, main img, [role='dialog'] img")),
@@ -725,12 +733,15 @@ export async function inspectPost(page, url) {
   // Em algumas versões do Instagram, o <article> contém só a mídia e
   // os controles ficam como irmãos dentro de <main>. Priorizar main evita
   // ler um artigo visual sem os botões de Curtir/Salvar/Comentários.
-  const rootSelector = snapshot.selectors.main ? "main" : snapshot.selectors.article ? "article" : snapshot.selectors.dialog ? '[role="dialog"]' : "main";
+  const rootSelector = snapshot.selectors.main ? "main" : snapshot.selectors.article ? "article" : snapshot.selectors.dialog ? '[role="dialog"]' : "body";
   let observedState;
   let stateReadError = "";
   try {
     observedState = await page.locator(rootSelector).first().evaluate(element => {
-      const controls = [...element.querySelectorAll('button,[role="button"]')];
+      const controls = [...element.querySelectorAll('button,[role="button"]')].filter(node => {
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
       // No Instagram atual, o rótulo acessível costuma estar no SVG interno,
       // não no próprio botão. Ler ambos evita marcar todos os estados como
       // desconhecidos quando o botão tem innerText vazio.
@@ -793,7 +804,13 @@ export async function inspectPost(page, url) {
         liked, saved, commented, ownCommentTexts,
         stateKnown: { liked: likeStateKnown, saved: savedStateKnown, commented: commentStateVerified },
         verificationDiagnostics: {
-          rootSelector, controlCount: controls.length, controlLabels: controlLabels.slice(0, 30),
+          rootSelector, controlCount: controls.length, controlLabels: controlLabels.slice(0, 50),
+          controlCandidates: controls.slice(0, 50).map(node => ({
+            tag: node.tagName.toLowerCase(), role: node.getAttribute("role") || "",
+            ariaLabel: node.getAttribute("aria-label") || "", title: node.getAttribute("title") || "",
+            testId: node.getAttribute("data-testid") || "", text: (node.innerText || "").trim().slice(0, 100),
+            svgLabels: [...node.querySelectorAll("svg,[aria-label],[title]")].map(child => child.getAttribute("aria-label") || child.getAttribute("title") || child.getAttribute("data-testid") || "").filter(Boolean).slice(0, 8)
+          })),
           likeControlFound: likeStateKnown, likeLabels, saveControlFound: savedStateKnown, saveLabels,
           profileLinkCount: profileLinks.length, profileDetectionStrategy: labeledProfileLinks.length ? "A — rótulo acessível" : avatarProfileLinks.length ? "B — avatar do menu" : menuProfileLinks.length ? "C — link do menu" : "nenhuma", identifiedUsername: username || null, commentRowsInspected: commentRows.length,
           expectedCommentCount: expectedComments, commentListComplete, alreadyCommented: commented,
@@ -1527,6 +1544,24 @@ async function openStoryContent(page, url) {
 export async function inspectStory(page, url) {
   const storyOpen = await openStoryContent(page, url);
   await expandVisibleCommentThreads(page);
+  // Open only the public comment composer; never use private reply controls.
+  let publicCommentButtonLabel = "";
+  const publicButtons = page.locator('button,[role="button"]');
+  const publicButtonMatches = [];
+  for (let index = 0; index < await publicButtons.count(); index++) {
+    const button = publicButtons.nth(index);
+    if (!(await button.isVisible().catch(() => false))) continue;
+    const label = await button.evaluate(node =>
+      [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText]
+        .filter(Boolean).join(" ").replace(/\\s+/g, " ").trim()
+    ).catch(() => "");
+    if (/^(comentar|adicionar comentário|comment|add comment)$/i.test(label)) publicButtonMatches.push({ button, label });
+  }
+  if (publicButtonMatches.length === 1) {
+    publicCommentButtonLabel = publicButtonMatches[0].label;
+    await publicButtonMatches[0].button.click().catch(() => {});
+    await page.waitForTimeout(350);
+  }
   const snapshot = await page.evaluate(() => {
     const visible = node => { const r=node.getBoundingClientRect(); return r.width>0 && r.height>0; };
     const fields = [...document.querySelectorAll('textarea,input,[contenteditable="true"],[role="textbox"]')].filter(visible);
@@ -1564,9 +1599,9 @@ export async function inspectStory(page, url) {
     const explicitEmpty=/ainda não há comentários|seja o primeiro a comentar|no comments yet|be the first to comment/i.test(lower);
     const hasMoreComments=/ver todos os|view all|ver mais comentários|view more comments|carregar mais comentários|load more comments|comentários anteriores|previous comments/i.test(lower);
     const commentListComplete=explicitEmpty||(expectedComments!==null&&commentNodes.length>=expectedComments&&!hasMoreComments);
-    return { publicCommentAvailable:Boolean(publicField), publicCommentLabel:publicField ? [publicField.getAttribute("placeholder"),publicField.getAttribute("aria-label")].filter(Boolean).join(" ") : "", alreadyCommented, ownCommentTexts, usernameKnown:Boolean(username), profileDetectionStrategy:labeled.length?"A — rótulo acessível":avatar.length?"B — avatar do menu":fallback.length?"C — link do menu":"nenhuma", commentListComplete, expectedComments, commentRowsInspected:commentNodes.length, controls, bodyText };
+    return { publicCommentAvailable:Boolean(publicField), publicCommentLabel:publicField ? [publicField.getAttribute("placeholder"),publicField.getAttribute("aria-label")].filter(Boolean).join(" ") : "", publicCommentButtonAvailable:controls.some(label => /^(comentar|adicionar comentário|comment|add comment)$/i.test(label.trim())), alreadyCommented, ownCommentTexts, usernameKnown:Boolean(username), profileDetectionStrategy:labeled.length?"A — rótulo acessível":avatar.length?"B — avatar do menu":fallback.length?"C — link do menu":"nenhuma", commentListComplete, expectedComments, commentRowsInspected:commentNodes.length, controls, bodyText };
   });
-  return { ...snapshot, storyOpen, stateKnown:{ publicCommentAvailable:snapshot.publicCommentAvailable, alreadyCommented:isCommentStateVerified({usernameKnown:snapshot.usernameKnown,alreadyCommented:snapshot.alreadyCommented,commentListComplete:snapshot.commentListComplete}) } };
+  return { ...snapshot, publicCommentButtonLabel, publicCommentButtonCandidates: publicButtonMatches.length, storyOpen, stateKnown:{ publicCommentAvailable:snapshot.publicCommentAvailable || snapshot.publicCommentButtonAvailable, alreadyCommented:isCommentStateVerified({usernameKnown:snapshot.usernameKnown,alreadyCommented:snapshot.alreadyCommented,commentListComplete:snapshot.commentListComplete}) } };
 }
 
 export async function executeStoryComment(page, url, comment, onBeforePublish = async () => {}) {
