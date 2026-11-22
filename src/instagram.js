@@ -637,14 +637,14 @@ function extractMainCaptionFallback(snapshot) {
   // Remove rótulos de interface isolados; nunca recorre ao texto integral de body.
   if (snapshot.selectors?.article || snapshot.selectors?.dialog || !snapshot.selectors?.main) return "";
   const noise = /^(?:perfil|profile|comentários?|comments?|curtir|descurtir|like|unlike|comentar|comment|compartilhar|share|salvar|save|ver tradução|see translation|responder|reply|mais|more|seguir|following|seguindo|mensagem|message|publicações?|posts?)$/i;
-  const lines = String(snapshot.mainText || "").split(/\\r?\\n/)
-    .map(line => line.replace(/\\s+/g, " ").trim())
+  const lines = String(snapshot.mainText || "").split(/\r?\n/)
+    .map(line => line.replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .filter(line => !noise.test(line))
-    .filter(line => !/^@[\\w.]+$/.test(line))
-    .filter(line => !/^\\d+(?:[.,]\\d+)?\\s*(?:curtidas?|likes?|comentários?|comments?)?$/i.test(line))
-    .filter(line => !/^(?:curtido por|liked by|há\\s+\\d+|\\d+\\s*(?:h|d|sem|w))\\b/i.test(line));
-  return lines.join("\\n").trim();
+    .filter(line => !/^@[\w.]+$/.test(line))
+    .filter(line => !/^\d+(?:[.,]\d+)?\s*(?:curtidas?|likes?|comentários?|comments?)?$/i.test(line))
+    .filter(line => !/^(?:curtido por|liked by|há\s+\d+|\d+\s*(?:h|d|sem|w))\b/i.test(line));
+  return lines.join("\n").trim();
 }
 
 export function interpretPostSnapshot(snapshot) {
