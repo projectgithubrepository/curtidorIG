@@ -171,3 +171,12 @@ A execução mais recente apresentou 41 Feed/Reels com 123 etapas não verificad
 5. Reconciliar a divergência de cobertura Feed/Reels e Stories já registrada acima.
 
 **AUTOMÁTICO permanece não autorizado até que o novo TESTE demonstre reconhecimento consistente.** Esta correção melhora a interpretação do DOM observado; não comprova, por si só, o comportamento da interface real do Instagram.
+
+
+### Revisão complementar — IDs genéricos e evidência de perfil
+
+Na segunda revisão da classificação, foi identificado que `like_button` e `save_button` podem ser identificadores estáticos do componente, sem informar o estado do toggle. A implementação foi ajustada para não inferir “não curtida/não salva” apenas desses IDs. Rótulos acessíveis/textuais explícitos determinam o estado; IDs `unlike` e `unsave` só são aceitos como prova positiva de estado aplicado quando não há rótulo explícito. A classificação usa todos os controles visíveis capturados, não apenas a amostra exibida no diagnóstico.
+
+O diagnóstico também passa a registrar até 20 hrefs candidatos do menu de navegação, depois de excluir cabeçalhos internos de conteúdo. Isso permitirá conferir se o link identificado pertence à sessão autenticada sem confundi-lo com o autor da publicação.
+
+Foram executados manualmente no ambiente disponível quatro cenários isolados do classificador: controles não aplicados com rótulos, controles já aplicados, IDs genéricos sem rótulo (mantidos desconhecidos) e IDs explícitos `unlike/unsave`. Os quatro cenários passaram. Isso é uma verificação isolada da função, não substitui `npm test`, GitHub Actions ou a coleta autenticada.
