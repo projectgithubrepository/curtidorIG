@@ -248,3 +248,31 @@ Pendências mantidas:
 - O último TESTE mostrou 41/37 Feed/Reels e 3/13 Stories. A extração de identidade em ramos irmãos e a abertura do botão "Ver story" foram corrigidas, mas só uma nova coleta pode confirmar quantos dos 10 Stories faltantes serão recuperados.
 - Os 4 Feed/Reels excedentes continuam sem causa individual comprovada; não foram removidos por heurística.
 - As 3 inspeções de Story anteriores não incluem causa individual no resumo filtrado. A nova versão registra os rótulos dos controles para diferenciar falha de seletor, confirmação persistente e outros erros.
+
+
+## Atualização — correção da inspeção de estados Feed/Reels (22/11/2026)
+
+### Problema
+O último TESTE apresentou 123 etapas não verificadas em 41 Feed/Reels: 41 curtidas, 41 salvamentos e 41 comentários. A causa imediata não era uma regra que proibia ações pendentes: o plano já aceita estados conhecidos negativos. O ponto sem comprovação era a leitura da interface, que não estava identificando de forma suficiente os controles e/ou a identidade e completude dos comentários.
+
+### Correção de inspeção de Curtir/Salvar
+- A captura anterior buscava somente button e [role="button"] dentro do primeiro elemento selecionado (main, article, dialog ou body). Isso deixava de fora controles acessíveis que estivessem fora daquele escopo ou que fossem expostos por um nó interno.
+- A nova captura varre o documento inteiro, considera button, [role="button"], [tabindex="0"] e nós com aria-label, title ou data-testid; rótulos encontrados em filhos/SVG são associados ao ancestral acionável e deduplicados pelo elemento.
+- A seleção do estado continua estrita: somente rótulos inequívocos Curtir/Like, Descurtir/Unlike, Salvar/Save e Remover dos salvos/Remove from saved são aceitos. IDs genéricos like_button e save_button não determinam o estado. Mais de um candidato ou evidência contraditória permanece desconhecido.
+- O classificador passou a reconhecer também sufixos acessíveis “botão/button”.
+
+### Correção do mapeamento de ações pendentes
+Foi adicionado teste explícito para os três estados conhecidos negativos: quando a inspeção comprova “não curtida”, “não salva” e “sem comentário”, com inventário de coleção, grupo e identidade de origem confirmados, as etapas são classificadas como simulada e testMode.mapped=true. No AUTOMÁTICO, esses estados negativos são os que permitem executar a ação; estados desconhecidos continuam bloqueados.
+
+### Testes adicionados
+- tests/instagram-control-state.test.js: rótulos acessíveis com sufixo de botão em português e inglês.
+- tests/execution-plan.test.js: estados negativos comprovados entram no mapeamento de ações pendentes.
+
+### Revisões independentes
+1. **Lógica de negócio:** não converter desconhecido em falso; não repetir curtida/salvamento/comentário; só mapear ação quando o estado negativo for comprovado; manter a verificação da coleção de destino separada do botão Salvar.
+2. **Implementação/runtime:** ampliar a descoberta DOM sem aceitar qualquer texto como evidência; associar rótulos filhos ao controle acionável; deduplicar controles; adicionar testes de classificador e plano.
+
+### Estado de validação
+- Commits de código/testes: ef6c30fa4af042d61988ab0c18e95285f92a0963, 13917181d39231eb27f515671d13faf96655eb9b, d39ada2a8358819f624de89fb7aaef6e928140b6, 76b9ff70d88b1a15c41d037b7c2c5725d6f20124, 5463efcd0f046b5a8b295fc08643fd4d08d1a7b3 e 0b00b651e7ee24ce9b786dfb94be07cb69e8783b.
+- GitHub Actions run #544 para o último SHA foi iniciado e ainda está em andamento na última consulta. A execução #543 foi cancelada porque um novo push substituiu o commit em teste.
+- Ainda não há nova coleta TESTE autenticada; portanto, não declarar corrigidas as 123 etapas nem autorizar AUTOMÁTICO. A validação funcional exige novo relatório com diagnósticos individuais de controles, perfil e comentários.
