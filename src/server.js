@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openInstagram, collectGroupPosts, inspectPost, inspectStory, inspectSavedCollection, inspectDestinationGroup, unsaveSavedCollectionItem, executeLike, executeSaveToCollection, executeComment, executeStoryComment, executeStoryShareToGroup, executeShareToGroup, executeCompletionReaction, getGroupShareState } from "./instagram.js";
 import { createComment } from "./comments.js";
-import { appendHistory, getTaskState, getRecentComments, readHistory } from "./history.js";
+import { appendHistory, getTaskState, getPendingUrlAttempts, getRecentComments, readHistory } from "./history.js";
 import { mergeTaskState, taskStateLabel, administrativeTargetsForRange } from "./group-state.js";
 import { buildExecutionPlan, interpretGroupInstructions } from "./execution-plan.js";
 
@@ -471,18 +471,17 @@ app.post("/api/start", async (req, res) => {
         const groupShareState = getGroupShareState(item.url, destinationGroupVerification);
         const alreadyInDestinationGroup = groupShareState === "already-shared";
         const historicalState = getTaskState(item.url, item.threadId, item.messageId, completionEmoji);
-        // O CSV é uma trilha histórica/proteção de tentativas, não prova do
-        // estado atual no Instagram. Somente a inspeção da sessão atual ou o
-        // inventário atual do destino pode marcar uma ação como concluída.
+        const pendingUrlAttempts = getPendingUrlAttempts(item.url);
+        // O CSV não comprova estados concluídos: a inspeção atual e o inventário
+        // do destino são autoritativos. Tentativas sem confirmação são globais
+        // por URL para impedir que uma mensagem duplicada provoque novo clique.
         const previousState = {
-          // Estados concluídos vêm da inspeção atual; do histórico só recuperamos
-          // tentativas ambíguas que precisam impedir um segundo clique após reinício.
           liked:false, saved:false, savedFolderVerified:false, commented:false,
           sharedToGroup:alreadyInDestinationGroup,
-          shareAttempted:Boolean(historicalState.shareAttempted && !alreadyInDestinationGroup),
-          commentAttempted:Boolean(historicalState.commentAttempted),
-          likeAttempted:Boolean(historicalState.likeAttempted),
-          saveAttempted:Boolean(historicalState.saveAttempted),
+          shareAttempted:Boolean(pendingUrlAttempts.shareAttempted && !alreadyInDestinationGroup),
+          commentAttempted:Boolean(pendingUrlAttempts.commentAttempted),
+          likeAttempted:Boolean(pendingUrlAttempts.likeAttempted),
+          saveAttempted:Boolean(pendingUrlAttempts.saveAttempted),
           reactionAttempted:Boolean(historicalState.reactionAttempted),
           commentForbidden:false, groupCheck:false, reactionEmoji:"", complete:false
         };
