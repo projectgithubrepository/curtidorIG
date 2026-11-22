@@ -712,7 +712,7 @@ async function expandVisibleCommentThreads(page) {
 
 
 export function classifyPostControls(controlCandidates = []) {
-  const normalize = value => String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[_-]+/g, " ").replace(/\\s+/g, " ").trim();
+  const normalize = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
   const matches = { like: [], save: [] };
   for (const [index, candidate] of controlCandidates.entries()) {
     const allLabels = (candidate?.labels || []).map(normalize);
@@ -723,10 +723,10 @@ export function classifyPostControls(controlCandidates = []) {
     const likeStates = new Set();
     const saveStates = new Set();
     for (const label of labels) {
-      if (/^(?:curtir|like)(?:\\s+(?:publicacao|post))?$/.test(label)) likeStates.add(false);
-      if (/^(?:descurtir|unlike)(?:\\s+(?:publicacao|post))?$/.test(label)) likeStates.add(true);
-      if (/^(?:salvar|save)(?:\\s+(?:publicacao|post))?$/.test(label)) saveStates.add(false);
-      if (/^(?:remover dos salvos|remove from saved|unsave)(?:\\s+(?:publicacao|post))?$/.test(label)) saveStates.add(true);
+      if (/^(?:curtir|like)(?:\s+(?:publicacao|post))?$/.test(label)) likeStates.add(false);
+      if (/^(?:descurtir|unlike)(?:\s+(?:publicacao|post))?$/.test(label)) likeStates.add(true);
+      if (/^(?:salvar|save)(?:\s+(?:publicacao|post))?$/.test(label)) saveStates.add(false);
+      if (/^(?:remover dos salvos|remove from saved|unsave)(?:\s+(?:publicacao|post))?$/.test(label)) saveStates.add(true);
     }
     if (!likeStates.size && /^(?:unlike button|unlike)$/.test(testId)) likeStates.add(true);
     if (!saveStates.size && /^(?:unsave button|unsave)$/.test(testId)) saveStates.add(true);
@@ -742,7 +742,6 @@ export function classifyPostControls(controlCandidates = []) {
     saveCandidateCount: matches.save.length
   };
 }
-
 export function isCommentStateVerified({ usernameKnown = false, alreadyCommented = false, commentListComplete = false } = {}) {
   return Boolean(usernameKnown && (alreadyCommented || commentListComplete));
 }
