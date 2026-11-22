@@ -768,7 +768,12 @@ export async function inspectPost(page, url) {
       const usernames = [...new Set(profileLinks.map(node => (node.getAttribute("href") || "").split("/").filter(Boolean)[0]).filter(Boolean))];
       const username = usernames.length === 1 ? usernames[0] : "";
       // Três estruturas comuns para linhas de comentário; deduplica nós repetidos.
-      const commentRows = [...new Set(element.querySelectorAll("li,[role='listitem'],[data-testid*='comment' i],[data-comment-id]"))].filter(item => item.querySelector("a[href]"));
+      const structuredCommentRows = [...new Set(element.querySelectorAll("li,[role='listitem'],[data-testid*='comment' i],[data-comment-id]"))].filter(item => item.querySelector("a[href]"));
+      // Fallback C: alguns layouts removem li/role/data-testid; procura o menor
+      // contêiner textual com link de autor, evitando contar ancestrais duplicados.
+      const genericCommentCandidates = [...element.querySelectorAll("div")].filter(node => node.querySelector("a[href]") && (node.innerText || "").trim().length > 0 && (node.innerText || "").trim().length < 600);
+      const genericCommentRows = genericCommentCandidates.filter(node => !genericCommentCandidates.some(child => child !== node && node.contains(child) && (child.innerText || "").trim() === (node.innerText || "").trim()));
+      const commentRows = structuredCommentRows.length ? structuredCommentRows : genericCommentRows;
       const ownCommentRows = username ? commentRows.filter(item => [...item.querySelectorAll("a[href]")].some(link => {
         try { return new URL(link.getAttribute("href"), location.origin).pathname.replace(/\/$/,"") === "/" + username; } catch { return false; }
       })) : [];
@@ -1540,7 +1545,10 @@ export async function inspectStory(page, url) {
     const usernames=[...new Set(profile.map(a=>(a.getAttribute("href")||"").split("/").filter(Boolean)[0]).filter(Boolean))];
     const username=usernames.length===1?usernames[0]:"";
     // A/B/C para comentários: li, listitem e atributos de comentário.
-    const commentNodes=[...new Set(document.querySelectorAll("li,[role='listitem'],[data-testid*='comment' i],[data-comment-id]"))].filter(node=>node.querySelector("a[href]"));
+    const structuredCommentNodes=[...new Set(document.querySelectorAll("li,[role='listitem'],[data-testid*='comment' i],[data-comment-id]"))].filter(node=>node.querySelector("a[href]"));
+    const genericCandidates=[...document.querySelectorAll("div")].filter(node=>node.querySelector("a[href]")&&(node.innerText||"").trim().length>0&&(node.innerText||"").trim().length<600);
+    const genericNodes=genericCandidates.filter(node=>!genericCandidates.some(child=>child!==node&&node.contains(child)&&(child.innerText||"").trim()===(node.innerText||"").trim()));
+    const commentNodes=structuredCommentNodes.length?structuredCommentNodes:genericNodes;
     const ownRows=username?commentNodes.filter(node=>[...node.querySelectorAll("a[href]")].some(a=>{try{return new URL(a.getAttribute("href"),location.origin).pathname.replace(/\/$/,"")==="/"+username;}catch{return false;}})):[];
     const ownCommentTexts=ownRows.map(node=>(node.innerText||"").trim()).filter(Boolean);
     const alreadyCommented=ownRows.length>0;
