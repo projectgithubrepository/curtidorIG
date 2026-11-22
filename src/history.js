@@ -97,6 +97,21 @@ export function getCompletedUrls() {
   ).map(entry => entry.url));
 }
 
+// Tentativas de ações sobre a publicação são globais por URL, pois uma mesma
+// publicação pode aparecer em várias mensagens de origem. A reação permanece
+// vinculada à mensagem exata e é recuperada por getTaskState().
+export function getPendingUrlAttempts(url) {
+  const entries = historyEntries().filter(entry => entry.url === url);
+  const any = key => entries.some(entry => truthy(entry[key]));
+  const confirmed = key => entries.some(entry => truthy(entry[key]));
+  return {
+    likeAttempted: any("curtida_tentada") && !confirmed("curtida"),
+    saveAttempted: any("salvamento_tentado") && !(confirmed("salva") && confirmed("pasta_correta")),
+    commentAttempted: any("comentario_tentado") && !confirmed("comentada"),
+    shareAttempted: any("envio_tentado") && !confirmed("enviado_grupo")
+  };
+}
+
 // Compatibilidade com versões anteriores: só considera concluído o fluxo inteiro.
 export const getProcessedUrls = getCompletedUrls;
 
