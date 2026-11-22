@@ -337,3 +337,12 @@ Duas revisões independentes:
 2. **Implementação/integração:** varredura DOM ampliada, deduplicação por elemento acionável, classificação por rótulo explícito e testes de regressão adicionados. O teste automatizado no GitHub Actions está em execução para o commit 0b00b651e7ee24ce9b786dfb94be07cb69e8783b; ainda não há resultado final.
 
 **Limite importante:** ainda não houve nova coleta autenticada para demonstrar que as 123 etapas passaram a ser reconhecidas no DOM real do Instagram. Não liberar AUTOMÁTICO até confirmar os estados reais e os demais pré-requisitos por publicação. O próximo relatório deve trazer, por URL, controlCandidates, quantidade de candidatos Curtir/Salvar, identidade do perfil, quantidade de comentários examinados, total esperado e motivo específico de desconhecimento.
+
+
+### Complemento — inspeção integral dos comentários (22/11/2026)
+
+A expansão de comentários também foi corrigida: a rotina agora percorre todos os controles visíveis de “ver mais/ver todos” (em vez de depender apenas do primeiro resultado) e permite até 40 lotes de expansão. A verificação dos comentários consulta o diálogo de comentários quando ele existe; caso contrário, usa a área da publicação. Isso evita declarar lista completa quando a área de comentários está em um diálogo separado ou quando o primeiro controle encontrado está oculto.
+
+A regra de segurança permanece: a ausência de comentário só é considerada comprovada quando o perfil autenticado foi identificado e a lista está completa; encontrar um comentário próprio é evidência positiva mesmo com lista parcial. A ausência de identidade ou de completude continua desconhecida e não dispara comentário automático.
+
+Commit desta extensão: e6532757235471206e2a5e97f5ce695d07928492. O novo CI precisa validar esta alteração também; não usar o resultado do commit anterior como prova desta extensão. A nova coleta TESTE autenticada ainda é necessária para verificar a captura real.
