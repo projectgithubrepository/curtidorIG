@@ -549,9 +549,9 @@ app.post("/api/start", async (req, res) => {
               let status = action.status;
               if (/^simulada/.test(status || "")) {
                 status = "simulada — publicação contabilizada uma única vez na primeira ocorrência da URL";
-              } else if (/^(pendente|não executada)/.test(status || "")) {
+              } else if (/^pendente/.test(status || "")) {
                 status = "pendente — tratar somente na ocorrência principal desta URL";
-              } else if (!/^(bloqueada|não verificada|aguardando|dispensada|já concluída|coberta)/.test(status || "")) {
+              } else if (!/^(bloqueada|não verificada|aguardando|dispensada|já concluída|coberta|não executada)/.test(status || "")) {
                 status = "coberta pela primeira ocorrência da URL — não repetir";
               }
               return { ...action, duplicateCovered: true, status, reason: action.reason || "A ação pertence à publicação, não à mensagem de origem; será contabilizada uma única vez por URL canônica." };
