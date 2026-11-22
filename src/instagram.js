@@ -829,10 +829,31 @@ export async function inspectPost(page, url) {
   let stateReadError = "";
   try {
     observedState = await page.locator(rootSelector).first().evaluate(element => {
-      const controls = [...element.querySelectorAll('button,[role="button"]')].filter(node => {
-        const rect = node.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      });
+      // Os controles podem estar fora do article/main selecionado, e o rótulo
+      // acessível pode estar no SVG interno. Varre o documento inteiro e
+      // consolida cada rótulo no seu elemento acionável para evitar duplicatas.
+      const controlNodes = new Map();
+      const labelPattern = /^(?:curtir|descurtir|like|unlike|salvar|save|remover dos salvos|remove from saved)(?:\\s+(?:publicacao|post))?(?:\\s+(?:botao|button))?$/i;
+      const candidates = [...document.querySelectorAll('button,[role="button"],[tabindex="0"],[aria-label],[title],[data-testid]')];
+      for (const node of candidates) {
+        const clickable = node.closest('button,[role="button"],[tabindex="0"]');
+        const labels = [
+          node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText,
+          node.getAttribute("data-testid"),
+          ...[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child =>
+            [child.getAttribute("aria-label"), child.getAttribute("title"), child.getAttribute("data-testid")]
+          )
+        ].map(value => String(value || "").trim()).filter(Boolean);
+        const hasActionLabel = labels.some(value => labelPattern.test(value));
+        const target = clickable || (hasActionLabel ? node : null);
+        if (!target) continue;
+        const rect = target.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) continue;
+        const key = target;
+        const previous = controlNodes.get(key) || [];
+        controlNodes.set(key, [...new Set([...previous, ...labels])]);
+      }
+      const controls = [...controlNodes.keys()];
       // No Instagram atual, o rótulo acessível costuma estar no SVG interno,
       // não no próprio botão. Ler ambos evita marcar todos os estados como
       // desconhecidos quando o botão tem innerText vazio.
@@ -840,6 +861,7 @@ export async function inspectPost(page, url) {
       // made anchored matching fail for controls such as "like_button Curtir".
       const controlCandidates = controls.map(node => {
         const labels = [
+          ...controlNodes.get(node),
           node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText,
           node.getAttribute("data-testid"),
           ...[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child =>
