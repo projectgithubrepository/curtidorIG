@@ -475,9 +475,15 @@ app.post("/api/start", async (req, res) => {
         // estado atual no Instagram. Somente a inspeção da sessão atual ou o
         // inventário atual do destino pode marcar uma ação como concluída.
         const previousState = {
+          // Estados concluídos vêm da inspeção atual; do histórico só recuperamos
+          // tentativas ambíguas que precisam impedir um segundo clique após reinício.
           liked:false, saved:false, savedFolderVerified:false, commented:false,
           sharedToGroup:alreadyInDestinationGroup,
           shareAttempted:Boolean(historicalState.shareAttempted && !alreadyInDestinationGroup),
+          commentAttempted:Boolean(historicalState.commentAttempted),
+          likeAttempted:Boolean(historicalState.likeAttempted),
+          saveAttempted:Boolean(historicalState.saveAttempted),
+          reactionAttempted:Boolean(historicalState.reactionAttempted),
           commentForbidden:false, groupCheck:false, reactionEmoji:"", complete:false
         };
         const instructions = interpretGroupInstructions(item.messageText || "");
