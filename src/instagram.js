@@ -408,7 +408,7 @@ export function addNetworkMessages(records, { groupThreadId, startDate, endDate,
       }
       candidateTrace.push({
         url,
-        contentType: /\\/stories\\//i.test(url) ? "story" : "feed",
+        contentType: /\/stories\//i.test(url) ? "story" : "feed",
         messageId: String(record.messageId || ""),
         threadId: String(record.threadId || ""),
         timestamp: record.timestamp || "",
