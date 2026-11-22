@@ -528,7 +528,11 @@ app.post("/api/start", async (req, res) => {
                 } else if (story.stateKnown?.alreadyCommented !== true || !item.identityVerified) {
                   actionLog.push({action:"commentStory",status:"bloqueada",reason:"Não foi possível confirmar a identidade do perfil, a lista de comentários ou a mensagem original."});
                 } else {
-                  const outcome = await executeStoryComment(page,item.url,comment);
+                  const outcome = await executeStoryComment(page,item.url,comment,async()=>{
+                    taskState=mergeTaskState(taskState,{commentAttempted:true});
+                    previousState.commentAttempted=true;
+                    appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:story.bodyText||"",comment,groupName,collectionName,commentAttempted:true,liked:taskState.liked,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,commented:false,sharedToGroup:taskState.sharedToGroup,shareAttempted:taskState.shareAttempted,commentForbidden,completionEmoji,status:"tentativa de comentário em Story iniciada — aguardando confirmação",detail:"Tentativa registrada antes da publicação pública; não repetir se a confirmação falhar"});
+                  });
                   taskState = mergeTaskState(taskState,{commented:true});
                   actionLog.push({action:"commentStory",status:outcome.status});
                 }
@@ -653,10 +657,17 @@ app.post("/api/start", async (req, res) => {
             actionLog.push({action:"all",status:"bloqueada",reason:"A publicação não está vinculada a uma mensagem original identificada; nenhuma ação foi executada."});
           } else if (mode === "automatic") {
             if (taskState.shareAttempted && !taskState.sharedToGroup) actionLog.push({action:"shareToGroup",status:"bloqueada",reason:"Houve uma tentativa anterior sem confirmação. Verifique o grupo antes de confirmar manualmente; o app não enviará novamente para evitar duplicidade."});
+            if (taskState.commentAttempted && !taskState.commented && instructions.comment !== "forbidden") {
+              actionLog.push({action:"comment",status:"bloqueada — tentativa anterior sem confirmação",reason:"Confira manualmente os comentários desta publicação antes de qualquer nova tentativa. O sistema preservou a tentativa e não repetirá automaticamente."});
+            }
             const steps = [
               ["like", !taskState.liked, async () => executeLike(page,item.url), "liked"],
               ["saveToCollection", !(taskState.saved && taskState.savedFolderVerified), async () => executeSaveToCollection(page,item.url,collectionName,savedCollectionUrls), "saved"],
-              ["comment", instructions.comment !== "forbidden" && !taskState.commented, async () => executeComment(page,item.url,comment), "commented"],
+              ["comment", instructions.comment !== "forbidden" && !taskState.commented && !taskState.commentAttempted, async () => executeComment(page,item.url,comment,async()=>{
+                taskState=mergeTaskState(taskState,{commentAttempted:true});
+                previousState.commentAttempted=true;
+                appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,commentAttempted:true,liked:taskState.liked,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,commented:false,sharedToGroup:taskState.sharedToGroup,shareAttempted:taskState.shareAttempted,commentForbidden:instructions.comment==="forbidden",completionEmoji,status:"tentativa de comentário iniciada — aguardando confirmação",detail:"Tentativa registrada antes da publicação; não repetir se a confirmação falhar"});
+              }), "commented"],
               ["shareToGroup", !taskState.sharedToGroup && !taskState.shareAttempted, async () => executeShareToGroup(
                 page, item.url, destinationGroupName,
                 async () => {
