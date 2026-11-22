@@ -320,3 +320,20 @@ Validação:
 - O próximo TESTE precisa demonstrar a recuperação dos 10 Stories faltantes e explicar os 4 Feed/Reels excedentes. Não liberar AUTOMÁTICO enquanto houver divergência de cobertura ou estados não verificados.
 
 O diagnóstico detalhado, histórico de causas, regras de segurança e pendências permanece em [docs/diagnostico-tecnico-2026-11-22.md](docs/diagnostico-tecnico-2026-11-22.md).
+
+
+## Diagnóstico técnico — estados não verificados de Feed/Reels (22/11/2026)
+
+O TESTE mais recente mostrou 123 etapas não verificadas em 41 publicações (curtida, salvamento e comentário). A revisão do fluxo confirmou que o plano já diferencia estado conhecido positivo, conhecido negativo e desconhecido; quando a inspeção retorna estado conhecido negativo, a ação é elegível para mapeamento no TESTE e execução no AUTOMÁTICO, desde que os demais pré-requisitos estejam confirmados. O bloqueio observado decorre de a inspeção não conseguir classificar com segurança os controles/perfil/comentários; não é correto transformar ausência de rótulo em estado negativo.
+
+Correção aplicada:
+- A descoberta de controles de Curtir/Salvar deixou de depender apenas dos descendentes de um único elemento main/article; a inspeção agora varre os controles acessíveis do documento e consolida rótulos de elementos filhos (incluindo SVG) no respectivo controle acionável.
+- Foram incluídos controles com tabindex="0" e elementos com atributos acessíveis, sem considerar elementos arbitrários como prova: o classificador só aceita rótulos explícitos de estado e mantém duplicidade/contradição como desconhecida.
+- O classificador reconhece rótulos com sufixo de papel acessível “botão/button”.
+- Testes de regressão cobrem esses rótulos e garantem que estados negativos conhecidos sejam mapeados como ações simuladas, não como “não verificadas”.
+
+Duas revisões independentes:
+1. **Regra de negócio:** estado conhecido “não curtida/não salva/sem comentário” deve virar ação pendente; estado desconhecido, divergente, duplicado ou tentativa anterior sem confirmação continua bloqueado. O inventário da coleção continua sendo verificação separada do estado do botão.
+2. **Implementação/integração:** varredura DOM ampliada, deduplicação por elemento acionável, classificação por rótulo explícito e testes de regressão adicionados. O teste automatizado no GitHub Actions está em execução para o commit 0b00b651e7ee24ce9b786dfb94be07cb69e8783b; ainda não há resultado final.
+
+**Limite importante:** ainda não houve nova coleta autenticada para demonstrar que as 123 etapas passaram a ser reconhecidas no DOM real do Instagram. Não liberar AUTOMÁTICO até confirmar os estados reais e os demais pré-requisitos por publicação. O próximo relatório deve trazer, por URL, controlCandidates, quantidade de candidatos Curtir/Salvar, identidade do perfil, quantidade de comentários examinados, total esperado e motivo específico de desconhecimento.
