@@ -542,9 +542,9 @@ app.post("/api/start", async (req, res) => {
               reactionAttempted: Boolean(historicalState.reactionAttempted)
             });
             const requiredDone = item.contentType === "story"
-              ? (duplicateState.commented || duplicateState.commentForbidden || instructions.comment === "forbidden") && duplicateState.sharedToGroup
+              ? (duplicateState.commented || duplicateState.commentForbidden) && duplicateState.sharedToGroup
               : duplicateState.liked && duplicateState.saved && duplicateState.savedFolderVerified &&
-                (duplicateState.commented || duplicateState.commentForbidden || instructions.comment === "forbidden") && duplicateState.sharedToGroup;
+                (duplicateState.commented || duplicateState.commentForbidden) && duplicateState.sharedToGroup;
             const duplicatePlan = (primary.plan || []).filter(action => action.action !== "completionReaction").map(action => {
               let status = action.status;
               if (/^simulada/.test(status || "")) {
@@ -572,18 +572,14 @@ app.post("/api/start", async (req, res) => {
             } else if (!item.identityVerified || !item.messageId || !item.threadId) {
               reactionAction.status = "não verificada — mensagem original sem identidade comprovada";
               reactionAction.reason = "A reação é individual por mensagem e esta ocorrência não tem ID/conversa confirmados.";
+            } else if (historicalState.reactionAttempted) {
+              reactionAction.status = "bloqueada — tentativa anterior sem confirmação";
+              reactionAction.reason = "Confira manualmente a reação nesta mensagem antes de qualquer novo clique.";
             } else if (mode === "test") {
-              reactionAction.status = historicalState.reactionAttempted
-                ? "bloqueada — tentativa anterior sem confirmação"
-                : "não verificada — reação pertence a esta mensagem original; TESTE não executa";
-              reactionAction.reason = historicalState.reactionAttempted
-                ? "Confira manualmente a reação nesta mensagem antes de qualquer novo clique."
-                : "As ações da publicação são compartilhadas pela URL; a reação continua exclusiva desta mensagem e não é presumida.";
+              reactionAction.status = "não verificada — reação pertence a esta mensagem original; TESTE não executa";
+              reactionAction.reason = "As ações da publicação são compartilhadas pela URL; a reação continua exclusiva desta mensagem e não é presumida.";
             } else if (mode === "automatic") {
-              if (historicalState.reactionAttempted) {
-                reactionAction.status = "bloqueada — tentativa anterior sem confirmação";
-                reactionAction.reason = "Confira manualmente a reação nesta mensagem antes de qualquer novo clique.";
-              } else {
+              {
                 try {
                   const outcome = await executeCompletionReaction(page, item, completionEmoji, async () => {
                     duplicateState.reactionAttempted = true;
