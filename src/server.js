@@ -564,8 +564,14 @@ app.post("/api/start", async (req, res) => {
 
               const requiredStoryStepsDone = (taskState.commented || commentForbidden) && taskState.sharedToGroup;
               if (requiredStoryStepsDone && !taskState.groupCheck && item.identityVerified && !stopRequested) {
-                try {
-                  const outcome = await executeCompletionReaction(page,item,completionEmoji);
+                if (taskState.reactionAttempted) {
+                  actionLog.push({action:"completionReaction",status:"bloqueada — tentativa anterior sem confirmação",reason:"Confira manualmente a reação na mensagem original; novo clique poderia removê-la."});
+                } else try {
+                  const outcome = await executeCompletionReaction(page,item,completionEmoji,async()=>{
+                    taskState=mergeTaskState(taskState,{reactionAttempted:true});
+                    previousState.reactionAttempted=true;
+                    appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:story.bodyText||"",comment,groupName,collectionName,commented:taskState.commented,commentAttempted:taskState.commentAttempted,sharedToGroup:taskState.sharedToGroup,shareAttempted:taskState.shareAttempted,reactionAttempted:true,groupCheck:false,completionEmoji,commentForbidden,status:"tentativa de reação em Story iniciada — aguardando confirmação",detail:"Tentativa registrada antes da reação; não repetir se a confirmação falhar"});
+                  });
                   taskState = mergeTaskState(taskState,{groupCheck:true});
                   actionLog.push({action:"completionReaction",status:outcome.status});
                 } catch (error) {
@@ -659,12 +665,22 @@ app.post("/api/start", async (req, res) => {
             actionLog.push({action:"all",status:"bloqueada",reason:"A publicação não está vinculada a uma mensagem original identificada; nenhuma ação foi executada."});
           } else if (mode === "automatic") {
             if (taskState.shareAttempted && !taskState.sharedToGroup) actionLog.push({action:"shareToGroup",status:"bloqueada",reason:"Houve uma tentativa anterior sem confirmação. Verifique o grupo antes de confirmar manualmente; o app não enviará novamente para evitar duplicidade."});
+            if (taskState.likeAttempted && !taskState.liked) actionLog.push({action:"like",status:"bloqueada — tentativa anterior sem confirmação",reason:"Verifique manualmente se a publicação foi curtida; novo clique poderia desfazer a curtida."});
+            if (taskState.saveAttempted && !(taskState.saved && taskState.savedFolderVerified)) actionLog.push({action:"saveToCollection",status:"bloqueada — tentativa anterior sem confirmação",reason:"Verifique manualmente se a publicação está salva na coleção correta antes de qualquer nova alteração."});
             if (taskState.commentAttempted && !taskState.commented && instructions.comment !== "forbidden") {
               actionLog.push({action:"comment",status:"bloqueada — tentativa anterior sem confirmação",reason:"Confira manualmente os comentários desta publicação antes de qualquer nova tentativa. O sistema preservou a tentativa e não repetirá automaticamente."});
             }
             const steps = [
-              ["like", !taskState.liked, async () => executeLike(page,item.url), "liked"],
-              ["saveToCollection", !(taskState.saved && taskState.savedFolderVerified), async () => executeSaveToCollection(page,item.url,collectionName,savedCollectionUrls), "saved"],
+              ["like", !taskState.liked && !taskState.likeAttempted, async () => executeLike(page,item.url,async()=>{
+                taskState=mergeTaskState(taskState,{likeAttempted:true});
+                previousState.likeAttempted=true;
+                appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,likeAttempted:true,liked:false,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,shareAttempted:taskState.shareAttempted,commentAttempted:taskState.commentAttempted,completionEmoji,status:"tentativa de curtida iniciada — aguardando confirmação",detail:"Tentativa registrada antes do clique; não repetir automaticamente se o estado não puder ser confirmado"});
+              }), "liked"],
+              ["saveToCollection", !(taskState.saved && taskState.savedFolderVerified) && !taskState.saveAttempted, async () => executeSaveToCollection(page,item.url,collectionName,savedCollectionUrls,async()=>{
+                taskState=mergeTaskState(taskState,{saveAttempted:true});
+                previousState.saveAttempted=true;
+                appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,saveAttempted:true,liked:taskState.liked,saved:false,savedFolderVerified:false,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,shareAttempted:taskState.shareAttempted,commentAttempted:taskState.commentAttempted,completionEmoji,status:"tentativa de salvamento iniciada — aguardando confirmação",detail:"Tentativa registrada antes do clique; confirmar a coleção antes de qualquer nova alteração"});
+              }), "saved"],
               ["comment", instructions.comment !== "forbidden" && !taskState.commented && !taskState.commentAttempted, async () => executeComment(page,item.url,comment,async()=>{
                 taskState=mergeTaskState(taskState,{commentAttempted:true});
                 previousState.commentAttempted=true;
@@ -708,8 +724,14 @@ app.post("/api/start", async (req, res) => {
             }
             const requiredDone = taskState.liked && taskState.saved && taskState.savedFolderVerified && (taskState.commented || instructions.comment==="forbidden") && taskState.sharedToGroup;
             if (requiredDone && !taskState.groupCheck && !stopRequested) {
-              try {
-                const outcome = await executeCompletionReaction(page,item,completionEmoji);
+              if (taskState.reactionAttempted) {
+                actionLog.push({action:"completionReaction",status:"bloqueada — tentativa anterior sem confirmação",reason:"Confira manualmente a reação na mensagem original; novo clique poderia removê-la."});
+              } else try {
+                const outcome = await executeCompletionReaction(page,item,completionEmoji,async()=>{
+                  taskState=mergeTaskState(taskState,{reactionAttempted:true});
+                  previousState.reactionAttempted=true;
+                  appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,liked:taskState.liked,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,commented:taskState.commented,commentAttempted:taskState.commentAttempted,likeAttempted:taskState.likeAttempted,saveAttempted:taskState.saveAttempted,sharedToGroup:taskState.sharedToGroup,shareAttempted:taskState.shareAttempted,reactionAttempted:true,groupCheck:false,completionEmoji,commentForbidden:instructions.comment==="forbidden",status:"tentativa de reação iniciada — aguardando confirmação",detail:"Tentativa registrada antes de aplicar a reação; não repetir se a confirmação falhar"});
+                });
                 taskState = mergeTaskState(taskState,{groupCheck:true});
                 actionLog.push({action:"completionReaction",status:outcome.status});
                 appendHistory({url:item.url,groupThreadId:item.threadId,messageId:item.messageId,caption:inspection.caption,comment,groupName,collectionName,sharedAt:item.sharedAt,saved:taskState.saved,savedFolderVerified:taskState.savedFolderVerified,liked:taskState.liked,commented:taskState.commented,sharedToGroup:taskState.sharedToGroup,groupCheck:true,completionEmoji,commentForbidden:instructions.comment==="forbidden",status:taskStateLabel(taskState),detail:"Reação de conclusão verificada"});
