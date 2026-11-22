@@ -141,3 +141,5 @@ Quando configurada, a URL `https://www.instagram.com/direct/t/ID/` é o localiza
 Cada implementação deve ser revisada por dois revisores seniores independentes: um focado em regras de negócio, estados e duplicidade; outro focado em código, integração, falhas e efeitos reais ao executar. Em seguida, fazer revisão cruzada e executar testes de regressão e CI. Não declarar concluído apenas com base em compilação ou build.
 
 8. Curtida, salvamento e reação também registram uma tentativa antes do clique. Se o resultado ficar ambíguo, o histórico impede uma segunda interação automática que poderia desfazer a primeira.
+
+9. Tentativas ambíguas de ações sobre a publicação são agregadas pela URL canônica, para que uma segunda mensagem com o mesmo link não provoque uma nova interação. A reação de conclusão é a exceção: pertence à mensagem original exata e mantém seu estado por ID de mensagem.

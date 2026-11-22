@@ -267,3 +267,5 @@ A rota de Salvos é construída dinamicamente a partir do perfil da sessão aute
 Toda alteração de código, correção ou fluxo deve passar por duas revisões independentes: (1) revisão sênior de lógica e regras de negócio; (2) revisão sênior de implementação, integração e comportamento em execução. Depois, deve haver revisão cruzada do código novo com o código existente, testes de regressão e validação do resultado do GitHub Actions. Build aprovado isoladamente não comprova comportamento correto.
 
 - Além de comentários e compartilhamentos, tentativas de curtida, salvamento e reação são registradas antes do clique. Se a confirmação falhar, a aplicação não repete automaticamente uma ação que pode alternar/desfazer o estado; solicita conferência manual.
+
+- Tentativas não confirmadas de curtida, salvamento, comentário e envio são protegidas por URL, não apenas por mensagem de origem. Assim, a mesma publicação repetida em duas mensagens não gera uma segunda tentativa enquanto a primeira estiver ambígua. A reação continua vinculada ao ID da mensagem específica.
