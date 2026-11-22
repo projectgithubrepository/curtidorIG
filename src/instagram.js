@@ -742,17 +742,30 @@ export async function inspectPost(page, url) {
         return [...own, ...nested].filter(Boolean).join(" ").trim();
       }).filter(Boolean);
       const labels = controlLabels.join(" ");
-      const profileLinks = [...document.querySelectorAll("nav a[href],a[href]")].filter(node => {
-        const accessible = [
-          node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText,
-          ...[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child => [child.getAttribute("aria-label"), child.getAttribute("title")])
-        ].filter(Boolean).join(" ");
-        return /perfil|profile/i.test(accessible);
+      // Fallback A/B/C para identificar o perfil autenticado: rótulo acessível,
+      // avatar do menu e, por último, link de perfil único no menu.
+      const navLinks = [...document.querySelectorAll("nav a[href]")];
+      const validProfile = node => {
+        const parts = (node.getAttribute("href") || "").split("/").filter(Boolean);
+        return parts.length === 1 && !new Set(["accounts","direct","explore","reels","stories","p","reel","tv","saved"]).has((parts[0] || "").toLowerCase());
+      };
+      const labeledProfileLinks = navLinks.filter(node => {
+        const accessible = [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText,
+          ...[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child => [child.getAttribute("aria-label"),child.getAttribute("title")])].filter(Boolean).join(" ");
+        return validProfile(node) && /perfil|profile|your profile/i.test(accessible);
       });
+      const avatarProfileLinks = navLinks.filter(node => validProfile(node) && node.querySelector("img"));
+      const menuProfileLinks = navLinks.filter(validProfile);
+      const profileLinks = labeledProfileLinks.length ? labeledProfileLinks : avatarProfileLinks.length ? avatarProfileLinks : menuProfileLinks;
       const usernames = [...new Set(profileLinks.map(node => (node.getAttribute("href") || "").split("/").filter(Boolean)[0]).filter(Boolean))];
       const username = usernames.length === 1 ? usernames[0] : "";
-      const commentRows = [...element.querySelectorAll("li")].filter(item => item.querySelector("a[href]"));
-      const commented = username ? commentRows.some(item => [...item.querySelectorAll("a[href]")].some(link => link.getAttribute("href") === "/" + username + "/") && (item.innerText || "").trim().length > username.length) : false;
+      // Três estruturas comuns para linhas de comentário; deduplica nós repetidos.
+      const commentRows = [...new Set(element.querySelectorAll("li,[role='listitem'],[data-testid*='comment' i],[data-comment-id]"))].filter(item => item.querySelector("a[href]"));
+      const ownCommentRows = username ? commentRows.filter(item => [...item.querySelectorAll("a[href]")].some(link => {
+        try { return new URL(link.getAttribute("href"), location.origin).pathname.replace(/\\/$/,"") === "/" + username; } catch { return false; }
+      })) : [];
+      const ownCommentTexts = ownCommentRows.map(item => (item.innerText || "").trim()).filter(Boolean);
+      const commented = ownCommentRows.length > 0;
       const visibleText = (element.innerText || "").toLowerCase();
       const totalMatch = visibleText.match(/(?:ver todos os|view all)\s+(\d+)\s+(?:comentários|comments)|(\d+)\s+(?:comentários|comments)/i);
       const expectedComments = totalMatch ? Number(totalMatch[1] || totalMatch[2]) : null;
@@ -761,12 +774,12 @@ export async function inspectPost(page, url) {
       const commentListComplete = explicitEmpty || (expectedComments !== null && commentRows.length >= expectedComments && !hasMoreComments);
       const commentStateVerified = Boolean(username && (commented || commentListComplete));
       return {
-        liked: /descurtir|unlike/i.test(labels), saved: /remover dos salvos|remove from saved/i.test(labels), commented,
+        liked: /descurtir|unlike/i.test(labels), saved: /remover dos salvos|remove from saved/i.test(labels), commented, ownCommentTexts,
         stateKnown: { liked: /curtir|like|descurtir|unlike/i.test(labels), saved: /salvar|save|remover dos salvos|remove from saved/i.test(labels), commented: commentStateVerified },
         verificationDiagnostics: {
           rootSelector, controlCount: controls.length, controlLabels: controlLabels.slice(0, 30),
           likeControlFound: /curtir|like|descurtir|unlike/i.test(labels), saveControlFound: /salvar|save|remover dos salvos|remove from saved/i.test(labels),
-          profileLinkCount: profileLinks.length, identifiedUsername: username || null, commentRowsInspected: commentRows.length,
+          profileLinkCount: profileLinks.length, profileDetectionStrategy: labeledProfileLinks.length ? "A — rótulo acessível" : avatarProfileLinks.length ? "B — avatar do menu" : menuProfileLinks.length ? "C — link do menu" : "nenhuma", identifiedUsername: username || null, commentRowsInspected: commentRows.length,
           expectedCommentCount: expectedComments, commentListComplete, alreadyCommented: commented,
           commentInspectionReason: !username ? (profileLinks.length > 1 ? "Mais de um link de perfil compatível; identidade ambígua." : "Link do perfil do usuário não identificado na página.") : commented ? "Comentário do perfil encontrado; ação já concluída." : commentListComplete ? "Lista de comentários integralmente conferida; comentário do perfil não encontrado." : "Lista de comentários incompleta; ação bloqueada para evitar duplicidade."
         },
@@ -783,7 +796,7 @@ export async function inspectPost(page, url) {
     saved: observedState.stateKnown.saved ? (observedState.saved ? "salva" : "não salva") : "desconhecido",
     commented: observedState.stateKnown.commented ? (observedState.commented ? "comentário encontrado nos comentários visíveis" : "não encontrado nos comentários visíveis") : "desconhecido"
   };
-  return { caption: interpreted.caption, observedState, stateKnown: observedState.stateKnown, inspectionDiagnostics: interpreted.diagnostics };
+  return { caption: interpreted.caption, observedState, stateKnown: observedState.stateKnown, ownCommentTexts: observedState.ownCommentTexts || [], inspectionDiagnostics: interpreted.diagnostics };
 }
 
 
