@@ -269,3 +269,20 @@ Toda alteração de código, correção ou fluxo deve passar por duas revisões 
 - Além de comentários e compartilhamentos, tentativas de curtida, salvamento e reação são registradas antes do clique. Se a confirmação falhar, a aplicação não repete automaticamente uma ação que pode alternar/desfazer o estado; solicita conferência manual.
 
 - Tentativas não confirmadas de curtida, salvamento, comentário e envio são protegidas por URL, não apenas por mensagem de origem. Assim, a mesma publicação repetida em duas mensagens não gera uma segunda tentativa enquanto a primeira estiver ambígua. A reação continua vinculada ao ID da mensagem específica.
+
+
+## Registro contínuo de diagnóstico e correções
+
+A cada atualização, manter problema observado, causa técnica, correção aplicada, testes executados e pendências, para permitir retomada em outra conversa.
+
+### Diagnóstico de 21/11/2026
+
+- Referência administrativa `00/00`: inválida. Quando o aviso disser explicitamente `HOJE`, associar pelo timestamp da própria mensagem; data explícita válida tem precedência.
+- Legenda contaminada: não usar o texto integral da página como legenda. Capturar apenas elemento específico de legenda; se não houver elemento único, usar fallback neutro.
+- Coleção de Salvos: URL presente no inventário completo comprova que está salva naquela coleção mesmo se o botão não for reconhecido. Ausência não prova que esteja não salva em outra coleção.
+- Stories: reconhecer o botão público `Comentar` e abrir o compositor sem publicar; nunca confundir com resposta privada.
+- Feed/Reels: registrar candidatos DOM visíveis e seus atributos para distinguir ausência de controles de falha de reconhecimento.
+- Divergência administrativa 37 Feed/Reels e 13 Stories versus coleta 43/10 permanece pendente de rastreamento por URL/mensagem. Não forçar contagens.
+- URLs repetidas: ações de publicação uma vez por URL canônica; reação vinculada a cada mensagem original.
+
+**Validação pendente:** rodar suíte completa e nova coleta TESTE autenticada. Teste automatizado não comprova seletor real do Instagram.
