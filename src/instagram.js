@@ -744,12 +744,12 @@ export async function inspectPost(page, url) {
       const labels = controlLabels.join(" ");
       // O estado só é conhecido quando há exatamente um controle de curtida/salvamento
       // com rótulo próprio. Texto de comentários/contadores não pode definir o estado.
-      const likeLabels = controlLabels.filter(label => /^(?:curtir|descurtir|like|unlike)(?:\\b|\\s|$)/i.test(label.trim()));
-      const saveLabels = controlLabels.filter(label => /^(?:salvar|save|remover dos salvos|remove from saved|unsave)(?:\\b|\\s|$)/i.test(label.trim()));
+      const likeLabels = controlLabels.filter(label => /^(?:curtir|descurtir|like|unlike)(?:\b|\s|$)/i.test(label.trim()));
+      const saveLabels = controlLabels.filter(label => /^(?:salvar|save|remover dos salvos|remove from saved|unsave)(?:\b|\s|$)/i.test(label.trim()));
       const likeStateKnown = likeLabels.length === 1;
       const savedStateKnown = saveLabels.length === 1;
-      const liked = likeStateKnown && /^(?:descurtir|unlike)\\b/i.test(likeLabels[0]);
-      const saved = savedStateKnown && /^(?:remover dos salvos|remove from saved|unsave)\\b/i.test(saveLabels[0]);
+      const liked = likeStateKnown && /^(?:descurtir|unlike)\b/i.test(likeLabels[0]);
+      const saved = savedStateKnown && /^(?:remover dos salvos|remove from saved|unsave)\b/i.test(saveLabels[0]);
       // Fallback A/B/C para identificar o perfil autenticado: rótulo acessível,
       // avatar do menu e, por último, link de perfil único no menu.
       const navLinks = [...document.querySelectorAll("nav a[href]")];
@@ -1173,13 +1173,13 @@ export async function executeLike(page, url) {
       const nested=[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")]);
       return [...own,...nested].filter(Boolean).join(" ").trim();
     });
-    const matches=labels.filter(label=>/^(?:curtir|descurtir|like|unlike)(?:\\b|\\s|$)/i.test(label));
+    const matches=labels.filter(label=>/^(?:curtir|descurtir|like|unlike)(?:\b|\s|$)/i.test(label));
     if(matches.length!==1)return null;
-    return /^(?:descurtir|unlike)\\b/i.test(matches[0]);
+    return /^(?:descurtir|unlike)\b/i.test(matches[0]);
   }).catch(() => null);
   if (likeState === null) throw new Error("Estado da curtida não identificado com segurança; clique bloqueado para não desfazer uma curtida existente.");
   if (likeState) return { liked: true, status: "já curtida — não repetida" };
-  const button = await uniqueButton(page, [/\b(?:curtir|like)\b/i]);
+  const button = await uniqueButton(page, [/^(?:curtir|like)(?:\b|\s|$)/i]);
   await button.click();
   await page.waitForTimeout(700);
   const verified = await page.locator("main,article,[role='dialog']").first().evaluate(root => [...root.querySelectorAll("button,[role=button]")].some(node => {
