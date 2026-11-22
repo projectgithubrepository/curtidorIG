@@ -93,3 +93,27 @@ Base: relatório de diagnóstico e histórico CSV enviados para a coleta de 21/1
 ## Regra para continuidade
 
 Em cada nova resposta e alteração, atualizar este diagnóstico com: problema atual, evidência, causa, correção, resultado de testes e pendências. Não repetir coleta ou ação já confirmada; não declarar comportamento validado sem evidência real.
+
+
+## Atualização — falha de build e correções (22/11/2026)
+
+### Evidência da falha
+- Workflow: [Build Windows app — execução 519](https://github.com/projectgithubrepository/curtidorIG/actions/runs/44979632163).
+- SHA avaliado: `e8cc9577ce151f432fd35f7de3bcaf3b4c1299d4`.
+- Resultado: 107 testes aprovados, 3 reprovados; a etapa `Run tests` falhou e todas as etapas de empacotamento foram ignoradas.
+- Teste 53 (`tests/group-state.test.js:96`): a data explícita `20/11` perdeu prioridade para o timestamp de `HOJE`; resultado observado `2026-11-21`, esperado `11-20`.
+- Testes 65 e 85 (`tests/instagram-inspection.test.js` e `tests/instagram-post-inspection.test.js`): a legenda retornou vazia nos cenários em que só havia texto útil em `main`, sem `article`.
+
+### Causa e correção aplicada
+1. **Data administrativa:** o filtro de seleção já aceitava a data explícita sem ano, mas a montagem do campo de retorno priorizava o timestamp de `HOJE`. Corrigido para preservar qualquer data explícita válida (com ou sem ano) antes de consultar `sharedAt`.
+2. **Legenda:** mantida a prioridade para `captionText` de DOM específico. Adicionado fallback restrito ao texto de `main` apenas quando não há `article` nem `dialog`; remove linhas isoladas que são rótulos de interface, contagens e nomes de usuário. Não usa `bodyText`, descrição OG ou texto geral da página como legenda.
+
+### Revisões após a correção
+- **Revisão 1 — regra/negócio:** data explícita válida prevalece sobre `HOJE`; data sem ano continua sendo comparada dentro dos dias do período; fallback de legenda é condicionado à ausência de article/dialog e remove ruído de interface conhecido.
+- **Revisão 2 — implementação/integração:** conferidas as expressões regulares no arquivo salvo, a exportação pública de `interpretPostSnapshot`, o uso prioritário de `captionText` e a ausência de fallback para `bodyText`. A nova execução de CI ainda precisa terminar para confirmar os 110 testes e a build do instalador.
+
+### Estado após os commits corretivos
+- Correções publicadas em `src/group-state.js` e `src/instagram.js`.
+- Último SHA no momento desta atualização: `d4419128f598151945e4894bf96ca4d2c04e2e56`.
+- CI para esse SHA: em andamento; não declarar build aprovada até o workflow terminar.
+- Pendência funcional anterior permanece: executar nova coleta TESTE autenticada e conferir controles de 43 publicações, divergência de 4 Feed/Reels e 3 Stories ausentes. Nenhuma execução AUTOMÁTICA deve ser liberada com base apenas nos testes unitários.
