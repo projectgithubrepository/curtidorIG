@@ -702,11 +702,20 @@ export function interpretPostSnapshot(snapshot) {
 }
 
 async function expandVisibleCommentThreads(page) {
-  const more = page.getByText(/ver todos os? \d+ comentários|view all \d+ comments|ver mais comentários|view more comments|carregar mais comentários|load more comments|ver comentários anteriores|view previous comments/i).first();
-  for (let attempt = 0; attempt < 20; attempt++) {
-    if (!(await more.count().catch(() => 0)) || !(await more.isVisible().catch(() => false))) break;
-    await more.click().catch(() => {});
-    await page.waitForTimeout(250);
+  const more = page.getByText(/ver todos os? \d+ comentários|view all \d+ comments|ver mais comentários|view more comments|carregar mais comentários|load more comments|ver comentários anteriores|view previous comments/i);
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const count = await more.count().catch(() => 0);
+    let target = null;
+    for (let index = 0; index < count; index++) {
+      const candidate = more.nth(index);
+      if (await candidate.isVisible().catch(() => false)) {
+        target = candidate;
+        break;
+      }
+    }
+    if (!target) break;
+    await target.click().catch(() => {});
+    await page.waitForTimeout(350);
   }
 }
 
@@ -900,10 +909,11 @@ export async function inspectPost(page, url) {
       const usernames = [...new Set(profileLinks.map(node => (node.getAttribute("href") || "").split("/").filter(Boolean)[0]).filter(Boolean))];
       const username = usernames.length === 1 ? usernames[0] : "";
       // Três estruturas comuns para linhas de comentário; deduplica nós repetidos.
-      const structuredCommentRows = [...new Set(element.querySelectorAll("li,[role='listitem'],[data-testid*='comment' i],[data-comment-id]"))].filter(item => item.querySelector("a[href]"));
+      const commentRoot = document.querySelector("[role='dialog']") || element;
+      const structuredCommentRows = [...new Set(commentRoot.querySelectorAll("li,[role='listitem'],[data-testid*='comment' i],[data-comment-id]"))].filter(item => item.querySelector("a[href]"));
       // Fallback C: alguns layouts removem li/role/data-testid; procura o menor
       // contêiner textual com link de autor, evitando contar ancestrais duplicados.
-      const genericCommentCandidates = [...element.querySelectorAll("div")].filter(node => node.querySelector("a[href]") && (node.innerText || "").trim().length > 0 && (node.innerText || "").trim().length < 600);
+      const genericCommentCandidates = [...commentRoot.querySelectorAll("div")].filter(node => node.querySelector("a[href]") && (node.innerText || "").trim().length > 0 && (node.innerText || "").trim().length < 600);
       const genericCommentRows = genericCommentCandidates.filter(node => !genericCommentCandidates.some(child => child !== node && node.contains(child) && (child.innerText || "").trim() === (node.innerText || "").trim()));
       const commentRows = structuredCommentRows.length ? structuredCommentRows : genericCommentRows;
       const belongsToUser = item => [...item.querySelectorAll("a[href]")].some(link => {
@@ -917,7 +927,7 @@ export async function inspectPost(page, url) {
       const ownCommentRows = [...new Set([...structuredOwnRows, ...fallbackOwnRows])];
       const ownCommentTexts = ownCommentRows.map(item => (item.innerText || "").trim()).filter(Boolean);
       const commented = ownCommentRows.length > 0;
-      const visibleText = (element.innerText || "").toLowerCase();
+      const visibleText = (commentRoot.innerText || "").toLowerCase();
       const totalMatch = visibleText.match(/(?:ver todos os|view all)\s+(\d+)\s+(?:comentários|comments)|(\d+)\s+(?:comentários|comments)/i);
       const expectedComments = totalMatch ? Number(totalMatch[1] || totalMatch[2]) : null;
       const explicitEmpty = /ainda não há comentários|seja o primeiro a comentar|no comments yet|be the first to comment/i.test(visibleText);
