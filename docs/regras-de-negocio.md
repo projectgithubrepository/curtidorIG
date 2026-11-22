@@ -143,3 +143,20 @@ Cada implementação deve ser revisada por dois revisores seniores independentes
 8. Curtida, salvamento e reação também registram uma tentativa antes do clique. Se o resultado ficar ambíguo, o histórico impede uma segunda interação automática que poderia desfazer a primeira.
 
 9. Tentativas ambíguas de ações sobre a publicação são agregadas pela URL canônica, para que uma segunda mensagem com o mesmo link não provoque uma nova interação. A reação de conclusão é a exceção: pertence à mensagem original exata e mantém seu estado por ID de mensagem.
+
+
+## Registro contínuo de diagnóstico e correções
+
+Manter em cada atualização o problema, causa técnica, correção, testes e pendências para retomada em nova conversa.
+
+### Diagnóstico de 21/11/2026
+
+- `00/00` não é data. Aviso com `HOJE` deve ser associado pelo timestamp da própria mensagem administrativa; data explícita válida prevalece.
+- Legenda não pode ser o texto integral de `main`/página; somente nó específico de legenda pode alimentar o gerador. Sem evidência, usar fallback.
+- Presença da URL em inventário completo confirma salvamento na coleção; ausência não confirma estado não salvo global.
+- Comentário público em Story exige botão `Comentar` e compositor público; nunca enviar resposta privada.
+- Diagnóstico de Feed/Reels precisa expor candidatos DOM não reconhecidos.
+- Comparar os totais reais com a referência sem fabricar itens: 43/10 versus 37/13 ainda exige rastrear quatro Feed/Reels excedentes e três Stories ausentes.
+- Deduplicar ações de publicação por URL canônica, preservando reação por ID da mensagem original.
+
+Toda correção passa por duas revisões independentes: regras de negócio/estados/duplicidade e implementação/Playwright/integração/efeitos. Em seguida, revisão cruzada e testes de regressão. Testes automatizados não substituem validação em sessão autenticada.
