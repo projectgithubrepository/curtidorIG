@@ -124,3 +124,18 @@ A função **Dessalvar publicações em lote, individualmente** deve navegar at�
 ### Identificação do grupo coletivo por URL direta
 
 Quando configurada, a URL `https://www.instagram.com/direct/t/ID/` é o localizador primário da conversa coletiva. A aplicação deve confirmar o ID aberto e o nome exato no cabeçalho antes de inventariar o histórico ou permitir envios. Se a confirmação falhar, bloquear a etapa; não selecionar outra conversa por aproximação.
+
+
+## Estratégias alternativas e prevenção de repetição
+
+1. Quando um controle ou informação não é localizado pelo caminho primário, tentar alternativas estruturadas e documentadas (rótulos acessíveis, atributos de teste/título e elementos internos com rótulos acessíveis).
+2. Alternativas só podem ser usadas quando identificam um único alvo. Mais de um candidato, evidência conflitante ou estado não verificável resulta em bloqueio daquela ação e avanço para o próximo item.
+3. Comentários em Feed/Reels e Stories exigem comprovação do texto exato em comentário associado ao perfil autenticado. Texto no editor, no corpo geral ou em um aviso de envio não é confirmação.
+4. Antes de publicar comentário, gravar no histórico que a tentativa foi iniciada. Se a resposta do Instagram for ambígua, não repetir automaticamente; solicitar verificação manual.
+5. A reação de conclusão é vinculada ao ID da mensagem de origem. Emoji no texto não é reação. Se a autoria/estado da reação não puder ser confirmada, não alternar o controle.
+6. O modo TESTE nunca executa. Uma ação não verificada não pode ser apresentada como apta nem como concluída.
+7. Relatórios devem explicar separadamente o que foi encontrado, inspecionado, reconhecido como concluído, considerado elegível, bloqueado, não verificado ou dispensado.
+
+## Revisão obrigatória em duas etapas
+
+Cada implementação deve ser revisada por dois revisores seniores independentes: um focado em regras de negócio, estados e duplicidade; outro focado em código, integração, falhas e efeitos reais ao executar. Em seguida, fazer revisão cruzada e executar testes de regressão e CI. Não declarar concluído apenas com base em compilação ou build.

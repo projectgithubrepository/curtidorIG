@@ -250,3 +250,18 @@ A rota de Salvos é construída dinamicamente a partir do perfil da sessão aute
 - Antes de enviar ao grupo coletivo, percorre o histórico do grupo de destino e compara a URL canônica da publicação (incluindo Reels e Stories). Link encontrado significa envio já concluído e não deve ser repetido. Se o histórico não puder ser percorrido até o início e o link não for encontrado, o estado é desconhecido e a execução automática é bloqueada.
 - Tentativa de envio sem confirmação permanece bloqueada até conferência manual; não repetir automaticamente.
 - O histórico local é uma proteção adicional, não substitui a conferência do estado atual no Instagram.
+
+
+## Segurança de ações, tentativas e diagnóstico
+
+- O modo TESTE nunca executa ações. “Apta” descreve apenas a elegibilidade inicial; o modo AUTOMÁTICO precisa revalidar o estado imediatamente antes de cada interação.
+- Estado desconhecido não autoriza clique. O sistema tenta estratégias alternativas de localização (A/B/C) quando existem sinais estruturados e seguros; se houver ambiguidade ou não for possível confirmar o controle, registra o motivo e pula a ação sem alterar o estado.
+- Curtidas são reconhecidas por um controle de ação único e específico da publicação. Rótulos de comentários, contadores ou controles duplicados não são evidência suficiente.
+- Comentários publicados só são confirmados quando o texto exato aparece em uma linha de comentário associada ao perfil autenticado. A presença do texto no editor ou no corpo geral da página não comprova publicação.
+- A tentativa de comentar é gravada no histórico antes do clique de publicação. Se a confirmação posterior falhar, a tentativa fica pendente de verificação manual e não é repetida automaticamente, inclusive após reiniciar o aplicativo.
+- A localização da mensagem original para reação prioriza o ID estruturado; o texto é apenas fallback quando identifica uma única mensagem. O emoji no texto da mensagem não é considerado reação. Reações cuja autoria não possa ser confirmada não são alternadas.
+- O relatório separa aptas no teste, já concluídas, não verificadas, bloqueadas, aguardando, dispensadas, candidatas e sem classificação, explicando o significado de cada estado.
+
+## Regra de revisão de qualidade
+
+Toda alteração de código, correção ou fluxo deve passar por duas revisões independentes: (1) revisão sênior de lógica e regras de negócio; (2) revisão sênior de implementação, integração e comportamento em execução. Depois, deve haver revisão cruzada do código novo com o código existente, testes de regressão e validação do resultado do GitHub Actions. Build aprovado isoladamente não comprova comportamento correto.

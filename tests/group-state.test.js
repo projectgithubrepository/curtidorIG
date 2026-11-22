@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mergeTaskState, taskStateLabel, parseAdministrativeMilestone, administrativeTargetsForRange } from "../src/group-state.js";
+import { mergeTaskState, taskStateLabel, parseAdministrativeMilestone, administrativeTargetsForRange, hasGroupCheck } from "../src/group-state.js";
 
 test("a publication is complete only after all five states are confirmed", () => {
   let state = mergeTaskState({}, {});
@@ -58,4 +58,8 @@ test("unconfirmed comment attempt is preserved and explicitly marked for manual 
   assert.equal(state.commentAttempted, true);
   assert.equal(state.commented, false);
   assert.match(taskStateLabel(state), /verificar comentário tentado/);
+});
+
+test("message text containing the completion emoji is not evidence of an applied reaction", () => {
+  assert.equal(hasGroupCheck("Pedido original com emoji 🌷 no texto"), false);
 });
