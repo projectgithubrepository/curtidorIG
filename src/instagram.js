@@ -763,7 +763,7 @@ export async function inspectPost(page, url) {
       const saved = savedStateKnown && /^(?:remover dos salvos|remove from saved|unsave)\b/i.test(saveLabels[0]);
       // Fallback A/B/C para identificar o perfil autenticado: rótulo acessível,
       // avatar do menu e, por último, link de perfil único no menu.
-      const navLinks = [...document.querySelectorAll("nav a[href]")];
+      const navLinks = [...document.querySelectorAll("nav a[href], [role='navigation'] a[href], header a[href]")];
       const validProfile = node => {
         const parts = (node.getAttribute("href") || "").split("/").filter(Boolean);
         return parts.length === 1 && !new Set(["accounts","direct","explore","reels","stories","p","reel","tv","saved"]).has((parts[0] || "").toLowerCase());
@@ -1574,7 +1574,7 @@ export async function inspectStory(page, url) {
     );
     const bodyText=(document.body?.innerText||"").slice(0,4000);
     // A/B/C para descobrir o perfil autenticado, mesmo quando o rótulo acessível muda.
-    const navLinks=[...document.querySelectorAll("nav a[href]")];
+    const navLinks=[...document.querySelectorAll("nav a[href], [role='navigation'] a[href], header a[href]")];
     const validProfile=a=>{const parts=(a.getAttribute("href")||"").split("/").filter(Boolean);return parts.length===1&&!new Set(["accounts","direct","explore","reels","stories","p","reel","tv","saved"]).has((parts[0]||"").toLowerCase());};
     const labeled=navLinks.filter(a=>validProfile(a)&&/perfil|profile|your profile/i.test([a.getAttribute("aria-label"),a.getAttribute("title"),a.innerText].filter(Boolean).join(" ")));
     const avatar=navLinks.filter(a=>validProfile(a)&&a.querySelector("img"));
