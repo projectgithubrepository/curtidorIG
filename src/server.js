@@ -427,7 +427,7 @@ app.post("/api/start", async (req, res) => {
           const parts = parsed.pathname.split("/").filter(Boolean);
           if (["p", "reel", "tv"].includes((parts[0] || "").toLowerCase()) && parts[1]) return "media:" + parts[1];
           if ((parts[0] || "").toLowerCase() === "stories" && parts[1] && parts[2]) return "story:" + parts[1].toLowerCase() + ":" + parts[2];
-          return parsed.origin + parsed.pathname.replace(/\\/$/, "");
+          return parsed.origin + parsed.pathname.replace(/\/$/, "");
         } catch { return String(value || ""); }
       };
       const feedOccurrencesForDate = collected.filter(item => !item.dateUnknown && item.contentType !== "story");
