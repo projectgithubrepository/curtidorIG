@@ -632,6 +632,21 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
   });
 }
 
+function extractMainCaptionFallback(snapshot) {
+  // Fallback conservador: só usa o texto de main quando não há article/dialog.
+  // Remove rótulos de interface isolados; nunca recorre ao texto integral de body.
+  if (snapshot.selectors?.article || snapshot.selectors?.dialog || !snapshot.selectors?.main) return "";
+  const noise = /^(?:perfil|profile|comentários?|comments?|curtir|descurtir|like|unlike|comentar|comment|compartilhar|share|salvar|save|ver tradução|see translation|responder|reply|mais|more|seguir|following|seguindo|mensagem|message|publicações?|posts?)$/i;
+  const lines = String(snapshot.mainText || "").split(/\\r?\\n/)
+    .map(line => line.replace(/\\s+/g, " ").trim())
+    .filter(Boolean)
+    .filter(line => !noise.test(line))
+    .filter(line => !/^@[\\w.]+$/.test(line))
+    .filter(line => !/^\\d+(?:[.,]\\d+)?\\s*(?:curtidas?|likes?|comentários?|comments?)?$/i.test(line))
+    .filter(line => !/^(?:curtido por|liked by|há\\s+\\d+|\\d+\\s*(?:h|d|sem|w))\\b/i.test(line));
+  return lines.join("\\n").trim();
+}
+
 export function interpretPostSnapshot(snapshot) {
   const finalUrl = String(snapshot.url || "");
   const title = String(snapshot.title || "");
@@ -672,14 +687,16 @@ export function interpretPostSnapshot(snapshot) {
     throw Object.assign(new Error("O Instagram exibiu uma mensagem de conteúdo indisponível. Não é possível concluir se a publicação é privada ou foi removida."), { inspectionDiagnostics: { ...diagnostics, reason: "unavailable-message" } });
   }
 
-  const caption = String(snapshot.captionText || "").trim();
+  const specificCaption = String(snapshot.captionText || "").trim();
+  const fallbackCaption = specificCaption ? "" : extractMainCaptionFallback(snapshot);
+  const caption = specificCaption || fallbackCaption;
   if (!caption) {
     diagnostics.reason = snapshot.hasVideo || snapshot.hasImage ? "media-without-readable-caption" : "post-content-not-rendered";
     diagnostics.captionAvailable = false;
     diagnostics.captionSource = "not found — neutral fallback required";
   } else {
     diagnostics.captionAvailable = true;
-    diagnostics.captionSource = "caption-specific DOM";
+    diagnostics.captionSource = specificCaption ? "caption-specific DOM" : "filtered main text fallback";
   }
   return { caption: caption.slice(0, 5000), diagnostics };
 }
