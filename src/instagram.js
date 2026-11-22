@@ -859,38 +859,6 @@ export async function inspectPost(page, url) {
         };
       });
       const controlLabels = controlCandidates.flatMap(candidate => candidate.labels);
-      const controlState = (() => {
-        const normalize = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-        const matches = { like: [], save: [] };
-        for (const [index, candidate] of controlCandidates.entries()) {
-          const labels = candidate.labels.map(normalize);
-          const likeStates = new Set(), saveStates = new Set();
-          for (const label of labels) {
-            if (/^(?:curtir|like)(?:\s+(?:publicacao|post))?$/.test(label)) likeStates.add(false);
-            if (/^(?:descurtir|unlike)(?:\s+(?:publicacao|post))?$/.test(label)) likeStates.add(true);
-            if (/^(?:salvar|save)(?:\s+(?:publicacao|post))?$/.test(label)) saveStates.add(false);
-            if (/^(?:remover dos salvos|remove from saved|unsave)(?:\s+(?:publicacao|post))?$/.test(label)) saveStates.add(true);
-            if (/^(?:like button|like)$/.test(label) && /like/i.test(candidate.testId)) likeStates.add(false);
-            if (/^(?:unlike button|unlike)$/.test(label) && /unlike/i.test(candidate.testId)) likeStates.add(true);
-            if (/^(?:save button|save)$/.test(label) && /save/i.test(candidate.testId)) saveStates.add(false);
-            if (/^(?:unsave button|unsave)$/.test(label) && /unsave/i.test(candidate.testId)) saveStates.add(true);
-          }
-          if (likeStates.size === 1) matches.like.push({ index, value: [...likeStates][0] });
-          if (saveStates.size === 1) matches.save.push({ index, value: [...saveStates][0] });
-        }
-        return {
-          likedKnown: matches.like.length === 1,
-          liked: matches.like.length === 1 ? matches.like[0].value : false,
-          savedKnown: matches.save.length === 1,
-          saved: matches.save.length === 1 ? matches.save[0].value : false,
-          likeCandidateCount: matches.like.length,
-          saveCandidateCount: matches.save.length
-        };
-      })();
-      const likeStateKnown = controlState.likedKnown;
-      const savedStateKnown = controlState.savedKnown;
-      const liked = controlState.liked;
-      const saved = controlState.saved;
       // Fallback A/B/C para identificar o perfil autenticado: rótulo acessível,
       // avatar do menu e, por último, link de perfil único no menu.
       const navLinks = [...document.querySelectorAll("nav a[href], [role='navigation'] a[href], header a[href]")].filter(node => !node.closest("article, main, [role='main'], [role='dialog']"));
@@ -931,12 +899,12 @@ export async function inspectPost(page, url) {
       const commentListComplete = explicitEmpty || (expectedComments !== null && commentRows.length >= expectedComments && !hasMoreComments);
       const commentStateVerified = Boolean(username && (commented || commentListComplete));
       return {
-        liked, saved, commented, ownCommentTexts,
-        stateKnown: { liked: likeStateKnown, saved: savedStateKnown, commented: commentStateVerified },
+        commented, ownCommentTexts,
+        stateKnown: { commented: commentStateVerified },
         verificationDiagnostics: {
           rootSelector, controlCount: controls.length, controlLabels: controlLabels.slice(0, 80),
           controlCandidates: controlCandidates.slice(0, 80),
-          likeControlFound: likeStateKnown, likeCandidateCount: controlState.likeCandidateCount, saveControlFound: savedStateKnown, saveCandidateCount: controlState.saveCandidateCount,
+          controlCandidatesAvailable: controlCandidates.length,
           profileLinkCount: profileLinks.length, profileDetectionStrategy: labeledProfileLinks.length ? "A — rótulo acessível" : avatarProfileLinks.length ? "B — avatar do menu" : menuProfileLinks.length ? "C — link do menu" : "nenhuma", identifiedUsername: username || null, commentRowsInspected: commentRows.length,
           expectedCommentCount: expectedComments, commentListComplete, alreadyCommented: commented,
           commentInspectionReason: !username ? (profileLinks.length > 1 ? "Mais de um link de perfil compatível; identidade ambígua." : "Link do perfil do usuário não identificado na página.") : commented ? "Comentário do perfil encontrado; ação já concluída." : commentListComplete ? "Lista de comentários integralmente conferida; comentário do perfil não encontrado." : "Lista de comentários incompleta; ação bloqueada para evitar duplicidade."
@@ -946,8 +914,23 @@ export async function inspectPost(page, url) {
     });
   } catch (error) {
     stateReadError = error.message || String(error);
-    observedState = { liked:false, saved:false, commented:false, stateKnown:{liked:false,saved:false,commented:false}, verificationDiagnostics:{rootSelector,readError:stateReadError,controlCount:0,controlLabels:[]}, controlCount:0, controlLabels:"" };
+    observedState = { commented:false, stateKnown:{commented:false}, verificationDiagnostics:{rootSelector,readError:stateReadError,controlCount:0,controlLabels:[],controlCandidates:[]}, controlCount:0, controlLabels:"" };
   }
+  const controlState = classifyPostControls(observedState.verificationDiagnostics?.controlCandidates || []);
+  observedState.liked = controlState.liked;
+  observedState.saved = controlState.saved;
+  observedState.stateKnown = {
+    ...observedState.stateKnown,
+    liked: controlState.likedKnown,
+    saved: controlState.savedKnown
+  };
+  observedState.verificationDiagnostics = {
+    ...(observedState.verificationDiagnostics || {}),
+    likeControlFound: controlState.likedKnown,
+    likeCandidateCount: controlState.likeCandidateCount,
+    saveControlFound: controlState.savedKnown,
+    saveCandidateCount: controlState.saveCandidateCount
+  };
   interpreted.diagnostics.stateVerification = {
     ...(observedState.verificationDiagnostics || {}), stateReadError: stateReadError || null,
     liked: observedState.stateKnown.liked ? (observedState.liked ? "já curtida" : "não curtida") : "desconhecido",
