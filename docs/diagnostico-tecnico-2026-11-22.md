@@ -117,3 +117,57 @@ Em cada nova resposta e alteração, atualizar este diagnóstico com: problema a
 - Último SHA no momento desta atualização: `d4419128f598151945e4894bf96ca4d2c04e2e56`.
 - CI para esse SHA: em andamento; não declarar build aprovada até o workflow terminar.
 - Pendência funcional anterior permanece: executar nova coleta TESTE autenticada e conferir controles de 43 publicações, divergência de 4 Feed/Reels e 3 Stories ausentes. Nenhuma execução AUTOMÁTICA deve ser liberada com base apenas nos testes unitários.
+
+
+## Atualização — estados de curtida, salvamento e comentário (22/11/2026)
+
+### Evidência nova do TESTE
+
+A execução mais recente apresentou 41 Feed/Reels com 123 etapas não verificadas: 41 curtidas, 41 salvamentos e 41 comentários. A conta confirma que o problema está concentrado na inspeção de estado, não na preparação de comentários ou no compartilhamento ao grupo.
+
+### Causa identificada no código
+
+1. **Curtida e salvamento:** os rótulos do controle eram concatenados em uma única string com `data-testid`, `aria-label`, texto e SVG. A expressão de reconhecimento exigia que a string começasse diretamente por `Curtir`, `Descurtir`, `Salvar` ou `Remover dos salvos`. Se o atributo começasse por um identificador, por exemplo `like_button`, o controle válido não era reconhecido mesmo com o rótulo acessível presente.
+2. **Identidade do perfil:** a busca incluía todos os links dentro de qualquer `header`, inclusive cabeçalhos internos da publicação. Isso podia misturar o link do autor do post com o link do perfil autenticado e produzir identidade ambígua.
+3. **Segurança:** a correção não transforma ausência de evidência em estado negativo. Se houver dois controles possíveis ou rótulos contraditórios, a ação continua desconhecida e bloqueada.
+
+### Correções publicadas
+
+- Os atributos e rótulos dos controles agora são preservados separadamente.
+- A classificação é feita por controle, normaliza acentos/separadores e reconhece os estados Curtir/Descurtir e Salvar/Remover dos salvos em português e inglês.
+- O sistema exige exatamente um controle compatível para cada estado; duplicidade ou contradição permanece desconhecida.
+- A identificação do perfil desconsidera links localizados dentro de `article`, `main`, `[role=main]` e diálogos, para não confundir o autor do conteúdo com a conta autenticada.
+- O relatório passa a manter candidatos DOM individuais, rótulos e contagem de controles reconhecidos para permitir diagnóstico por publicação.
+
+### Testes de regressão adicionados
+
+`tests/instagram-control-state.test.js` cobre:
+- `data-testid` antes do rótulo acessível;
+- estados já curtido/salvo em português e inglês;
+- normalização de acentos e separadores;
+- controles duplicados;
+- evidências contraditórias no mesmo controle.
+
+### Revisões independentes
+
+**Revisão 1 — regra de negócio e estados**
+- Estado positivo/negativo só é reconhecido com um controle único.
+- Não se clica quando o estado é ambíguo.
+- Inventário de Salvos continua sendo evidência positiva independente; ausência na coleção não prova que o post não está salvo em outra pasta.
+- Comentários só podem ser considerados ausentes quando a identidade do perfil e a integralidade da lista forem comprovadas.
+
+**Revisão 2 — implementação e integração**
+- A classificação foi extraída para função pura testável e é aplicada aos candidatos capturados pelo Playwright.
+- O retorno da inspeção preserva `controlCandidates`, `controlLabels`, quantidade de controles e contagem de candidatos por ação.
+- A seleção de links de perfil exclui cabeçalhos internos de conteúdo.
+- A suíte completa e o CI ainda precisam ser executados; a sessão autenticada do Instagram não está disponível nesta revisão.
+
+### Pendências de validação real
+
+1. Executar a suíte completa e confirmar o resultado do GitHub Actions.
+2. Rodar novo TESTE autenticado e verificar se curtida/salvamento deixam de ficar desconhecidos.
+3. Conferir por publicação o candidato DOM que fundamentou cada estado.
+4. Confirmar a identificação do perfil e a integralidade da lista de comentários.
+5. Reconciliar a divergência de cobertura Feed/Reels e Stories já registrada acima.
+
+**AUTOMÁTICO permanece não autorizado até que o novo TESTE demonstre reconhecimento consistente.** Esta correção melhora a interpretação do DOM observado; não comprova, por si só, o comportamento da interface real do Instagram.
