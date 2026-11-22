@@ -144,3 +144,15 @@ test("blocks contradictory unsaved button when the destination collection alread
   assert.match(plan[1].status,/^não verificada/);
   assert.match(plan[1].reason,/botão Salvar indica que ela não está salva/i);
 });
+
+test("automatic plan blocks a comment with a previous unconfirmed attempt", () => {
+  const plan = buildExecutionPlan({
+    mode: "automatic",
+    collectionName: "Laranja antigo",
+    comment: "Comentário muito bom 🌷",
+    taskState: { commentAttempted: true }
+  });
+  const action = plan.find(item => item.action === "comment");
+  assert.equal(action.status, "bloqueada");
+  assert.match(action.reason, /não repetirá automaticamente/);
+});

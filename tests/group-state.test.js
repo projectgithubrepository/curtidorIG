@@ -52,3 +52,10 @@ test("reads administrative daily targets for Feed and Stories", () => {
   );
   assert.equal(administrativeTargetsForRange([milestone], "2026-11-19", "2026-11-19"), null);
 });
+
+test("unconfirmed comment attempt is preserved and explicitly marked for manual verification", () => {
+  const state = mergeTaskState({}, { commentAttempted: true });
+  assert.equal(state.commentAttempted, true);
+  assert.equal(state.commented, false);
+  assert.match(taskStateLabel(state), /verificar comentário tentado/);
+});

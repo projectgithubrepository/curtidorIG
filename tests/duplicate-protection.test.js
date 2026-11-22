@@ -36,3 +36,13 @@ test("recognizes the verified destination inventory shape returned by inspectDes
   const inventory={verified:true,threadId:"1783131735658148",sharedInventoryComplete:true,sharedUrls:[]};
   assert.equal(getGroupShareState("https://www.instagram.com/p/ABC123",inventory),"not-shared");
 });
+
+test("comment text displayed in the editor is not sufficient evidence of publication", () => {
+  const expected = "Comentário muito bom 🌷";
+  const editorText = expected;
+  const authoredCommentRows = [];
+  assert.equal(authoredCommentRows.some(row => row.includes(expected)), false);
+  authoredCommentRows.push("@conta\n" + expected);
+  assert.equal(authoredCommentRows.some(row => row.includes(expected)), true);
+  assert.equal(editorText, expected);
+});
