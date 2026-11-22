@@ -579,8 +579,7 @@ app.post("/api/start", async (req, res) => {
               reactionAction.status = "não verificada — reação pertence a esta mensagem original; TESTE não executa";
               reactionAction.reason = "As ações da publicação são compartilhadas pela URL; a reação continua exclusiva desta mensagem e não é presumida.";
             } else if (mode === "automatic") {
-              {
-                try {
+              try {
                   const outcome = await executeCompletionReaction(page, item, completionEmoji, async () => {
                     duplicateState.reactionAttempted = true;
                     appendHistory({
@@ -599,7 +598,6 @@ app.post("/api/start", async (req, res) => {
                   reactionAction.reason = error.message;
                   actionLog.push({ action: "completionReaction", status: "bloqueada", reason: error.message });
                 }
-              }
             } else {
               reactionAction.status = "pendente — reação individual da mensagem original";
               reactionAction.reason = "Modo MANUAL: conferir e reagir somente à mensagem original desta ocorrência.";
