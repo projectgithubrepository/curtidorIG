@@ -301,3 +301,22 @@ A cada atualização, manter problema observado, causa técnica, correção apli
 - A reação de conclusão continua independente por ID da mensagem original. Quando uma publicação repetida aparece em outra mensagem, as ações da publicação são herdadas da primeira ocorrência e somente a reação da nova mensagem pode ser executada, após os pré-requisitos.
 - O relatório de diagnóstico inclui rastreamento por URL com ID da mensagem, ID da conversa, timestamp e classificação (aceita, outra conversa, sem identidade, administrativa, fora do período ou aguardando data), sem copiar o texto privado da mensagem.
 - Próxima validação necessária: executar TESTE novamente e examinar o rastreamento completo para explicar as quatro URLs Feed/Reels excedentes e as três URLs Story ausentes. A instrumentação explica a classificação, mas não substitui a nova coleta real.
+
+
+## Diagnóstico técnico — cobertura Feed/Reels e Stories (22/11/2026)
+
+O último TESTE real reportado apresentou referência administrativa de 37 Feed/Reels e 13 Stories, contra 41 Feed/Reels e 3 Stories coletados. A coleta atingiu o topo do histórico e não registrou travamento; portanto, não se deve interpretar a varredura concluída como prova de cobertura correta.
+
+Correções recentes:
+- O extrator de Stories agora combina username e ID de mídia quando aparecem em objetos irmãos no payload GraphQL do Direct.
+- O parser continua proibido de transformar o ID genérico da mensagem em ID do Story.
+- A abertura de Stories reconhece o botão público "Ver story" em `button` ou `[role=button]`, lendo separadamente `aria-label`, `title` e texto visível. Controles ambíguos continuam bloqueados.
+- Os erros da confirmação incluem os rótulos visíveis para facilitar o diagnóstico das próximas inspeções.
+
+Validação:
+- Os arquivos alterados e os testes novos passaram por verificação sintática.
+- O extrator de payload foi executado em dois cenários isolados: estrutura com usuário/mídia em ramos irmãos e cenário sem ID de mídia.
+- A suíte completa e o CI não foram executados/confirmados nesta etapa.
+- O próximo TESTE precisa demonstrar a recuperação dos 10 Stories faltantes e explicar os 4 Feed/Reels excedentes. Não liberar AUTOMÁTICO enquanto houver divergência de cobertura ou estados não verificados.
+
+O diagnóstico detalhado, histórico de causas, regras de segurança e pendências permanece em [docs/diagnostico-tecnico-2026-11-22.md](docs/diagnostico-tecnico-2026-11-22.md).
