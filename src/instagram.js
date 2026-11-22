@@ -710,6 +710,37 @@ async function expandVisibleCommentThreads(page) {
   }
 }
 
+
+export function classifyPostControls(controlCandidates = []) {
+  const normalize = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  const matches = { like: [], save: [] };
+  for (const [index, candidate] of controlCandidates.entries()) {
+    const labels = (candidate?.labels || []).map(normalize);
+    const likeStates = new Set();
+    const saveStates = new Set();
+    for (const label of labels) {
+      if (/^(?:curtir|like)(?:\s+(?:publicacao|post))?$/.test(label)) likeStates.add(false);
+      if (/^(?:descurtir|unlike)(?:\s+(?:publicacao|post))?$/.test(label)) likeStates.add(true);
+      if (/^(?:salvar|save)(?:\s+(?:publicacao|post))?$/.test(label)) saveStates.add(false);
+      if (/^(?:remover dos salvos|remove from saved|unsave)(?:\s+(?:publicacao|post))?$/.test(label)) saveStates.add(true);
+      if (/^(?:like button|like)$/.test(label) && /like/i.test(candidate?.testId || "")) likeStates.add(false);
+      if (/^(?:unlike button|unlike)$/.test(label) && /unlike/i.test(candidate?.testId || "")) likeStates.add(true);
+      if (/^(?:save button|save)$/.test(label) && /save/i.test(candidate?.testId || "")) saveStates.add(false);
+      if (/^(?:unsave button|unsave)$/.test(label) && /unsave/i.test(candidate?.testId || "")) saveStates.add(true);
+    }
+    if (likeStates.size === 1) matches.like.push({ index, value: [...likeStates][0] });
+    if (saveStates.size === 1) matches.save.push({ index, value: [...saveStates][0] });
+  }
+  return {
+    likedKnown: matches.like.length === 1,
+    liked: matches.like.length === 1 ? matches.like[0].value : false,
+    savedKnown: matches.save.length === 1,
+    saved: matches.save.length === 1 ? matches.save[0].value : false,
+    likeCandidateCount: matches.like.length,
+    saveCandidateCount: matches.save.length
+  };
+}
+
 export function isCommentStateVerified({ usernameKnown = false, alreadyCommented = false, commentListComplete = false } = {}) {
   return Boolean(usernameKnown && (alreadyCommented || commentListComplete));
 }
@@ -804,25 +835,65 @@ export async function inspectPost(page, url) {
       // No Instagram atual, o rótulo acessível costuma estar no SVG interno,
       // não no próprio botão. Ler ambos evita marcar todos os estados como
       // desconhecidos quando o botão tem innerText vazio.
-      const controlLabels = controls.map(node => {
-        const own = [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText, node.getAttribute("data-testid")];
-        const nested = [...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child =>
-          [child.getAttribute("aria-label"), child.getAttribute("title"), child.getAttribute("data-testid")]
-        );
-        return [...own, ...nested].filter(Boolean).join(" ").trim();
-      }).filter(Boolean);
-      const labels = controlLabels.join(" ");
-      // O estado só é conhecido quando há exatamente um controle de curtida/salvamento
-      // com rótulo próprio. Texto de comentários/contadores não pode definir o estado.
-      const likeLabels = controlLabels.filter(label => /^(?:curtir|descurtir|like|unlike)(?:\b|\s|$)/i.test(label.trim()));
-      const saveLabels = controlLabels.filter(label => /^(?:salvar|save|remover dos salvos|remove from saved|unsave)(?:\b|\s|$)/i.test(label.trim()));
-      const likeStateKnown = likeLabels.length === 1;
-      const savedStateKnown = saveLabels.length === 1;
-      const liked = likeStateKnown && /^(?:descurtir|unlike)\b/i.test(likeLabels[0]);
-      const saved = savedStateKnown && /^(?:remover dos salvos|remove from saved|unsave)\b/i.test(saveLabels[0]);
+      // Preserve each source independently: concatenating data-testid + aria-label
+      // made anchored matching fail for controls such as "like_button Curtir".
+      const controlCandidates = controls.map(node => {
+        const labels = [
+          node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText,
+          node.getAttribute("data-testid"),
+          ...[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child =>
+            [child.getAttribute("aria-label"), child.getAttribute("title"), child.getAttribute("data-testid")]
+          )
+        ].map(value => String(value || "").trim()).filter(Boolean);
+        return {
+          labels: [...new Set(labels)],
+          testId: node.getAttribute("data-testid") || "",
+          tag: node.tagName.toLowerCase(),
+          role: node.getAttribute("role") || "",
+          ariaLabel: node.getAttribute("aria-label") || "",
+          title: node.getAttribute("title") || "",
+          text: (node.innerText || "").trim().slice(0, 100),
+          svgLabels: [...node.querySelectorAll("svg,[aria-label],[title]")].map(child =>
+            child.getAttribute("aria-label") || child.getAttribute("title") || child.getAttribute("data-testid") || ""
+          ).filter(Boolean).slice(0, 8)
+        };
+      });
+      const controlLabels = controlCandidates.flatMap(candidate => candidate.labels);
+      const controlState = (() => {
+        const normalize = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+        const matches = { like: [], save: [] };
+        for (const [index, candidate] of controlCandidates.entries()) {
+          const labels = candidate.labels.map(normalize);
+          const likeStates = new Set(), saveStates = new Set();
+          for (const label of labels) {
+            if (/^(?:curtir|like)(?:\s+(?:publicacao|post))?$/.test(label)) likeStates.add(false);
+            if (/^(?:descurtir|unlike)(?:\s+(?:publicacao|post))?$/.test(label)) likeStates.add(true);
+            if (/^(?:salvar|save)(?:\s+(?:publicacao|post))?$/.test(label)) saveStates.add(false);
+            if (/^(?:remover dos salvos|remove from saved|unsave)(?:\s+(?:publicacao|post))?$/.test(label)) saveStates.add(true);
+            if (/^(?:like button|like)$/.test(label) && /like/i.test(candidate.testId)) likeStates.add(false);
+            if (/^(?:unlike button|unlike)$/.test(label) && /unlike/i.test(candidate.testId)) likeStates.add(true);
+            if (/^(?:save button|save)$/.test(label) && /save/i.test(candidate.testId)) saveStates.add(false);
+            if (/^(?:unsave button|unsave)$/.test(label) && /unsave/i.test(candidate.testId)) saveStates.add(true);
+          }
+          if (likeStates.size === 1) matches.like.push({ index, value: [...likeStates][0] });
+          if (saveStates.size === 1) matches.save.push({ index, value: [...saveStates][0] });
+        }
+        return {
+          likedKnown: matches.like.length === 1,
+          liked: matches.like.length === 1 ? matches.like[0].value : false,
+          savedKnown: matches.save.length === 1,
+          saved: matches.save.length === 1 ? matches.save[0].value : false,
+          likeCandidateCount: matches.like.length,
+          saveCandidateCount: matches.save.length
+        };
+      })();
+      const likeStateKnown = controlState.likedKnown;
+      const savedStateKnown = controlState.savedKnown;
+      const liked = controlState.liked;
+      const saved = controlState.saved;
       // Fallback A/B/C para identificar o perfil autenticado: rótulo acessível,
       // avatar do menu e, por último, link de perfil único no menu.
-      const navLinks = [...document.querySelectorAll("nav a[href], [role='navigation'] a[href], header a[href]")];
+      const navLinks = [...document.querySelectorAll("nav a[href], [role='navigation'] a[href], header a[href]")].filter(node => !node.closest("article, main, [role='main'], [role='dialog']"));
       const validProfile = node => {
         const parts = (node.getAttribute("href") || "").split("/").filter(Boolean);
         return parts.length === 1 && !new Set(["accounts","direct","explore","reels","stories","p","reel","tv","saved"]).has((parts[0] || "").toLowerCase());
@@ -863,19 +934,14 @@ export async function inspectPost(page, url) {
         liked, saved, commented, ownCommentTexts,
         stateKnown: { liked: likeStateKnown, saved: savedStateKnown, commented: commentStateVerified },
         verificationDiagnostics: {
-          rootSelector, controlCount: controls.length, controlLabels: controlLabels.slice(0, 50),
-          controlCandidates: controls.slice(0, 50).map(node => ({
-            tag: node.tagName.toLowerCase(), role: node.getAttribute("role") || "",
-            ariaLabel: node.getAttribute("aria-label") || "", title: node.getAttribute("title") || "",
-            testId: node.getAttribute("data-testid") || "", text: (node.innerText || "").trim().slice(0, 100),
-            svgLabels: [...node.querySelectorAll("svg,[aria-label],[title]")].map(child => child.getAttribute("aria-label") || child.getAttribute("title") || child.getAttribute("data-testid") || "").filter(Boolean).slice(0, 8)
-          })),
-          likeControlFound: likeStateKnown, likeLabels, saveControlFound: savedStateKnown, saveLabels,
+          rootSelector, controlCount: controls.length, controlLabels: controlLabels.slice(0, 80),
+          controlCandidates: controlCandidates.slice(0, 80),
+          likeControlFound: likeStateKnown, likeCandidateCount: controlState.likeCandidateCount, saveControlFound: savedStateKnown, saveCandidateCount: controlState.saveCandidateCount,
           profileLinkCount: profileLinks.length, profileDetectionStrategy: labeledProfileLinks.length ? "A — rótulo acessível" : avatarProfileLinks.length ? "B — avatar do menu" : menuProfileLinks.length ? "C — link do menu" : "nenhuma", identifiedUsername: username || null, commentRowsInspected: commentRows.length,
           expectedCommentCount: expectedComments, commentListComplete, alreadyCommented: commented,
           commentInspectionReason: !username ? (profileLinks.length > 1 ? "Mais de um link de perfil compatível; identidade ambígua." : "Link do perfil do usuário não identificado na página.") : commented ? "Comentário do perfil encontrado; ação já concluída." : commentListComplete ? "Lista de comentários integralmente conferida; comentário do perfil não encontrado." : "Lista de comentários incompleta; ação bloqueada para evitar duplicidade."
         },
-        controlCount: controls.length, controlLabels: controlLabels.join(" | ").slice(0, 1600)
+        controlCount: controls.length, controlLabels: controlLabels.join(" | ").slice(0, 2400)
       };
     });
   } catch (error) {
