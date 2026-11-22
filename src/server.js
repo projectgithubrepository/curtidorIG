@@ -54,6 +54,7 @@ function reportItem(item) {
       publicCommentButtonAvailable: Boolean(item.storyInspection.publicCommentButtonAvailable),
       publicCommentButtonLabel: item.storyInspection.publicCommentButtonLabel || "",
       publicCommentButtonCandidates: item.storyInspection.publicCommentButtonCandidates ?? 0,
+      publicCommentComposerOpened: Boolean(item.storyInspection.publicCommentComposerOpened),
       usernameKnown: Boolean(item.storyInspection.usernameKnown),
       commentListComplete: Boolean(item.storyInspection.commentListComplete),
       expectedComments: item.storyInspection.expectedComments ?? null,
