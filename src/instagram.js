@@ -723,10 +723,10 @@ export function classifyPostControls(controlCandidates = []) {
     const likeStates = new Set();
     const saveStates = new Set();
     for (const label of labels) {
-      if (/^(?:curtir|like)(?:\s+(?:publicacao|post))?$/.test(label)) likeStates.add(false);
-      if (/^(?:descurtir|unlike)(?:\s+(?:publicacao|post))?$/.test(label)) likeStates.add(true);
-      if (/^(?:salvar|save)(?:\s+(?:publicacao|post))?$/.test(label)) saveStates.add(false);
-      if (/^(?:remover dos salvos|remove from saved|unsave)(?:\s+(?:publicacao|post))?$/.test(label)) saveStates.add(true);
+      if (/^(?:curtir|like)(?:\s+(?:publicacao|post))?(?:\s*,?\s*(?:botao|button))?$/.test(label)) likeStates.add(false);
+      if (/^(?:descurtir|unlike)(?:\s+(?:publicacao|post))?(?:\s*,?\s*(?:botao|button))?$/.test(label)) likeStates.add(true);
+      if (/^(?:salvar|save)(?:\s+(?:publicacao|post))?(?:\s*,?\s*(?:botao|button))?$/.test(label)) saveStates.add(false);
+      if (/^(?:remover dos salvos|remove from saved|unsave)(?:\s+(?:publicacao|post))?(?:\s*,?\s*(?:botao|button))?$/.test(label)) saveStates.add(true);
     }
     if (!likeStates.size && /^(?:unlike button|unlike)$/.test(testId)) likeStates.add(true);
     if (!saveStates.size && /^(?:unsave button|unsave)$/.test(testId)) saveStates.add(true);
