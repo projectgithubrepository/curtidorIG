@@ -21,8 +21,10 @@ export function parseAdministrativeMilestone(value) {
     const day = Number(dateMatch[1]);
     const month = Number(dateMatch[2]);
     const year = dateMatch[3] ? Number(dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3]) : null;
+    const calendarYear = year ?? 2024; // leap year permits a valid 29/02 without an explicit year
     const validCalendarDate = day >= 1 && day <= 31 && month >= 1 && month <= 12 &&
-      (year == null || (year >= 2000 && year <= 2100 && new Date(Date.UTC(year, month - 1, day)).getUTCDate() === day));
+      new Date(Date.UTC(calendarYear, month - 1, day)).getUTCDate() === day &&
+      (year == null || (year >= 2000 && year <= 2100));
     if (validCalendarDate) {
       date = year != null
         ? `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
