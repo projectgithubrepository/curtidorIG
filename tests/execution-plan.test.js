@@ -179,3 +179,30 @@ test("test mode does not call a completion reaction ready when its previous stat
   assert.match(reaction.status,/^não verificada/);
   assert.match(reaction.reason,/estado da reação não foi inspecionado/);
 });
+
+
+test("known negative states are mapped as pending actions, not unverified", () => {
+  const plan = buildExecutionPlan({
+    mode: "test",
+    collectionName: "Laranja Girls",
+    comment: "Comentário contextual 🌸",
+    taskState: { liked: false, saved: false, commented: false, sharedToGroup: false },
+    stateKnown: {
+      liked: true,
+      savedStateKnown: true,
+      saved: false,
+      collectionInventoryAvailable: true,
+      collectionMembership: false,
+      commented: true,
+      destinationGroupVerified: true,
+      messageIdentityVerified: true,
+      groupCheckKnown: true
+    }
+  });
+  for (const action of plan.slice(0, 4)) {
+    assert.match(action.status, /^simulada/);
+    assert.equal(action.testMode.mapped, true);
+    assert.equal(action.testMode.candidate, false);
+    assert.equal(action.testMode.executed, false);
+  }
+});
