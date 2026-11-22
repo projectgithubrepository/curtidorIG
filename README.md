@@ -286,3 +286,12 @@ A cada atualização, manter problema observado, causa técnica, correção apli
 - URLs repetidas: ações de publicação uma vez por URL canônica; reação vinculada a cada mensagem original.
 
 **Validação pendente:** rodar suíte completa e nova coleta TESTE autenticada. Teste automatizado não comprova seletor real do Instagram.
+
+
+### Complemento — duplicidade e rastreamento por mensagem (22/11/2026)
+
+- A comparação com a meta administrativa agora usa URLs únicas por conteúdo (Feed/Reels e Stories), enquanto o relatório mantém separadamente a quantidade de ocorrências compartilhadas.
+- O plano deduplica curtida, salvamento, comentário e compartilhamento pela URL canônica. Ocorrências repetidas não inflacionam os totais de ações.
+- A reação de conclusão continua independente por ID da mensagem original. Quando uma publicação repetida aparece em outra mensagem, as ações da publicação são herdadas da primeira ocorrência e somente a reação da nova mensagem pode ser executada, após os pré-requisitos.
+- O relatório de diagnóstico inclui rastreamento por URL com ID da mensagem, ID da conversa, timestamp e classificação (aceita, outra conversa, sem identidade, administrativa, fora do período ou aguardando data), sem copiar o texto privado da mensagem.
+- Próxima validação necessária: executar TESTE novamente e examinar o rastreamento completo para explicar as quatro URLs Feed/Reels excedentes e as três URLs Story ausentes. A instrumentação explica a classificação, mas não substitui a nova coleta real.
