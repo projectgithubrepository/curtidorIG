@@ -421,8 +421,20 @@ app.post("/api/start", async (req, res) => {
       const withoutIdentity = collected.filter(item => !item.identityVerified).length;
       const administrativeMilestones = collected.flatMap(item => item.administrativeMilestones || []);
       const administrativeTarget = administrativeTargetsForRange(administrativeMilestones, startDate, endDate);
-      const actualFeedForDate = collected.filter(item => !item.dateUnknown && item.contentType !== "story").length;
-      const actualStoriesForDate = collected.filter(item => !item.dateUnknown && item.contentType === "story").length;
+      const canonicalContentKey = value => {
+        try {
+          const parsed = new URL(value);
+          const parts = parsed.pathname.split("/").filter(Boolean);
+          if (["p", "reel", "tv"].includes((parts[0] || "").toLowerCase()) && parts[1]) return "media:" + parts[1];
+          if ((parts[0] || "").toLowerCase() === "stories" && parts[1] && parts[2]) return "story:" + parts[1].toLowerCase() + ":" + parts[2];
+          return parsed.origin + parsed.pathname.replace(/\\/$/, "");
+        } catch { return String(value || ""); }
+      };
+      const feedOccurrencesForDate = collected.filter(item => !item.dateUnknown && item.contentType !== "story");
+      const storyOccurrencesForDate = collected.filter(item => !item.dateUnknown && item.contentType === "story");
+      // Administrative totals count distinct content, not repeated shares of the same URL.
+      const actualFeedForDate = new Set(feedOccurrencesForDate.map(item => canonicalContentKey(item.url))).size;
+      const actualStoriesForDate = new Set(storyOccurrencesForDate.map(item => canonicalContentKey(item.url))).size;
       const collectionCoverage = administrativeTarget ? {
         available: true,
         targetDate: administrativeTarget.date,
@@ -432,6 +444,8 @@ app.post("/api/start", async (req, res) => {
         actualFeed: actualFeedForDate,
         actualStories: actualStoriesForDate,
         actualTotal: actualFeedForDate + actualStoriesForDate,
+        feedOccurrences: feedOccurrencesForDate.length,
+        storyOccurrences: storyOccurrencesForDate.length,
         missingFeed: administrativeTarget.feedCount == null ? null : Math.max(0, administrativeTarget.feedCount - actualFeedForDate),
         missingStories: administrativeTarget.storiesCount == null ? null : Math.max(0, administrativeTarget.storiesCount - actualStoriesForDate),
         excessFeed: administrativeTarget.feedCount == null ? null : Math.max(0, actualFeedForDate - administrativeTarget.feedCount),
