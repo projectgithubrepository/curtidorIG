@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { classifyPostControls } from "../src/instagram.js";
+import { classifyPostControls, isCommentStateVerified } from "../src/instagram.js";
 
 test("recognizes like/save labels when data-testid precedes the accessible label", () => {
   const result = classifyPostControls([
@@ -74,4 +74,13 @@ test("accepts explicit state-specific test IDs when accessible labels are absent
   assert.equal(result.liked, true);
   assert.equal(result.savedKnown, true);
   assert.equal(result.saved, true);
+});
+
+test("verifies a prior comment from a positive author match even when the list is partial", () => {
+  assert.equal(isCommentStateVerified({ usernameKnown: true, alreadyCommented: true, commentListComplete: false }), true);
+});
+
+test("does not treat a partial comment list without a positive author match as verified", () => {
+  assert.equal(isCommentStateVerified({ usernameKnown: true, alreadyCommented: false, commentListComplete: false }), false);
+  assert.equal(isCommentStateVerified({ usernameKnown: false, alreadyCommented: true, commentListComplete: true }), false);
 });
