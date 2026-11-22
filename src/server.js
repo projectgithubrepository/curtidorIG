@@ -595,6 +595,7 @@ app.post("/api/start", async (req, res) => {
                 : actionLog.find(entry=>entry.action==="shareStoryToGroup")?.status || "aguardando ação manual";
             const storyRequiredDone = (taskState.commented || commentForbidden) && taskState.sharedToGroup;
             const reactionStatus = taskState.groupCheck ? "já concluída — não repetir" :
+              taskState.reactionAttempted ? "bloqueada — tentativa anterior sem confirmação; verificar manualmente antes de nova ação" :
               !item.identityVerified ? "não verificada — mensagem original não identificada" :
               storyRequiredDone ? (mode==="test" ? "simulada — nenhuma ação executada" : actionLog.find(entry=>entry.action==="completionReaction")?.status || "pronta para execução")
               : "aguardando etapas obrigatórias";
