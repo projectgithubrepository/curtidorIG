@@ -1611,7 +1611,12 @@ export async function executeCompletionReaction(page, item, emoji = "🌸", onBe
 }
 
 
-async function openStoryContent(page, url) {
+function normalizeStoryControlLabel(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ").trim().toLocaleLowerCase();
+}
+
+export async function openStoryContent(page, url) {
   let requested;
   try { requested = new URL(url); } catch { throw new Error("URL do Story inválida."); }
   if (requested.hostname !== "www.instagram.com" || !/^\/stories\/[^/]+\/\d+\/?$/.test(requested.pathname)) {
@@ -1625,34 +1630,53 @@ async function openStoryContent(page, url) {
     if (!sameInstagramContentUrl(page.url(), requested.href)) throw new Error("O Instagram não abriu o Story solicitado; nenhuma ação será planejada para outro conteúdo.");
   };
   validatePage();
-  const confirmation = page.getByRole("button", { name: /^ver story$/i });
+
+  // O botão pode ser um <button> ou um elemento role=button, e o texto
+  // acessível pode divergir do nome computado pelo Playwright.
+  const controls = page.locator('button,[role="button"]');
   const visible = [];
-  for (let index = 0; index < await confirmation.count(); index++) {
-    const button = confirmation.nth(index);
-    if (await button.isVisible().catch(() => false)) visible.push(button);
+  const candidateLabels = [];
+  for (let index = 0; index < await controls.count(); index++) {
+    const button = controls.nth(index);
+    if (!(await button.isVisible().catch(() => false))) continue;
+    const labels = await button.evaluate(node =>
+      [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText]
+        .filter(Boolean).map(value => String(value).replace(/\s+/g, " ").trim())
+    ).catch(() => []);
+    if (labels.length) candidateLabels.push(labels.slice(0, 3));
+    if (labels.some(label => normalizeStoryControlLabel(label) === "ver story")) visible.push(button);
   }
-  if (visible.length > 1) throw new Error("Mais de um botão “Ver story” foi encontrado; abertura cancelada por ambiguidade.");
+  if (visible.length > 1) {
+    throw new Error("Mais de um botão “Ver story” foi encontrado; abertura cancelada por ambiguidade. Candidatos: " + JSON.stringify(candidateLabels.slice(0, 12)));
+  }
   let confirmationClicked = false;
   if (visible.length === 1) {
     await visible[0].click();
     confirmationClicked = true;
     await page.waitForTimeout(1400);
     validatePage();
-    const remaining = page.getByRole("button", { name: /^ver story$/i });
     let stillVisible = false;
+    const remaining = page.locator('button,[role="button"]');
     for (let index = 0; index < await remaining.count(); index++) {
-      if (await remaining.nth(index).isVisible().catch(() => false)) stillVisible = true;
+      const button = remaining.nth(index);
+      if (!(await button.isVisible().catch(() => false))) continue;
+      const labels = await button.evaluate(node =>
+        [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText]
+          .filter(Boolean).map(value => String(value).replace(/\s+/g, " ").trim())
+      ).catch(() => []);
+      if (labels.some(label => normalizeStoryControlLabel(label) === "ver story")) stillVisible = true;
     }
-    if (stillVisible) throw new Error("O botão “Ver story” permaneceu na tela após o clique; o conteúdo não foi confirmado como aberto.");
+    if (stillVisible) {
+      throw new Error("O botão “Ver story” permaneceu visível após o clique; o conteúdo não foi confirmado como aberto. Candidatos: " + JSON.stringify(candidateLabels.slice(0, 12)));
+    }
   } else {
     const screenText = await page.locator("body").innerText().catch(() => "");
     if (/ver story/i.test(screenText) && !/comentários|comments/i.test(screenText)) {
-      throw new Error("A tela de confirmação “Ver story” foi detectada, mas o botão não pôde ser identificado com segurança.");
+      throw new Error("A tela de confirmação “Ver story” foi detectada, mas nenhum controle visível com rótulo exato foi localizado. Candidatos visíveis: " + JSON.stringify(candidateLabels.slice(0, 12)));
     }
   }
-  return { confirmationClicked, confirmationLabel: confirmationClicked ? "Ver story" : "" };
+  return { confirmationClicked, confirmationLabel: confirmationClicked ? "Ver story" : "", confirmationCandidates: candidateLabels.slice(0, 12) };
 }
-
 export async function inspectStory(page, url) {
   const storyOpen = await openStoryContent(page, url);
   await expandVisibleCommentThreads(page);
