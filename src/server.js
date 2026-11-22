@@ -33,6 +33,16 @@ function logDiagnostic(level, message, details = {}) {
   if (diagnosticLog.length > 1000) diagnosticLog.shift();
 }
 
+function canonicalPublicationKey(value) {
+  try {
+    const parsed = new URL(value);
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    if (["p", "reel", "tv"].includes((parts[0] || "").toLowerCase()) && parts[1]) return "media:" + parts[1];
+    if ((parts[0] || "").toLowerCase() === "stories" && parts[1] && parts[2]) return "story:" + parts[1].toLowerCase() + ":" + parts[2];
+    return parsed.origin + parsed.pathname.replace(/\/$/, "");
+  } catch { return String(value || ""); }
+}
+
 function reportItem(item) {
   return {
     url: item.url || "",
@@ -496,8 +506,12 @@ app.post("/api/start", async (req, res) => {
       progress.message = `${collected.length} links encontrados; ${withoutDate} sem data identificável; ${milestoneCount} marcos administrativos identificados; ${withoutIdentity} itens sem vínculo comprovado com mensagem. ${networkStatus} Verificando histórico...`;
       const previous = getRecentComments(200);
       logDiagnostic("INFO", "Iniciando inspeção e planejamento das publicações", { total: collected.length, mode });
+      const seenPublicationKeys = new Set();
       for (const item of collected) {
         if (stopRequested) break;
+        const publicationKey = canonicalPublicationKey(item.url);
+        const duplicatePublication = seenPublicationKeys.has(publicationKey);
+        seenPublicationKeys.add(publicationKey);
         const groupShareState = getGroupShareState(item.url, destinationGroupVerification);
         const alreadyInDestinationGroup = groupShareState === "already-shared";
         const historicalState = getTaskState(item.url, item.threadId, item.messageId, completionEmoji);
@@ -516,6 +530,110 @@ app.post("/api/start", async (req, res) => {
           commentForbidden:false, groupCheck:false, reactionEmoji:"", complete:false
         };
         const instructions = interpretGroupInstructions(item.messageText || "");
+        if (duplicatePublication) {
+          const primary = results.find(result => canonicalPublicationKey(result.url) === publicationKey);
+          if (primary) {
+            const primaryState = primary.taskState || {};
+            const duplicateState = mergeTaskState({}, {
+              ...primaryState,
+              groupCheck: false,
+              reactionAttempted: Boolean(historicalState.reactionAttempted)
+            });
+            const requiredDone = item.contentType === "story"
+              ? (duplicateState.commented || duplicateState.commentForbidden || instructions.comment === "forbidden") && duplicateState.sharedToGroup
+              : duplicateState.liked && duplicateState.saved && duplicateState.savedFolderVerified &&
+                (duplicateState.commented || duplicateState.commentForbidden || instructions.comment === "forbidden") && duplicateState.sharedToGroup;
+            const duplicatePlan = (primary.plan || []).filter(action => action.action !== "completionReaction").map(action => {
+              let status = action.status;
+              if (/^(simulada|pendente)$/.test(status || "")) {
+                status = mode === "test"
+                  ? "simulada — publicação contabilizada na primeira ocorrência da URL"
+                  : "coberta pela primeira ocorrência da URL — não repetir";
+              } else if (!/^(bloqueada|não verificada|aguardando|dispensada|já concluída|coberta)/.test(status || "")) {
+                status = "coberta pela primeira ocorrência da URL — não repetir";
+              }
+              return { ...action, duplicateCovered: true, status, reason: action.reason || "A ação pertence à publicação, não à mensagem de origem; será contabilizada uma única vez por URL canônica." };
+            });
+            const reactionAction = {
+              action: "completionReaction",
+              label: `Reagir à mensagem original com ${completionEmoji}`,
+              alreadyDone: false,
+              eligible: Boolean(item.identityVerified && item.messageId && item.threadId),
+              required: true,
+              requiresAllPrevious: true
+            };
+            const actionLog = [];
+            let reactionCompleted = false;
+            if (!requiredDone) {
+              reactionAction.status = "aguardando etapas obrigatórias da publicação";
+              reactionAction.reason = "A ocorrência principal da mesma URL ainda não concluiu todas as ações obrigatórias.";
+            } else if (!item.identityVerified || !item.messageId || !item.threadId) {
+              reactionAction.status = "não verificada — mensagem original sem identidade comprovada";
+              reactionAction.reason = "A reação é individual por mensagem e esta ocorrência não tem ID/conversa confirmados.";
+            } else if (mode === "test") {
+              reactionAction.status = historicalState.reactionAttempted
+                ? "bloqueada — tentativa anterior sem confirmação"
+                : "não verificada — reação pertence a esta mensagem original; TESTE não executa";
+              reactionAction.reason = historicalState.reactionAttempted
+                ? "Confira manualmente a reação nesta mensagem antes de qualquer novo clique."
+                : "As ações da publicação são compartilhadas pela URL; a reação continua exclusiva desta mensagem e não é presumida.";
+            } else if (mode === "automatic") {
+              if (historicalState.reactionAttempted) {
+                reactionAction.status = "bloqueada — tentativa anterior sem confirmação";
+                reactionAction.reason = "Confira manualmente a reação nesta mensagem antes de qualquer novo clique.";
+              } else {
+                try {
+                  const outcome = await executeCompletionReaction(page, item, completionEmoji, async () => {
+                    duplicateState.reactionAttempted = true;
+                    appendHistory({
+                      url: item.url, groupThreadId: item.threadId, messageId: item.messageId,
+                      caption: primary.caption || "", groupName, collectionName, sharedAt: item.sharedAt,
+                      reactionAttempted: true, groupCheck: false, completionEmoji,
+                      status: "tentativa de reação iniciada — aguardando confirmação",
+                      detail: "Publicação repetida: tentativa registrada para a mensagem original específica."
+                    });
+                  });
+                  reactionCompleted = true;
+                  reactionAction.status = outcome.status;
+                  actionLog.push({ action: "completionReaction", status: outcome.status });
+                } catch (error) {
+                  reactionAction.status = "bloqueada";
+                  reactionAction.reason = error.message;
+                  actionLog.push({ action: "completionReaction", status: "bloqueada", reason: error.message });
+                }
+              }
+            } else {
+              reactionAction.status = "pendente — reação individual da mensagem original";
+              reactionAction.reason = "Modo MANUAL: conferir e reagir somente à mensagem original desta ocorrência.";
+            }
+            const taskState = mergeTaskState({}, { ...duplicateState, groupCheck: reactionCompleted });
+            duplicatePlan.push(reactionAction);
+            const duplicateResult = {
+              ...item,
+              caption: primary.caption || "",
+              comment: "",
+              commentSource: "publicação já analisada na primeira ocorrência",
+              duplicateOfUrl: true,
+              duplicatePrimaryMessageId: primary.messageId || "",
+              taskState,
+              plan: duplicatePlan,
+              actionLog,
+              status: "URL repetida — ações da publicação contabilizadas uma vez; reação vinculada a esta mensagem",
+              detail: "Esta URL já foi processada na mensagem " + (primary.messageId || "original") + ". Curtida, salvamento, comentário e compartilhamento não são repetidos; a reação permanece específica da mensagem " + item.messageId + "."
+            };
+            results.push(duplicateResult);
+            appendHistory({
+              url: item.url, groupThreadId: item.threadId, messageId: item.messageId,
+              caption: primary.caption || "", groupName, collectionName, sharedAt: item.sharedAt,
+              liked: taskState.liked, saved: taskState.saved, savedFolderVerified: taskState.savedFolderVerified,
+              commented: taskState.commented, sharedToGroup: taskState.sharedToGroup,
+              groupCheck: taskState.groupCheck, completionEmoji,
+              detail: duplicateResult.detail
+            });
+            progress.done++;
+            continue;
+          }
+        }
         if (item.dateUnknown) {
           const reason = "A mensagem e o link foram extraídos, mas o Instagram não forneceu um timestamp válido. O item foi mantido como candidato, porém não pode ser atribuído com segurança ao período selecionado nem executado.";
           const unknownPlan = item.contentType === "story"
@@ -835,6 +953,7 @@ app.post("/api/start", async (req, res) => {
       };
       const actionTotals = {};
       for (const item of results) for (const action of (item.plan || [])) {
+        if (action.duplicateCovered) continue;
         const key = action.action;
         if (!actionTotals[key]) actionTotals[key] = { total: 0, simulated: 0, unverified: 0, blocked: 0, done: 0, candidate: 0, dispensed: 0, waiting: 0, unclassified: 0 };
         const bucket = actionTotals[key];
@@ -851,11 +970,11 @@ app.post("/api/start", async (req, res) => {
       const preliminaryLines = Object.entries(actionTotals).map(([key,value]) =>
         `- ${actionLabels[key] || key}: ${value.total} previstas | ${value.simulated} aptas no TESTE | ${value.candidate} candidatas | ${value.waiting} aguardando etapas | ${value.dispensed} dispensadas | ${value.unverified} não verificadas | ${value.blocked} bloqueadas | ${value.done} já concluídas | ${value.unclassified} sem classificação`
       );
-      const plannedActions = results.reduce((sum,item) => sum + (item.plan?.length || 0), 0);
-      const mappedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => action.testMode?.mapped).length, 0);
-      const candidateActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => action.testMode?.candidate).length, 0);
+      const plannedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => !action.duplicateCovered).length, 0);
+      const mappedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => !action.duplicateCovered && action.testMode?.mapped).length, 0);
+      const candidateActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => !action.duplicateCovered && action.testMode?.candidate).length, 0);
       const inspectedFeedReels = results.filter(item => item.contentType !== "story" ? Boolean(item.stateVerification) : Boolean(item.storyInspection)).length;
-      const alreadyDoneActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^já concluída/.test(action.status)).length, 0);
+      const alreadyDoneActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => !action.duplicateCovered && /^já concluída/.test(action.status)).length, 0);
       const simulatedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^simulada/.test(action.status)).length, 0);
       const blockedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^bloqueada/.test(action.status)).length, 0);
       const unverifiedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^não verificada/.test(action.status)).length, 0);
