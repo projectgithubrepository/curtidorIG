@@ -276,3 +276,12 @@ Foi adicionado teste explícito para os três estados conhecidos negativos: quan
 - Commits de código/testes: ef6c30fa4af042d61988ab0c18e95285f92a0963, 13917181d39231eb27f515671d13faf96655eb9b, d39ada2a8358819f624de89fb7aaef6e928140b6, 76b9ff70d88b1a15c41d037b7c2c5725d6f20124, 5463efcd0f046b5a8b295fc08643fd4d08d1a7b3 e 0b00b651e7ee24ce9b786dfb94be07cb69e8783b.
 - GitHub Actions run #544 para o último SHA foi iniciado e ainda está em andamento na última consulta. A execução #543 foi cancelada porque um novo push substituiu o commit em teste.
 - Ainda não há nova coleta TESTE autenticada; portanto, não declarar corrigidas as 123 etapas nem autorizar AUTOMÁTICO. A validação funcional exige novo relatório com diagnósticos individuais de controles, perfil e comentários.
+
+
+### Complemento — inspeção integral dos comentários (22/11/2026)
+
+A expansão de comentários também foi corrigida: a rotina agora percorre todos os controles visíveis de “ver mais/ver todos” (em vez de depender apenas do primeiro resultado) e permite até 40 lotes de expansão. A verificação dos comentários consulta o diálogo de comentários quando ele existe; caso contrário, usa a área da publicação. Isso evita declarar lista completa quando a área de comentários está em um diálogo separado ou quando o primeiro controle encontrado está oculto.
+
+A regra de segurança permanece: a ausência de comentário só é considerada comprovada quando o perfil autenticado foi identificado e a lista está completa; encontrar um comentário próprio é evidência positiva mesmo com lista parcial. A ausência de identidade ou de completude continua desconhecida e não dispara comentário automático.
+
+Commit desta extensão: e6532757235471206e2a5e97f5ce695d07928492. O novo CI precisa validar esta alteração também; não usar o resultado do commit anterior como prova desta extensão. A nova coleta TESTE autenticada ainda é necessária para verificar a captura real.
