@@ -774,9 +774,12 @@ export async function inspectPost(page, url) {
       const genericCommentCandidates = [...element.querySelectorAll("div")].filter(node => node.querySelector("a[href]") && (node.innerText || "").trim().length > 0 && (node.innerText || "").trim().length < 600);
       const genericCommentRows = genericCommentCandidates.filter(node => !genericCommentCandidates.some(child => child !== node && node.contains(child) && (child.innerText || "").trim() === (node.innerText || "").trim()));
       const commentRows = structuredCommentRows.length ? structuredCommentRows : genericCommentRows;
-      const ownCommentRows = username ? commentRows.filter(item => [...item.querySelectorAll("a[href]")].some(link => {
+      const belongsToUser = item => [...item.querySelectorAll("a[href]")].some(link => {
         try { return new URL(link.getAttribute("href"), location.origin).pathname.replace(/\/$/,"") === "/" + username; } catch { return false; }
-      })) : [];
+      });
+      const structuredOwnRows = username ? structuredCommentRows.filter(belongsToUser) : [];
+      const fallbackOwnRows = username ? genericCommentRows.filter(belongsToUser) : [];
+      const ownCommentRows = structuredOwnRows.length ? structuredOwnRows : fallbackOwnRows;
       const ownCommentTexts = ownCommentRows.map(item => (item.innerText || "").trim()).filter(Boolean);
       const commented = ownCommentRows.length > 0;
       const visibleText = (element.innerText || "").toLowerCase();
@@ -1549,7 +1552,10 @@ export async function inspectStory(page, url) {
     const genericCandidates=[...document.querySelectorAll("div")].filter(node=>node.querySelector("a[href]")&&(node.innerText||"").trim().length>0&&(node.innerText||"").trim().length<600);
     const genericNodes=genericCandidates.filter(node=>!genericCandidates.some(child=>child!==node&&node.contains(child)&&(child.innerText||"").trim()===(node.innerText||"").trim()));
     const commentNodes=structuredCommentNodes.length?structuredCommentNodes:genericNodes;
-    const ownRows=username?commentNodes.filter(node=>[...node.querySelectorAll("a[href]")].some(a=>{try{return new URL(a.getAttribute("href"),location.origin).pathname.replace(/\/$/,"")==="/"+username;}catch{return false;}})):[];
+    const belongsToUser=node=>[...node.querySelectorAll("a[href]")].some(a=>{try{return new URL(a.getAttribute("href"),location.origin).pathname.replace(/\/$/,"")==="/"+username;}catch{return false;}});
+    const structuredOwnRows=username?structuredCommentNodes.filter(belongsToUser):[];
+    const fallbackOwnRows=username?genericNodes.filter(belongsToUser):[];
+    const ownRows=structuredOwnRows.length?structuredOwnRows:fallbackOwnRows;
     const ownCommentTexts=ownRows.map(node=>(node.innerText||"").trim()).filter(Boolean);
     const alreadyCommented=ownRows.length>0;
     const lower=bodyText.toLowerCase();
