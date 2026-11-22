@@ -188,3 +188,16 @@ A inspeção de comentários agora combina as linhas estruturadas (`li`, `role=l
 
 O diagnóstico registra separadamente quantas linhas estruturadas, linhas genéricas e linhas próprias foram encontradas, além dos hrefs candidatos de perfil. Foram adicionados testes para garantir que um comentário próprio encontrado seja reconhecido mesmo com lista parcial e que ausência em lista parcial permaneça desconhecida.
 
+
+
+### Verificação final de implementação — 22/11/2026
+
+Na revisão cruzada do código, foi detectado e corrigido um escape duplicado nas expressões regulares do classificador (normalização de acentos e espaços). A correção foi validada diretamente a partir da função publicada, e não por uma cópia manual.
+
+- 6 cenários isolados do classificador executados contra a função do repositório: todos passaram.
+- 3 verificações de segurança de comentário executadas contra a função do repositório: todas passaram.
+- Compilação sintática por `new Function` após remoção apenas das declarações `import/export`: `src/instagram.js`, `src/execution-plan.js` e o novo teste compilaram sem erro.
+- A suíte completa `npm test` não foi executada neste ambiente; dependências/runtime local não estão disponíveis.
+- A consulta de status do commit no GitHub não retornou checks nem execuções de workflow. Portanto, CI permanece **não verificado**, não aprovado.
+
+Último commit de código no momento desta anotação: `610635e8006134ec190743adb28a26bf18686f7e`. A validação real depende de uma nova coleta TESTE com a sessão autenticada do Instagram.
