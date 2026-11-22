@@ -98,3 +98,11 @@ test("a valid explicit administrative date takes precedence over HOJE timestamp"
   const target = administrativeTargetsForRange([{ ...milestone, sharedAt: "2026-11-21T19:02:41.022Z" }], "2026-11-20", "2026-11-20");
   assert.equal(target.date, "11-20");
 });
+
+
+test("rejects impossible calendar dates even when no year is supplied", () => {
+  const marker = parseAdministrativeMilestone("Aviso: Data 31/02 • 37 FEED • 13 STORIES. Conferência da pasta de salvos.");
+  assert.equal(marker.date, "");
+  assert.equal(marker.todayReference, false);
+  assert.equal(administrativeTargetsForRange([marker], "2026-02-01", "2026-02-28"), null);
+});
