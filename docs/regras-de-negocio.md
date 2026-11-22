@@ -139,3 +139,5 @@ Quando configurada, a URL `https://www.instagram.com/direct/t/ID/` é o localiza
 ## Revisão obrigatória em duas etapas
 
 Cada implementação deve ser revisada por dois revisores seniores independentes: um focado em regras de negócio, estados e duplicidade; outro focado em código, integração, falhas e efeitos reais ao executar. Em seguida, fazer revisão cruzada e executar testes de regressão e CI. Não declarar concluído apenas com base em compilação ou build.
+
+8. Curtida, salvamento e reação também registram uma tentativa antes do clique. Se o resultado ficar ambíguo, o histórico impede uma segunda interação automática que poderia desfazer a primeira.

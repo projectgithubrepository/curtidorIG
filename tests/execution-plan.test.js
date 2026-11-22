@@ -156,3 +156,14 @@ test("automatic plan blocks a comment with a previous unconfirmed attempt", () =
   assert.equal(action.status, "bloqueada");
   assert.match(action.reason, /não repetirá automaticamente/);
 });
+
+test("automatic plan blocks uncertain prior toggle attempts instead of clicking again", () => {
+  const plan = buildExecutionPlan({
+    mode:"automatic", collectionName:"Laranja antigo",
+    comment:"Comentário muito bom 🌷",
+    taskState:{likeAttempted:true,saveAttempted:true,reactionAttempted:true}
+  });
+  assert.match(plan.find(item=>item.action==="like").status,/^bloqueada/);
+  assert.match(plan.find(item=>item.action==="saveToCollection").status,/^bloqueada/);
+  assert.match(plan.find(item=>item.action==="completionReaction").status,/^bloqueada/);
+});

@@ -63,3 +63,14 @@ test("unconfirmed comment attempt is preserved and explicitly marked for manual 
 test("message text containing the completion emoji is not evidence of an applied reaction", () => {
   assert.equal(hasGroupCheck("Pedido original com emoji 🌷 no texto"), false);
 });
+
+test("uncertain toggle attempts remain pending for manual verification", () => {
+  const state = mergeTaskState({}, { likeAttempted:true, saveAttempted:true, reactionAttempted:true });
+  assert.equal(state.likeAttempted, true);
+  assert.equal(state.saveAttempted, true);
+  assert.equal(state.reactionAttempted, true);
+  const label = taskStateLabel(state);
+  assert.match(label, /tentativa de curtida/);
+  assert.match(label, /tentativa de salvamento/);
+  assert.match(label, /tentativa de reação/);
+});
