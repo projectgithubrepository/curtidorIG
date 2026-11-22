@@ -522,6 +522,8 @@ app.post("/api/start", async (req, res) => {
             if (mode === "automatic") {
               if (commentForbidden) {
                 actionLog.push({action:"commentStory",status:"dispensada — pedido explícito para não comentar"});
+              } else if (taskState.commentAttempted && !taskState.commented) {
+                actionLog.push({action:"commentStory",status:"bloqueada — tentativa anterior sem confirmação",reason:"Confira manualmente os comentários deste Story antes de qualquer nova tentativa. O sistema preservou a tentativa e não repetirá automaticamente."});
               } else if (!taskState.commented) {
                 if (!story.publicCommentAvailable) {
                   actionLog.push({action:"commentStory",status:"bloqueada",reason:"Comentários públicos indisponíveis; nenhuma resposta privada/DM será enviada."});
