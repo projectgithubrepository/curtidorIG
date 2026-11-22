@@ -46,6 +46,8 @@ function canonicalPublicationKey(value) {
 function reportItem(item) {
   return {
     url: item.url || "",
+    duplicateOfUrl: Boolean(item.duplicateOfUrl),
+    duplicatePrimaryMessageId: item.duplicatePrimaryMessageId || "",
     requestText: item.messageText || "",
     contentType: item.contentType || "",
     sharedAt: item.sharedAt || "",
@@ -110,7 +112,7 @@ app.get("/api/diagnostic-summary", (_req, res) => {
     "CURTIDORIG | RESUMO TÉCNICO FILTRADO",
     `Resultado: ${report.outcome || "indisponível"} | Modo: ${report.request?.mode || "?"}`,
     `Grupo: ${report.request?.groupName || "?"} | Período: ${report.request?.startDate || "?"} a ${report.request?.endDate || "?"}`,
-    `Itens: ${summary.publicationsFound ?? report.publications?.length ?? 0} encontrados | ${summary.publicationsInspected ?? 0} inspecionados | Feed/Reels: ${summary.feedsAndReels ?? "?"} | Stories: ${summary.stories ?? "?"}`,
+    `Itens: ${summary.publicationsFound ?? report.publications?.length ?? 0} ocorrências | ${summary.publicationsUnique ?? "?"} URLs únicas | ${summary.duplicateOccurrences ?? 0} repetidas | ${summary.publicationsInspected ?? 0} únicas inspecionadas | Feed/Reels: ${summary.feedsAndReels ?? "?"} | Stories: ${summary.stories ?? "?"}`,
     ...(coverage.available ? [`Referência administrativa (URLs únicas): Feed ${coverage.actualFeed}/${coverage.expectedFeed} | Stories ${coverage.actualStories}/${coverage.expectedStories} | ${coverage.matches ? "CONFERE" : "DIVERGÊNCIA"}`, `Ocorrências compartilhadas: Feed ${coverage.feedOccurrences ?? "?"} | Stories ${coverage.storyOccurrences ?? "?"}`] : ["Referência administrativa: indisponível"]),
     `Varredura: ${scan.historyRounds ?? "?"} rodadas | avanço: ${scan.scrollProgressRounds ?? "?"} | topo: ${scan.stableBoundaryReached ? "sim" : "não"} | marco temporal: ${scan.dateBoundaryReached ? "sim" : "não"} | travada: ${scan.historyStalled ? "sim" : "não"}`,
     `Rede: ${network.capturedResponses ?? 0} respostas / ${network.parsedResponses ?? 0} interpretadas / ${network.unparsedResponses ?? 0} não interpretadas`,
@@ -940,10 +942,10 @@ app.post("/api/start", async (req, res) => {
       const finalNetworkStatus = finalNetwork
         ? ` Captura de rede: ${finalNetwork.capturedResponses} respostas, ${finalNetwork.messageLikeObjects} objetos de mensagem; reações ${finalNetwork.hasReactionFields ? "detectadas" : "não detectadas"}.`
         : "";
-      const inspectionFailures = results.filter(item =>
+      const inspectionFailures = results.filter(item => !item.duplicateOfUrl && (
         item.contentType === "story" ? !item.storyInspection :
         item.status === "inspeção não concluída — ações não verificadas"
-      ).length;
+      )).length;
       const captionUnavailable = results.filter(item => item.inspectionDiagnostics?.captionAvailable === false).length;
       const storiesBlocked = results.filter(item => item.contentType === "story" && (item.plan || []).some(action => /^(bloqueada|não verificada)/.test(action.status))).length;
       const actionLabels = {
@@ -973,19 +975,20 @@ app.post("/api/start", async (req, res) => {
       const plannedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => !action.duplicateCovered).length, 0);
       const mappedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => !action.duplicateCovered && action.testMode?.mapped).length, 0);
       const candidateActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => !action.duplicateCovered && action.testMode?.candidate).length, 0);
-      const inspectedFeedReels = results.filter(item => item.contentType !== "story" ? Boolean(item.stateVerification) : Boolean(item.storyInspection)).length;
+      const inspectedFeedReels = results.filter(item => !item.duplicateOfUrl && (item.contentType !== "story" ? Boolean(item.stateVerification) : Boolean(item.storyInspection))).length;
+      const uniqueCollectedCount = new Set(collected.map(item => canonicalPublicationKey(item.url))).size;
       const alreadyDoneActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => !action.duplicateCovered && /^já concluída/.test(action.status)).length, 0);
-      const simulatedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^simulada/.test(action.status)).length, 0);
-      const blockedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^bloqueada/.test(action.status)).length, 0);
-      const unverifiedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^não verificada/.test(action.status)).length, 0);
-      const waitingActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^aguardando/.test(action.status)).length, 0);
-      const dispensedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => /^dispensada/.test(action.status)).length, 0);
+      const simulatedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => !action.duplicateCovered && /^simulada/.test(action.status)).length, 0);
+      const blockedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => !action.duplicateCovered && /^bloqueada/.test(action.status)).length, 0);
+      const unverifiedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => !action.duplicateCovered && /^não verificada/.test(action.status)).length, 0);
+      const waitingActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => !action.duplicateCovered && /^aguardando/.test(action.status)).length, 0);
+      const dispensedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action => !action.duplicateCovered && /^dispensada/.test(action.status)).length, 0);
       const unclassifiedActions = results.reduce((sum,item) => sum + (item.plan || []).filter(action =>
-        !/^(simulada|não verificada|bloqueada|já concluída|dispensada|aguardando|candidata)/.test(action.status)
+        !action.duplicateCovered && !/^(simulada|não verificada|bloqueada|já concluída|dispensada|aguardando|candidata)/.test(action.status)
       ).length, 0);
       const testIncomplete = mode === "test" && (inspectionFailures > 0 || captionUnavailable > 0 || unverifiedActions > 0 || blockedActions > 0 || storiesBlocked > 0 || unclassifiedActions > 0 || !savedCollectionInventoryAvailable || collectionIncomplete);
       progress.message = mode === "test"
-        ? `TESTE ${testIncomplete ? "PARCIAL" : "CONCLUÍDO"}: ${inspectedFeedReels}/${collected.length} itens analisados; ${collectionCoverage.available ? `cobertura da administração: Feed ${actualFeedForDate}/${collectionCoverage.expectedFeed}, Stories ${actualStoriesForDate}/${collectionCoverage.expectedStories}; ` : ""}${withoutDate} candidatos sem data incluídos; ${withoutIdentity} sem identidade; ${mappedActions} etapas com estado reconhecido e elegíveis na validação inicial (NÃO EXECUTADAS; o AUTOMÁTICO ainda revalida antes de cada ação); ${candidateActions} candidatas; ${waitingActions} aguardando etapas; ${alreadyDoneActions} já concluídas; ${dispensedActions} dispensadas; ${blockedActions} bloqueadas; ${unverifiedActions} não verificadas; ${unclassifiedActions} sem classificação; ${storiesBlocked} Stories com etapas bloqueadas ou não verificadas; ${inspectionFailures} inspeções interrompidas; ${captionUnavailable} sem legenda legível; ${plannedActions} etapas no plano. Nenhuma ação foi executada.`
+        ? `TESTE ${testIncomplete ? "PARCIAL" : "CONCLUÍDO"}: ${inspectedFeedReels}/${uniqueCollectedCount} publicações únicas analisadas; ${collectionCoverage.available ? `cobertura da administração: Feed ${actualFeedForDate}/${collectionCoverage.expectedFeed}, Stories ${actualStoriesForDate}/${collectionCoverage.expectedStories}; ` : ""}${withoutDate} candidatos sem data incluídos; ${withoutIdentity} sem identidade; ${mappedActions} etapas com estado reconhecido e elegíveis na validação inicial (NÃO EXECUTADAS; o AUTOMÁTICO ainda revalida antes de cada ação); ${candidateActions} candidatas; ${waitingActions} aguardando etapas; ${alreadyDoneActions} já concluídas; ${dispensedActions} dispensadas; ${blockedActions} bloqueadas; ${unverifiedActions} não verificadas; ${unclassifiedActions} sem classificação; ${storiesBlocked} Stories com etapas bloqueadas ou não verificadas; ${inspectionFailures} inspeções interrompidas; ${captionUnavailable} sem legenda legível; ${plannedActions} etapas no plano. Nenhuma ação foi executada.`
         : mode === "manual" ? `Coleta ${collectionIncomplete ? "PARCIAL" : "concluída"}: ${results.length} itens preparados para execução manual; ${withoutDate} sem data e ${withoutIdentity} sem identidade.`
         : `Execução automática finalizada: ${results.length} itens analisados. Consulte o resultado de cada ação.`;
       logDiagnostic("INFO", "Coleta concluída", { listed: results.length, inspectionFailures, captionUnavailable, unverifiedActions, savedCollectionInventoryAvailable, networkResponses: network?.capturedResponses ?? 0 });
@@ -999,6 +1002,8 @@ app.post("/api/start", async (req, res) => {
         request: { groupName, collectionName, collectionUrl, destinationGroupName, destinationGroupUrl, mode, completionEmoji, startDate, endDate },
         summary: {
           publicationsFound: collected.length,
+          publicationsUnique: uniqueCollectedCount,
+          duplicateOccurrences: collected.length - uniqueCollectedCount,
           publicationsInspected: inspectedFeedReels,
           administrativeMilestones: new Set(administrativeMilestones.map(marker => marker.text)).size,
           administrativeTarget,
@@ -1008,8 +1013,8 @@ app.post("/api/start", async (req, res) => {
           collectionDiagnostics,
           collectionScanComplete,
           collectionIncomplete,
-          stories: collected.filter(item => item.contentType === "story").length,
-          feedsAndReels: collected.filter(item => item.contentType !== "story").length,
+          stories: new Set(collected.filter(item => item.contentType === "story").map(item => canonicalPublicationKey(item.url))).size,
+          feedsAndReels: new Set(collected.filter(item => item.contentType !== "story").map(item => canonicalPublicationKey(item.url))).size,
           itemsWithoutDate: collected.filter(item => item.dateUnknown).length,
           itemsWithoutIdentity: withoutIdentity,
           inspectionFailures,
