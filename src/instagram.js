@@ -1163,7 +1163,7 @@ async function uniqueButton(page, patterns, root = "main,article,[role='dialog']
   return controls.nth(matches[0]);
 }
 
-export async function executeLike(page, url) {
+export async function executeLike(page, url, onBeforeClick = async () => {}) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
   if (!sameInstagramContentUrl(page.url(),url)) throw new Error("O Instagram não abriu a publicação solicitada; curtida bloqueada.");
@@ -1180,6 +1180,7 @@ export async function executeLike(page, url) {
   if (likeState === null) throw new Error("Estado da curtida não identificado com segurança; clique bloqueado para não desfazer uma curtida existente.");
   if (likeState) return { liked: true, status: "já curtida — não repetida" };
   const button = await uniqueButton(page, [/^(?:curtir|like)(?:\b|\s|$)/i]);
+  await onBeforeClick();
   await button.click();
   await page.waitForTimeout(700);
   const verified = await page.locator("main,article,[role='dialog']").first().evaluate(root => [...root.querySelectorAll("button,[role=button]")].some(node => {
@@ -1196,7 +1197,7 @@ function savedCollectionKey(url) {
   return parsed.pathname.replace(/\/$/,"");
 }
 
-export async function executeSaveToCollection(page, url, collectionName, knownCollectionUrls = null) {
+export async function executeSaveToCollection(page, url, collectionName, knownCollectionUrls = null, onBeforeSave = async () => {}) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(1200);
   if (!sameInstagramContentUrl(page.url(),url)) throw new Error("O Instagram não abriu a publicação solicitada; salvamento bloqueado.");
@@ -1215,6 +1216,7 @@ export async function executeSaveToCollection(page, url, collectionName, knownCo
     throw new Error("A publicação já está salva, mas não aparece comprovadamente na coleção solicitada. Não vou alternar o estado de salvamento.");
   }
   const saveControl = await uniqueButton(page, [/^(?:salvar|save|adicionar aos salvos|add to saved)\b/i]);
+  await onBeforeSave();
   await saveControl.click();
   await page.waitForTimeout(700);
   const dialog = page.getByRole("dialog").last();
@@ -1406,7 +1408,7 @@ export async function executeShareToGroup(page, url, destinationGroupName, onBef
   return { sharedToGroup: true, status: "publicação localizada nas mensagens recentes do grupo coletivo" };
 }
 
-export async function executeCompletionReaction(page, item, emoji = "🌸") {
+export async function executeCompletionReaction(page, item, emoji = "🌸", onBeforeReact = async () => {}) {
   if (!item?.threadId || !item?.messageId || !item?.identityVerified || !item?.messageText) {
     throw new Error("Reação bloqueada: não há identidade e texto suficientes da mensagem original.");
   }
@@ -1463,6 +1465,7 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
   const picker = page.locator('[role="dialog"],[role="menu"]').last();
   const emojiButton = picker.getByRole("button", { name: new RegExp(emoji.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first();
   if (!(await emojiButton.count())) throw new Error(`Emoji ${emoji} não encontrado no seletor de reações.`);
+  await onBeforeReact();
   await emojiButton.click();
   await page.waitForTimeout(700);
   const reactionPresent = await message.evaluate((node,targetEmoji) => [...node.querySelectorAll('[data-emoji],[data-testid*="reaction" i],[aria-label*="reaction" i],[aria-label*="reação" i],[title*="reaction" i],[title*="reação" i]')].some(chip => [chip.getAttribute("data-emoji"),chip.getAttribute("aria-label"),chip.getAttribute("title"),chip.getAttribute("alt")].filter(Boolean).join(" ").includes(targetEmoji)),emoji).catch(()=>false);
