@@ -13,6 +13,7 @@ test("an unconfirmed comment attempt is persisted and prevents automatic retry a
     likeAttempted: true,
     saveAttempted: true,
     reactionAttempted: true,
+    shareAttempted: true,
     commented: false,
     status: "tentativa de comentário iniciada — aguardando confirmação"
   });
