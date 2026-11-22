@@ -94,8 +94,19 @@ async function readVisiblePostLinks(page) {
 }
 
 async function readVisibleAdministrativeMilestones(page) {
-  const texts = await page.locator('[role="row"],[role="listitem"],[data-testid*="message"]').allInnerTexts().catch(() => []);
-  return texts.map(parseAdministrativeMilestone).filter(Boolean);
+  const rows = await page.locator('[role="row"],[role="listitem"],[data-testid*="message"]').evaluateAll(nodes =>
+    nodes.map(node => ({
+      text: node.innerText || "",
+      sharedAt: (() => {
+        const time = node.querySelector("time[datetime],time[title]");
+        return time?.getAttribute("datetime") || time?.getAttribute("title") || "";
+      })()
+    }))
+  ).catch(() => []);
+  return rows.map(row => {
+    const marker = parseAdministrativeMilestone(row.text);
+    return marker ? { ...marker, sharedAt: row.sharedAt || "" } : null;
+  }).filter(Boolean);
 }
 function normalizeDirectGroupName(value) {
   return String(value||"").normalize("NFKC").replace(/\s+/g," ").trim().toLocaleLowerCase();
