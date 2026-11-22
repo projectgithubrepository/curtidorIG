@@ -84,3 +84,26 @@ test("does not treat a partial comment list without a positive author match as v
   assert.equal(isCommentStateVerified({ usernameKnown: true, alreadyCommented: false, commentListComplete: false }), false);
   assert.equal(isCommentStateVerified({ usernameKnown: false, alreadyCommented: true, commentListComplete: true }), false);
 });
+
+
+test("recognizes accessible labels that include the button role suffix", () => {
+  const result = classifyPostControls([
+    { labels: ["Curtir, botão"] },
+    { labels: ["Salvar, botão"] }
+  ]);
+  assert.equal(result.likedKnown, true);
+  assert.equal(result.liked, false);
+  assert.equal(result.savedKnown, true);
+  assert.equal(result.saved, false);
+});
+
+test("recognizes English accessible labels with button suffix", () => {
+  const result = classifyPostControls([
+    { labels: ["Unlike, button"] },
+    { labels: ["Remove from saved, button"] }
+  ]);
+  assert.equal(result.likedKnown, true);
+  assert.equal(result.liked, true);
+  assert.equal(result.savedKnown, true);
+  assert.equal(result.saved, true);
+});
