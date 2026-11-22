@@ -387,9 +387,39 @@ export function addNetworkMessages(records, { groupThreadId, startDate, endDate,
       if (rejection) storyCounts[rejection]++;
     }
   }
+  // Trace every network URL by its exact source message and classification.
+  // The trace deliberately excludes message body text; IDs/timestamps/URLs are
+  // sufficient to explain date/thread/type decisions without copying private chat text.
+  const candidateTrace = [];
+  const traced = new Set();
+  for (const record of records) {
+    for (const url of record.urls || []) {
+      const key = String(record.messageId || "") + "|" + String(record.threadId || "") + "|" + url;
+      if (traced.has(key)) continue;
+      traced.add(key);
+      let classification = "acceptedInDateRange";
+      if (!groupThreadId || !record.threadId) classification = "rejectedWithoutThread";
+      else if (record.threadId !== groupThreadId) classification = "rejectedOtherThread";
+      else if (!record.messageId) classification = "rejectedWithoutMessageId";
+      else if (record.text && isAdministrativeMessage(record.text)) classification = "rejectedAdministrativeMessage";
+      else {
+        const date = dateInRange(record.timestamp, startDate, endDate);
+        classification = !date.known ? "pendingDateVerification" : date.inRange ? "acceptedInDateRange" : "rejectedOutsideDateRange";
+      }
+      candidateTrace.push({
+        url,
+        contentType: /\\/stories\\//i.test(url) ? "story" : "feed",
+        messageId: String(record.messageId || ""),
+        threadId: String(record.threadId || ""),
+        timestamp: record.timestamp || "",
+        classification
+      });
+    }
+  }
   return { accepted, unknownDateCandidates, rejectedThread, rejectedUnscoped, rejectedIdentity,
     acceptedStoryUrls:[...acceptedStoryUrls],
-    storyCollection:storyCounts
+    storyCollection:storyCounts,
+    candidateTrace
   };
 }
 
@@ -574,6 +604,7 @@ export async function collectGroupPosts(page, { groupName, startDate, endDate, s
       finalUniqueStoryUrls:finalUniqueStoryUrls.size,
       acceptedNetworkUrlsMissingFromFinal:acceptedStoryUrlsMissingFromFinal
     },
+    networkCandidateTrace: networkMerge.candidateTrace || [],
   };
   // Não descartar silenciosamente mensagens com link e identidade, mas sem timestamp.
   // Elas seguem para inspeção como candidatas com data desconhecida e não entram na contagem
