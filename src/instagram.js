@@ -905,7 +905,7 @@ export async function inspectPost(page, url) {
         stateKnown: { commented: commentStateVerified },
         verificationDiagnostics: {
           rootSelector, controlCount: controls.length, controlLabels: controlLabels.slice(0, 80),
-          controlCandidates: controlCandidates.slice(0, 120),\n          controlCandidateTotal: controlCandidates.length,
+          controlCandidates,\n          controlCandidateTotal: controlCandidates.length,
           controlCandidatesAvailable: controlCandidates.length,
           profileLinkCount: profileLinks.length, profileDetectionStrategy: labeledProfileLinks.length ? "A — rótulo acessível" : avatarProfileLinks.length ? "B — avatar do menu" : menuProfileLinks.length ? "C — link do menu" : "nenhuma", identifiedUsername: username || null, commentRowsInspected: commentRows.length,
           expectedCommentCount: expectedComments, commentListComplete, alreadyCommented: commented,
