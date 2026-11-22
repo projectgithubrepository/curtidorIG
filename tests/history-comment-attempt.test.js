@@ -43,4 +43,16 @@ test("a pending attempt on one source message protects the same URL in another m
     status:"ações confirmadas em outra ocorrência"
   });
   assert.deepEqual(getPendingUrlAttempts(url),{likeAttempted:false,saveAttempted:false,commentAttempted:false,shareAttempted:false});
+  appendHistory({
+    url, groupThreadId:"1783000000000002", messageId:"source-message-a",
+    liked:true, saved:true, savedFolderVerified:true, commented:true, sharedToGroup:true,
+    groupCheck:true, completionEmoji:"🌷",
+    status:"tentativas anteriores resolvidas por confirmação"
+  });
+  const resolved=getTaskState(url,"1783000000000002","source-message-a","🌷");
+  assert.equal(resolved.likeAttempted,false);
+  assert.equal(resolved.saveAttempted,false);
+  assert.equal(resolved.commentAttempted,false);
+  assert.equal(resolved.reactionAttempted,false);
+
 });
