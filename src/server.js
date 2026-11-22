@@ -84,6 +84,13 @@ app.get("/api/diagnostic-summary", (_req, res) => {
   const network = report.networkDiagnostics || {};
   const coverage = summary.collectionCoverage || {};
   const scan = report.collectionDiagnostics || {};
+  const candidateTrace = scan.networkCandidateTrace || [];
+  const storyCandidateLines = candidateTrace.filter(item => item.contentType === "story").map(item =>
+    `- ${item.url} | msg=${item.messageId || "?"} | conversa=${item.threadId || "?"} | data=${item.timestamp || "?"} | ${item.classification}`
+  );
+  const feedCandidateLines = candidateTrace.filter(item => item.contentType === "feed").map(item =>
+    `- ${item.url} | msg=${item.messageId || "?"} | conversa=${item.threadId || "?"} | data=${item.timestamp || "?"} | ${item.classification}`
+  );
   const operations = (network.operationDetails || []).slice(0, 5).map(item =>
     `- ${item.operation}: ${item.responses || 0} respostas / ${item.messageLikeObjects || 0} mensagens / ${item.sharedMediaObjects || 0} compartilhamentos / ${item.storyUrls || 0} URLs de Stories`
   );
@@ -94,7 +101,7 @@ app.get("/api/diagnostic-summary", (_req, res) => {
     `Resultado: ${report.outcome || "indisponível"} | Modo: ${report.request?.mode || "?"}`,
     `Grupo: ${report.request?.groupName || "?"} | Período: ${report.request?.startDate || "?"} a ${report.request?.endDate || "?"}`,
     `Itens: ${summary.publicationsFound ?? report.publications?.length ?? 0} encontrados | ${summary.publicationsInspected ?? 0} inspecionados | Feed/Reels: ${summary.feedsAndReels ?? "?"} | Stories: ${summary.stories ?? "?"}`,
-    ...(coverage.available ? [`Referência administrativa: Feed ${coverage.actualFeed}/${coverage.expectedFeed} | Stories ${coverage.actualStories}/${coverage.expectedStories} | ${coverage.matches ? "CONFERE" : "DIVERGÊNCIA"}`] : ["Referência administrativa: indisponível"]),
+    ...(coverage.available ? [`Referência administrativa (URLs únicas): Feed ${coverage.actualFeed}/${coverage.expectedFeed} | Stories ${coverage.actualStories}/${coverage.expectedStories} | ${coverage.matches ? "CONFERE" : "DIVERGÊNCIA"}`, `Ocorrências compartilhadas: Feed ${coverage.feedOccurrences ?? "?"} | Stories ${coverage.storyOccurrences ?? "?"}`] : ["Referência administrativa: indisponível"]),
     `Varredura: ${scan.historyRounds ?? "?"} rodadas | avanço: ${scan.scrollProgressRounds ?? "?"} | topo: ${scan.stableBoundaryReached ? "sim" : "não"} | marco temporal: ${scan.dateBoundaryReached ? "sim" : "não"} | travada: ${scan.historyStalled ? "sim" : "não"}`,
     `Rede: ${network.capturedResponses ?? 0} respostas / ${network.parsedResponses ?? 0} interpretadas / ${network.unparsedResponses ?? 0} não interpretadas`,
     `Direct: ${network.websocketConnections ?? 0} WebSockets / ${network.websocketFrames ?? 0} quadros | IDs de mensagens: ${network.distinctMessageIds ?? 0}`,
@@ -102,6 +109,11 @@ app.get("/api/diagnostic-summary", (_req, res) => {
     ...(scan.storyNetwork ? [
       `Reconciliação de Stories: ${scan.storyNetwork.uniqueNetworkStoryUrls ?? 0} URLs únicas observadas | ${scan.storyNetwork.acceptedInDateRange ?? 0} aceitas na data | ${scan.storyNetwork.pendingDateVerification ?? 0} aguardando data | ${scan.storyNetwork.rejectedOtherThread ?? 0} outra conversa | ${scan.storyNetwork.rejectedWithoutThread ?? 0} sem conversa | ${scan.storyNetwork.rejectedWithoutMessageId ?? 0} sem ID de mensagem | ${scan.storyNetwork.rejectedAdministrativeMessage ?? 0} administrativas | ${scan.storyNetwork.rejectedOutsideDateRange ?? 0} fora do período | ${scan.storyNetwork.finalStoryItems ?? 0} itens finais (${scan.storyNetwork.finalUniqueStoryUrls ?? 0} URLs únicas) | ${scan.storyNetwork.acceptedNetworkUrlsMissingFromFinal ?? 0} aceitas ausentes da lista final`
     ] : ["Reconciliação de Stories: contadores por etapa indisponíveis"]),
+    `Rastreamento por URL: ${candidateTrace.length} ocorrências de rede classificadas | Feed/Reels: ${feedCandidateLines.length} | Stories: ${storyCandidateLines.length}`,
+    "Candidatos Feed/Reels (URL, mensagem, conversa, timestamp e classificação):",
+    ...(feedCandidateLines.length ? feedCandidateLines : ["- Nenhum candidato Feed/Reels na captura de rede"]),
+    "Candidatos Stories (URL, mensagem, conversa, timestamp e classificação):",
+    ...(storyCandidateLines.length ? storyCandidateLines : ["- Nenhum candidato Story na captura de rede"]),
     "Operações de rede:",
     ...(operations.length ? operations : ["- Nenhuma identificada"]),
     `Coleção de destino "${report.request?.collectionName || "?"}": ${summary.savedCollectionInventoryAvailable ? "inventariada" : "NÃO localizada/inventariada"}`,
