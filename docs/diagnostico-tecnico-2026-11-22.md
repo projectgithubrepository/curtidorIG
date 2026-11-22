@@ -201,3 +201,28 @@ Na revisão cruzada do código, foi detectado e corrigido um escape duplicado na
 - A consulta de status do commit no GitHub não retornou checks nem execuções de workflow. Portanto, CI permanece **não verificado**, não aprovado.
 
 Último commit de código no momento desta anotação: `610635e8006134ec190743adb28a26bf18686f7e`. A validação real depende de uma nova coleta TESTE com a sessão autenticada do Instagram.
+
+
+## Atualização — reconciliação de Stories após novo TESTE (22/11/2026)
+
+### Evidência do teste mais recente
+- Referência administrativa: Feed 37, Stories 13.
+- Coleta: 41 URLs únicas Feed/Reels e 3 URLs únicas de Stories; 44 URLs únicas no total.
+- Divergência: +4 Feed/Reels e -10 Stories.
+- Rede: 24 ocorrências de URL Story, 22 URLs únicas; apenas 3 URLs foram associadas à conversa alvo e ao dia solicitado. As outras 19 foram corretamente classificadas como provenientes de outras conversas.
+- A varredura percorreu 68 rodadas, alcançou o topo e identificou o marco temporal; portanto, o relatório não indica travamento de rolagem.
+- 3 inspeções de Story falharam; cada falha foi registrada, mas o resumo não traz a causa individual.
+
+### Causa de código identificada
+A rotina `storyIdentity` só aceitava uma identidade quando username e ID estavam no mesmo objeto descendente. Payloads em que o proprietário e o objeto de mídia aparecem como irmãos — por exemplo, `story_share.user.username` separado de `story_share.media.pk` — eram descartados mesmo dentro de uma estrutura Story. Isso reduz a extração de URLs de Stories em respostas GraphQL que não trazem permalink explícito.
+
+### Correção aplicada
+- A identidade do Story agora agrega username e ID de mídia em ramos irmãos dentro do mesmo contexto Story.
+- IDs genéricos de mensagem continuam excluídos: `message_id` não pode virar ID de Story.
+- IDs `pk`/`media_id` são priorizados; `id` genérico só é aceito quando há evidência de objeto de mídia ou username no próprio nó.
+- Foram adicionados dois testes de regressão: proprietário/mídia em objetos irmãos e proteção contra confusão entre ID da mensagem e ID do Story.
+
+### Revisões
+- **Revisão de regra de negócio:** só constrói permalink quando username e ID da mídia podem ser associados no mesmo ramo/contexto Story; não converte ID de mensagem em Story.
+- **Revisão de implementação:** mantida a travessia com limite de profundidade e proteção contra ciclos; IDs de mídia continuam validados como numéricos; URLs são deduplicadas no coletor.
+- **Validação pendente:** executar suíte completa e novo TESTE autenticado. A correção é uma causa concreta de subextração identificada no parser; ainda não prova que os 10 Stories faltantes foram todos recuperados.
