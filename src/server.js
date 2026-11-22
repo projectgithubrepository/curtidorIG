@@ -51,6 +51,9 @@ function reportItem(item) {
     storyInspection: item.storyInspection ? {
       publicCommentAvailable: Boolean(item.storyInspection.publicCommentAvailable),
       publicCommentLabel: item.storyInspection.publicCommentLabel || "",
+      publicCommentButtonAvailable: Boolean(item.storyInspection.publicCommentButtonAvailable),
+      publicCommentButtonLabel: item.storyInspection.publicCommentButtonLabel || "",
+      publicCommentButtonCandidates: item.storyInspection.publicCommentButtonCandidates ?? 0,
       usernameKnown: Boolean(item.storyInspection.usernameKnown),
       commentListComplete: Boolean(item.storyInspection.commentListComplete),
       expectedComments: item.storyInspection.expectedComments ?? null,
@@ -631,15 +634,18 @@ app.post("/api/start", async (req, res) => {
         try {
           const inspection = await inspectPost(page, item.url);
           const collectionKey = new URL(item.url).pathname.replace(/\/$/, "");
-          const savedFolderVerified = Boolean(inspection.observedState.saved && savedCollectionInventoryAvailable && savedCollectionUrls?.has(collectionKey));
-          let taskState = mergeTaskState(previousState, { ...inspection.observedState, savedFolderVerified, commentForbidden: instructions.comment === "forbidden" });
+          const collectionMembership = Boolean(savedCollectionInventoryAvailable && savedCollectionUrls?.has(collectionKey));
+          // A complete destination inventory is positive proof of saved membership.
+          const savedFolderVerified = collectionMembership;
+          const observedTaskState = { ...inspection.observedState, saved: Boolean(inspection.observedState.saved || collectionMembership), savedFolderVerified };
+          let taskState = mergeTaskState(previousState, { ...observedTaskState, commentForbidden: instructions.comment === "forbidden" });
           const comment = taskState.commented || instructions.comment === "forbidden" ? "" : createComment(inspection.caption, [...previous, ...results.map(r => r.comment).filter(Boolean)]);
           const commentSource = inspection.caption?.trim() ? "legenda" : "fallback sem legenda";
           const stateKnown = {
             liked: inspection.stateKnown?.liked === true,
             savedStateKnown: inspection.stateKnown?.saved === true,
-            saved: inspection.observedState.saved === true,
-            collectionMembership: Boolean(savedCollectionInventoryAvailable && savedCollectionUrls?.has(collectionKey)),
+            saved: observedTaskState.saved === true,
+            collectionMembership,
             collectionInventoryAvailable: Boolean(savedCollectionInventoryAvailable),
             commented: inspection.stateKnown?.commented === true,
             destinationGroupVerified: destinationGroupVerification.verified && destinationGroupVerification.sharedInventoryComplete,
@@ -650,8 +656,10 @@ app.post("/api/start", async (req, res) => {
               liked: inspection.stateKnown?.liked
                 ? "Controle identificado; estado atual: " + (inspection.observedState.liked ? "já curtida" : "não curtida") + "."
                 : "Controle de curtida não reconhecido. Controles encontrados: " + (inspection.observedState.controlLabels || "nenhum") + ".",
-              saveToCollection: !inspection.stateKnown?.saved
-                ? "Controle Salvar/Remover dos salvos não reconhecido. Controles encontrados: " + (inspection.observedState.controlLabels || "nenhum") + "."
+              saveToCollection: collectionMembership
+                ? "URL encontrada no inventário completo da coleção “" + collectionName + "”; salvamento e pasta confirmados independentemente do rótulo do botão."
+                : !inspection.stateKnown?.saved
+                ? "Controle Salvar/Remover dos salvos não reconhecido. Controles candidatos: " + JSON.stringify(inspection.inspectionDiagnostics?.stateVerification?.controlCandidates || inspection.observedState.controlLabels || [])
                 : !savedCollectionInventoryAvailable
                   ? "Botão Salvar identificado (" + (inspection.observedState.saved ? "salva" : "não salva") + "), mas o inventário da coleção “" + collectionName + "” não foi carregado; a pasta correta não pode ser confirmada."
                   : !savedCollectionUrls?.has(collectionKey)
