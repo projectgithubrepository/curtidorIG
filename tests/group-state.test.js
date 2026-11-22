@@ -74,3 +74,27 @@ test("uncertain toggle attempts remain pending for manual verification", () => {
   assert.match(label, /tentativa de salvamento/);
   assert.match(label, /tentativa de reação/);
 });
+
+
+test("resolves an invalid 00/00 administrative date from the timestamp of a HOJE message", () => {
+  const message = "✨ Aviso: HOJE no grupo tivemos esse total de pedidos: Data: 00/00 • 37 FEED • 13 STORIES. Lembre-se da conferência e pasta de salvos.";
+  const milestone = parseAdministrativeMilestone(message);
+  assert.equal(milestone.date, "");
+  assert.equal(milestone.todayReference, true);
+  const target = administrativeTargetsForRange([
+    { ...milestone, sharedAt: "2026-11-21T19:02:41.022Z" }
+  ], "2026-11-21", "2026-11-21");
+  assert.deepEqual({ date: target.date, feedCount: target.feedCount, storiesCount: target.storiesCount },
+    { date: "2026-11-21", feedCount: 37, storiesCount: 13 });
+});
+
+test("does not apply a HOJE administrative marker outside the timestamp date", () => {
+  const milestone = parseAdministrativeMilestone("Aviso HOJE: 37 FEED • 13 STORIES. Conferência da pasta de salvos.");
+  assert.equal(administrativeTargetsForRange([{ ...milestone, sharedAt: "2026-11-21T19:02:41.022Z" }], "2026-11-22", "2026-11-22"), null);
+});
+
+test("a valid explicit administrative date takes precedence over HOJE timestamp", () => {
+  const milestone = parseAdministrativeMilestone("Aviso HOJE: Data 20/11 • 37 FEED • 13 STORIES. Conferência da pasta de salvos.");
+  const target = administrativeTargetsForRange([{ ...milestone, sharedAt: "2026-11-21T19:02:41.022Z" }], "2026-11-20", "2026-11-20");
+  assert.equal(target.date, "11-20");
+});
