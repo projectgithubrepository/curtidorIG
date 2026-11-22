@@ -95,7 +95,7 @@ function renderPreliminary(summary, request) {
   const scanText = scan.historyRounds !== undefined
     ? `Varredura: ${scan.historyRounds} rodadas · ${scan.dateBoundaryReached ? "mensagem anterior à data inicial encontrada" : scan.stableBoundaryReached ? "topo do histórico detectado" : "fim do histórico não confirmado"} · ${summary.itemsWithoutDate ?? 0} itens sem data mantidos como candidatos · ${summary.itemsWithoutIdentity ?? 0} sem vínculo com mensagem.`
     : "Diagnóstico de varredura indisponível.";
-  preliminaryIntro.textContent = `${summary.publicationsFound ?? 0} itens encontrados · ${summary.publicationsInspected ?? 0} inspecionados. ${coverageText} ${scanText} Os quantitativos abaixo mostram o que o sistema avaliou; não são ações realizadas.`;
+  preliminaryIntro.textContent = `${summary.publicationsFound ?? 0} itens encontrados · ${summary.publicationsInspected ?? 0} inspecionados. ${coverageText} ${scanText} O modo TESTE não executa ações. “Apta” significa que a validação inicial reconheceu os pré-requisitos; o modo AUTOMÁTICO ainda revalida imediatamente antes de cada ação. “Não verificada” nunca significa “pode executar”.`;
   preliminaryMetrics.replaceChildren();
   const labels = {like:"Curtidas",saveToCollection:"Salvamentos",comment:"Comentários em publicações",shareToGroup:"Envios ao grupo coletivo",completionReaction:"Reações no grupo de origem",commentStory:"Comentários em Stories",shareStoryToGroup:"Envios de Stories"};
   const totals = summary.actionTotals || {};
@@ -111,10 +111,29 @@ function renderPreliminary(summary, request) {
     const number = document.createElement("strong");
     number.className = "metric-number";
     number.textContent = String(value.total ?? 0);
-    const detail = document.createElement("small");
-    detail.className = "metric-detail";
-    detail.textContent = `${value.simulated ?? 0} aptas · ${value.candidate ?? 0} candidatas · ${value.waiting ?? 0} aguardando · ${value.dispensed ?? 0} dispensadas · ${value.done ?? 0} concluídas · ${value.blocked ?? 0} bloqueadas · ${value.unverified ?? 0} não verificadas · ${value.unclassified ?? 0} sem classificação`;
-    tile.append(label, number, detail);
+    const subtitle = document.createElement("small");
+    subtitle.className = "metric-subtitle";
+    subtitle.textContent = "Quantidade de itens em que esta etapa foi avaliada. Não significa que a ação foi realizada.";
+    const rows = [
+      ["Aptas no teste", value.simulated ?? 0, "Estado reconhecido; elegível na validação inicial. Não executada."],
+      ["Já concluídas", value.done ?? 0, "Ação anterior confirmada; não deve ser repetida."],
+      ["Não verificadas", value.unverified ?? 0, "Estado desconhecido; não autoriza execução automática."],
+      ["Bloqueadas", value.blocked ?? 0, "Condição impeditiva ou risco de duplicidade."],
+      ["Aguardando", value.waiting ?? 0, "Depende de outra etapa obrigatória."],
+      ["Dispensadas", value.dispensed ?? 0, "Não se aplica por regra explícita."],
+      ["Candidatas", value.candidate ?? 0, "Depende de validação/pré-requisito adicional."],
+      ["Sem classificação", value.unclassified ?? 0, "Resultado ainda não enquadrado."]
+    ];
+    const list = document.createElement("dl");
+    list.className = "metric-breakdown";
+    for (const [name, count, explanation] of rows) {
+      const wrap = document.createElement("div");
+      const dt = document.createElement("dt"); dt.textContent = name;
+      const dd = document.createElement("dd"); dd.textContent = String(count);
+      const help = document.createElement("small"); help.textContent = explanation;
+      wrap.append(dt, dd, help); list.append(wrap);
+    }
+    tile.append(label, number, subtitle, list);
     preliminaryMetrics.append(tile);
   }
   const note = document.createElement("p");
