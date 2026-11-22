@@ -15,17 +15,26 @@ export function isAdministrativeMessage(value) {
 export function parseAdministrativeMilestone(value) {
   const text = normalizeGroupText(value);
   if (!isAdministrativeMessage(value)) return null;
-  const dateMatch = String(value ?? "").match(/\b(\d{1,2})(?:\s+do\s+|[/-])(\d{1,2})(?:(?:[/-]|\s+de\s+)(\d{2,4}))?\b/i);
+  const dateMatch = String(value ?? "").match(/\\b(\\d{1,2})(?:\\s+do\\s+|[/-])(\\d{1,2})(?:(?:[/-]|\\s+de\\s+)(\\d{2,4}))?\\b/i);
   let date = "";
   if (dateMatch) {
-    const year = dateMatch[3] ? (dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3]) : "";
-    date = year ? `${year}-${dateMatch[2].padStart(2, "0")}-${dateMatch[1].padStart(2, "0")}` : `${dateMatch[2].padStart(2, "0")}-${dateMatch[1].padStart(2, "0")}`;
+    const day = Number(dateMatch[1]);
+    const month = Number(dateMatch[2]);
+    const year = dateMatch[3] ? Number(dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3]) : null;
+    const validCalendarDate = day >= 1 && day <= 31 && month >= 1 && month <= 12 &&
+      (year == null || (year >= 2000 && year <= 2100 && new Date(Date.UTC(year, month - 1, day)).getUTCDate() === day));
+    if (validCalendarDate) {
+      date = year != null
+        ? `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+        : `${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
   }
-  const feed = text.match(/(\d+)\s*(?:publicacoes?\s*)?feed\b/);
-  const stories = text.match(/(\d+)\s*stories\b/);
+  const feed = text.match(/(\\d+)\\s*(?:publicacoes?\\s*)?feed\\b/);
+  const stories = text.match(/(\\d+)\\s*stories\\b/);
   return {
     type: "administrative",
     date,
+    todayReference: /\\bhoje\\b/.test(text),
     feedCount: feed ? Number(feed[1]) : null,
     storiesCount: stories ? Number(stories[1]) : null,
     text: String(value ?? "").slice(0, 1200)
@@ -65,8 +74,8 @@ export function taskStateLabel(state = {}) {
 // Localiza a meta publicada pela administração para a janela coletada.
 // Datas sem ano (ex.: 18/11) são associadas ao ano do período solicitado.
 export function administrativeTargetsForRange(markers = [], startDate = "", endDate = "") {
-  const validRange = /^\d{4}-\d{2}-\d{2}$/.test(startDate) &&
-    /^\d{4}-\d{2}-\d{2}$/.test(endDate) && startDate <= endDate;
+  const validRange = /^\\d{4}-\\d{2}-\\d{2}$/.test(startDate) &&
+    /^\\d{4}-\\d{2}-\\d{2}$/.test(endDate) && startDate <= endDate;
   if (!validRange) return null;
   const days = new Set();
   const cursor = new Date(startDate + "T12:00:00Z");
@@ -78,14 +87,29 @@ export function administrativeTargetsForRange(markers = [], startDate = "", endD
   const marker = markers.find(item => {
     if (item.feedCount == null && item.storiesCount == null) return false;
     const date = String(item.date || "");
-    const matches = /^\d{4}-\d{2}-\d{2}$/.test(date)
-      ? date >= startDate && date <= endDate
-      : /^\d{2}-\d{2}$/.test(date) && days.has(date);
-    return matches;
+    if (/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return date >= startDate && date <= endDate;
+    if (/^\\d{2}-\\d{2}$/.test(date)) return days.has(date);
+    // "HOJE" uses the timestamp of this exact administrative message.
+    if (item.todayReference && item.sharedAt) {
+      const shared = new Date(item.sharedAt);
+      if (!Number.isNaN(shared.getTime())) {
+        const localDay = [shared.getFullYear(), String(shared.getMonth() + 1).padStart(2, "0"), String(shared.getDate()).padStart(2, "0")].join("-");
+        return localDay >= startDate && localDay <= endDate;
+      }
+    }
+    return false;
   });
   if (!marker) return null;
+  const markerDate = /^\\d{4}-\\d{2}-\\d{2}$/.test(String(marker.date || ""))
+    ? marker.date
+    : marker.todayReference && marker.sharedAt
+      ? (() => {
+          const d = new Date(marker.sharedAt);
+          return Number.isNaN(d.getTime()) ? "" : [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+        })()
+      : marker.date;
   return {
-    date: marker.date,
+    date: markerDate,
     feedCount: marker.feedCount,
     storiesCount: marker.storiesCount,
     totalCount: (marker.feedCount ?? 0) + (marker.storiesCount ?? 0),
