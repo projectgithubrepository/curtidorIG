@@ -104,9 +104,10 @@ export function getPendingUrlAttempts(url) {
   const entries = historyEntries().filter(entry => entry.url === url);
   const any = key => entries.some(entry => truthy(entry[key]));
   const confirmed = key => entries.some(entry => truthy(entry[key]));
+  const savedInCorrectFolder = entries.some(entry => truthy(entry.salva) && truthy(entry.pasta_correta));
   return {
     likeAttempted: any("curtida_tentada") && !confirmed("curtida"),
-    saveAttempted: any("salvamento_tentado") && !(confirmed("salva") && confirmed("pasta_correta")),
+    saveAttempted: any("salvamento_tentado") && !savedInCorrectFolder,
     commentAttempted: any("comentario_tentado") && !confirmed("comentada"),
     shareAttempted: any("envio_tentado") && !confirmed("enviado_grupo")
   };
