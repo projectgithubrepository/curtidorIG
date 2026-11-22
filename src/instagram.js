@@ -1553,7 +1553,7 @@ export async function inspectStory(page, url) {
     if (!(await button.isVisible().catch(() => false))) continue;
     const label = await button.evaluate(node =>
       [node.getAttribute("aria-label"), node.getAttribute("title"), node.innerText]
-        .filter(Boolean).join(" ").replace(/\\s+/g, " ").trim()
+        .filter(Boolean).join(" ").replace(/\s+/g, " ").trim()
     ).catch(() => "");
     if (/^(comentar|adicionar comentário|comment|add comment)$/i.test(label)) publicButtonMatches.push({ button, label });
   }
