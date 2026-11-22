@@ -242,6 +242,12 @@ npm start
 A rota de Salvos é construída dinamicamente a partir do perfil da sessão autenticada, no formato `/{usuario}/saved/`. O nome de usuário não pode ser fixado no código nem inferido de um link aleatório da página. A aplicação identifica o link de perfil na navegação do Instagram e só então abre a rota de Salvos correspondente. Dentro dela, a coleção é identificada pelo rótulo exato exibido na interface; não se deve tratar uma rota genérica `/saved/`, outro perfil ou uma página aleatória como a coleção solicitada. Se o perfil ou a coleção não puderem ser identificados sem ambiguidade, a operação é interrompida e registrada no diagnóstico.
 
 
+## Reconhecimento conservador dos controles do Instagram
+
+A inspeção lê separadamente `aria-label`, `title`, texto visível, `data-testid` e rótulos dos SVGs internos. Esses valores não podem ser concatenados antes da classificação: um identificador como `like_button` antes do rótulo `Curtir` fazia a expressão ancorada deixar de reconhecer o controle. A classificação agora normaliza acentos e separadores, reconhece rótulos em português/inglês e exige exatamente um controle inequívoco por ação. Controles ausentes, duplicados ou contraditórios continuam como desconhecidos.
+
+A identificação do perfil autenticado exclui links de autoria dentro de `main`, `article` e diálogos. Isso evita confundir o autor da publicação com o perfil da sessão ao conferir comentários. A lista de comentários só é considerada conferida quando há comentário próprio identificado ou evidência de lista integralmente carregada; a ausência de comentário em uma lista parcial nunca libera uma nova publicação.
+
 ## Proteção contra ações duplicadas
 
 - Antes de curtir, a aplicação identifica explicitamente o estado do controle. Se já estiver curtido, não clica novamente; se o estado for desconhecido, bloqueia a ação para não desfazer a curtida.
