@@ -833,7 +833,7 @@ export async function inspectPost(page, url) {
       // acessível pode estar no SVG interno. Varre o documento inteiro e
       // consolida cada rótulo no seu elemento acionável para evitar duplicatas.
       const controlNodes = new Map();
-      const labelPattern = /^(?:curtir|descurtir|like|unlike|salvar|save|remover dos salvos|remove from saved)(?:\\s+(?:publicacao|post))?(?:\\s+(?:botao|button))?$/i;
+      const labelPattern = /^(?:curtir|descurtir|like|unlike|salvar|save|remover dos salvos|remove from saved)(?:\s+(?:publicacao|post))?(?:\s+(?:botao|button))?$/i;
       const candidates = [...document.querySelectorAll('button,[role="button"],[tabindex="0"],[aria-label],[title],[data-testid]')];
       for (const node of candidates) {
         const clickable = node.closest('button,[role="button"],[tabindex="0"]');
