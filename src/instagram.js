@@ -1432,8 +1432,21 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
   if(reactionState==="already-applied")return {groupCheck:true,status:`reação ${emoji} já aplicada por esta conta — não repetida (${messageMatchStrategy})`};
   if(reactionState!=="absent")throw new Error("Existe uma reação compatível ou a leitura falhou, mas não foi possível confirmar se pertence a esta conta. Reação não alterada para evitar duplicidade.");
   await message.hover();
-  const reaction = message.locator('button[aria-label*="reagir" i],button[aria-label*="reação" i],button[aria-label*="reaction" i],button[aria-label*="emoji" i],[role="button"][aria-label*="reagir" i],[role="button"][aria-label*="reação" i],[role="button"][aria-label*="reaction" i]').first();
-  if (!(await reaction.count())) throw new Error("Controle de reação da mensagem não identificado.");
+  // Controle de reação: A) aria-label; B) title/data-testid; C) rótulo no SVG interno.
+  let reaction = message.locator('button[aria-label*="reagir" i],button[aria-label*="reação" i],button[aria-label*="reaction" i],button[aria-label*="emoji" i],[role="button"][aria-label*="reagir" i],[role="button"][aria-label*="reação" i],[role="button"][aria-label*="reaction" i]').first();
+  if (!(await reaction.count())) {
+    reaction = message.locator('button[title*="reagir" i],button[title*="reaction" i],button[data-testid*="react" i],button[data-testid*="emoji" i],[role="button"][title*="reaction" i],[role="button"][data-testid*="react" i]').first();
+  }
+  if (!(await reaction.count())) {
+    const controls=message.locator('button,[role="button"]');
+    const matchingIndexes=await controls.evaluateAll(nodes=>nodes.map((node,index)=>{
+      const labels=[node.getAttribute("aria-label"),node.getAttribute("title"),node.getAttribute("data-testid"),node.innerText,
+        ...[...node.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title"),child.getAttribute("data-testid")])].filter(Boolean).join(" ");
+      return /reagir|reação|reaction|emoji/i.test(labels)?index:-1;
+    }).filter(index=>index>=0));
+    if(matchingIndexes.length===1)reaction=controls.nth(matchingIndexes[0]);
+    else throw new Error(matchingIndexes.length>1?"Mais de um controle pode abrir as reações; ação bloqueada por ambiguidade.":"Controle de reação não localizado pelas alternativas A (aria-label), B (title/data-testid) e C (rótulo do ícone).");
+  }
   await reaction.click();
   await page.waitForTimeout(400);
   const picker = page.locator('[role="dialog"],[role="menu"]').last();
