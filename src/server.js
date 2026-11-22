@@ -547,10 +547,10 @@ app.post("/api/start", async (req, res) => {
                 (duplicateState.commented || duplicateState.commentForbidden || instructions.comment === "forbidden") && duplicateState.sharedToGroup;
             const duplicatePlan = (primary.plan || []).filter(action => action.action !== "completionReaction").map(action => {
               let status = action.status;
-              if (/^(simulada|pendente)$/.test(status || "")) {
-                status = mode === "test"
-                  ? "simulada — publicação contabilizada na primeira ocorrência da URL"
-                  : "coberta pela primeira ocorrência da URL — não repetir";
+              if (/^simulada/.test(status || "")) {
+                status = "simulada — publicação contabilizada uma única vez na primeira ocorrência da URL";
+              } else if (/^(pendente|não executada)/.test(status || "")) {
+                status = "pendente — tratar somente na ocorrência principal desta URL";
               } else if (!/^(bloqueada|não verificada|aguardando|dispensada|já concluída|coberta)/.test(status || "")) {
                 status = "coberta pela primeira ocorrência da URL — não repetir";
               }
