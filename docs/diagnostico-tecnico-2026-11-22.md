@@ -226,3 +226,25 @@ A rotina `storyIdentity` só aceitava uma identidade quando username e ID estava
 - **Revisão de regra de negócio:** só constrói permalink quando username e ID da mídia podem ser associados no mesmo ramo/contexto Story; não converte ID de mensagem em Story.
 - **Revisão de implementação:** mantida a travessia com limite de profundidade e proteção contra ciclos; IDs de mídia continuam validados como numéricos; URLs são deduplicadas no coletor.
 - **Validação pendente:** executar suíte completa e novo TESTE autenticado. A correção é uma causa concreta de subextração identificada no parser; ainda não prova que os 10 Stories faltantes foram todos recuperados.
+
+
+### Complemento — abertura do Story e confirmação "Ver story" (22/11/2026)
+
+A inspeção anterior dependia de `getByRole("button", { name: /^ver story$/i })`. Em alguns layouts do Instagram, o controle visível pode ser um elemento `[role=button]` ou apresentar diferenças entre nome acessível, `aria-label`, `title` e texto interno. Isso podia deixar a confirmação sem reconhecimento e interromper a inspeção dos Stories.
+
+Correção:
+- A abertura agora varre controles visíveis `button,[role=button]` e compara separadamente `aria-label`, `title` e texto interno após normalização de acentos e espaços.
+- Só aceita o rótulo exato "Ver story"; "Responder", "Enviar mensagem" e outros controles não são confundidos.
+- Mais de um candidato continua bloqueando a abertura.
+- Se a confirmação não puder ser localizada ou continuar visível após o clique, o erro inclui os rótulos observados para diagnóstico, sem prosseguir com ações.
+- A função de normalização recebeu testes de regressão para variações de caixa, espaços e controles não equivalentes.
+
+Validação de código:
+- O extrator completo de payload foi compilado e executado em dois cenários locais isolados: proprietário e mídia em objetos irmãos geraram permalink correto; ausência de ID de mídia não converteu o ID da mensagem em Story.
+- A suíte de testes do projeto e a execução autenticada ainda não foram executadas neste ambiente.
+- O CI não retornou checks/workflow runs para os commits consultados; estado de CI permanece não verificado.
+
+Pendências mantidas:
+- O último TESTE mostrou 41/37 Feed/Reels e 3/13 Stories. A extração de identidade em ramos irmãos e a abertura do botão "Ver story" foram corrigidas, mas só uma nova coleta pode confirmar quantos dos 10 Stories faltantes serão recuperados.
+- Os 4 Feed/Reels excedentes continuam sem causa individual comprovada; não foram removidos por heurística.
+- As 3 inspeções de Story anteriores não incluem causa individual no resumo filtrado. A nova versão registra os rótulos dos controles para diferenciar falha de seletor, confirmação persistente e outros erros.
