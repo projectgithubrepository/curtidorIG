@@ -160,3 +160,12 @@ Manter em cada atualização o problema, causa técnica, correção, testes e pe
 - Deduplicar ações de publicação por URL canônica, preservando reação por ID da mensagem original.
 
 Toda correção passa por duas revisões independentes: regras de negócio/estados/duplicidade e implementação/Playwright/integração/efeitos. Em seguida, revisão cruzada e testes de regressão. Testes automatizados não substituem validação em sessão autenticada.
+
+
+### Duplicidade e auditoria de cobertura — 22/11/2026
+
+- Contagens administrativas comparam URLs únicas; ocorrências repetidas continuam preservadas para a reação de cada mensagem original.
+- Curtida, salvamento, comentário e compartilhamento são contabilizados uma vez por URL canônica. Uma segunda ocorrência herda o resultado da publicação e não repete ações de publicação.
+- Reação de conclusão não é deduplicada por URL: pertence ao ID exato de cada mensagem. No modo automático, só é tentada na ocorrência repetida quando as etapas obrigatórias da publicação principal foram concluídas; no TESTE permanece não verificada, sem clique.
+- Relatório textual/JSON inclui rastreamento de cada URL de rede, com mensagem, conversa, timestamp e motivo de classificação, sem reproduzir o conteúdo privado da conversa.
+- A divergência 37/13 versus coleta 43/10 ainda depende de nova execução TESTE para identificar quais quatro Feed/Reels excedem e quais três Stories não foram aceitos. Não completar a coleta artificialmente.
