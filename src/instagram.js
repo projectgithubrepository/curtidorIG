@@ -1393,16 +1393,31 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
   const openedThreadId=page.url().match(/\/direct\/t\/(\d+)/)?.[1]||"";
   if(openedThreadId!==String(item.threadId)) throw new Error("O Instagram não abriu a conversa original; reação bloqueada.");
   await page.waitForTimeout(1200);
-  const excerpt = String(item.messageText).trim().slice(0, 100);
-  const candidates = page.locator('[role="row"],[role="listitem"],[data-testid*="message"],[data-testid*="Message"]').filter({ hasText: excerpt });
-  const count = await candidates.count();
-  if (count !== 1) throw new Error("Mensagem original não localizada de forma única; reação bloqueada.");
-  const message = candidates.first();
-  const existingReaction = await message.locator('button,[role="button"],[aria-label],[title],img[alt],[data-emoji]').evaluateAll((nodes, targetEmoji) => nodes.some(node => [
-    node.getAttribute("aria-label"), node.getAttribute("title"), node.getAttribute("alt"),
-    node.getAttribute("data-emoji"), node.innerText
-  ].filter(Boolean).join(" ").includes(targetEmoji)), emoji).catch(() => false);
-  if (existingReaction) return { groupCheck:true, status:`reação ${emoji} já presente — não repetida` };
+  // A/B: procurar pelo ID da mensagem em atributos usados pelo Direct.
+  // C: usar o texto original apenas quando houver uma única correspondência.
+  const safeId=String(item.messageId).replace(/["\\]/g,"");
+  let message=null;
+  let messageMatchStrategy="";
+  for(const selector of [`[data-message-id="${safeId}"]`,`[data-mid="${safeId}"]`,`[id="${safeId}"]`,`[data-testid*="${safeId}"]`]){
+    const found=page.locator(selector);
+    if(await found.count()===1){message=found.first();messageMatchStrategy="A/B — ID estruturado";break;}
+  }
+  if(!message){
+    const excerpt=String(item.messageText).trim().slice(0,100);
+    const candidates=page.locator('[role="row"],[role="listitem"],[data-testid*="message"],[data-testid*="Message"]').filter({hasText:excerpt});
+    if(await candidates.count()===1){message=candidates.first();messageMatchStrategy="C — texto único";}
+  }
+  if(!message) throw new Error("Mensagem original não localizada pelos caminhos A (ID), B (atributos alternativos) ou C (texto único). Reação bloqueada.");
+  // Não examina innerText do cartão: um emoji escrito no texto não é uma reação.
+  const reactionState=await message.evaluate((node,targetEmoji)=>{
+    const chips=[...node.querySelectorAll('[data-emoji],[data-testid*="reaction" i],[aria-label*="reaction" i],[aria-label*="reação" i],[title*="reaction" i],[title*="reação" i]')];
+    const matches=chips.filter(chip=>[chip.getAttribute("data-emoji"),chip.getAttribute("aria-label"),chip.getAttribute("title"),chip.getAttribute("alt")].filter(Boolean).join(" ").includes(targetEmoji));
+    if(!matches.length)return "absent";
+    const own=matches.some(chip=>chip.getAttribute("data-reacted-by-viewer")==="true"||/you reacted|você reagiu|sua reação|reacted by you/i.test([chip.getAttribute("aria-label"),chip.getAttribute("title")].filter(Boolean).join(" ")));
+    return own?"already-applied":"present-owner-unknown";
+  },emoji).catch(()=>"unknown");
+  if(reactionState==="already-applied")return {groupCheck:true,status:`reação ${emoji} já aplicada por esta conta — não repetida (${messageMatchStrategy})`};
+  if(reactionState!=="absent")throw new Error("Existe uma reação compatível ou a leitura falhou, mas não foi possível confirmar se pertence a esta conta. Reação não alterada para evitar duplicidade.");
   await message.hover();
   const reaction = message.locator('button[aria-label*="reagir" i],button[aria-label*="reação" i],button[aria-label*="reaction" i],button[aria-label*="emoji" i],[role="button"][aria-label*="reagir" i],[role="button"][aria-label*="reação" i],[role="button"][aria-label*="reaction" i]').first();
   if (!(await reaction.count())) throw new Error("Controle de reação da mensagem não identificado.");
@@ -1413,12 +1428,9 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
   if (!(await emojiButton.count())) throw new Error(`Emoji ${emoji} não encontrado no seletor de reações.`);
   await emojiButton.click();
   await page.waitForTimeout(700);
-  const reactionPresent = await message.locator('button,[role="button"],[aria-label],[title],img[alt],[data-emoji]').evaluateAll((nodes, targetEmoji) => nodes.some(node => [
-    node.getAttribute("aria-label"), node.getAttribute("title"), node.getAttribute("alt"),
-    node.getAttribute("data-emoji"), node.innerText
-  ].filter(Boolean).join(" ").includes(targetEmoji)), emoji).catch(() => false);
-  if (!reactionPresent) throw new Error("A reação não pôde ser verificada na mensagem original.");
-  return { groupCheck: true, status: `reação ${emoji} aplicada e verificada na mensagem original` };
+  const reactionPresent = await message.evaluate((node,targetEmoji) => [...node.querySelectorAll('[data-emoji],[data-testid*="reaction" i],[aria-label*="reaction" i],[aria-label*="reação" i],[title*="reaction" i],[title*="reação" i]')].some(chip => [chip.getAttribute("data-emoji"),chip.getAttribute("aria-label"),chip.getAttribute("title"),chip.getAttribute("alt")].filter(Boolean).join(" ").includes(targetEmoji)),emoji).catch(()=>false);
+  if (!reactionPresent) throw new Error("Clique realizado, mas a reação não foi confirmada nos controles próprios da mensagem. Tentativa não deve ser repetida automaticamente.");
+  return { groupCheck: true, status: `reação ${emoji} aplicada e verificada (${messageMatchStrategy})` };
 }
 
 
