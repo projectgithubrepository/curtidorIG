@@ -31,6 +31,9 @@ export function buildExecutionPlan({
     liked: Boolean(taskState.liked),
     commented: Boolean(taskState.commented),
     commentAttempted: Boolean(taskState.commentAttempted),
+    likeAttempted: Boolean(taskState.likeAttempted),
+    saveAttempted: Boolean(taskState.saveAttempted),
+    reactionAttempted: Boolean(taskState.reactionAttempted),
     sharedToGroup: Boolean(taskState.sharedToGroup),
     shareAttempted: Boolean(taskState.shareAttempted),
     saved: Boolean(taskState.saved),
@@ -56,6 +59,9 @@ export function buildExecutionPlan({
     else if (item.action === "comment" && item.policy === "forbidden") status = "dispensada — pedido explícito para não comentar";
     else if (item.action === "shareToGroup" && state.shareAttempted && !state.sharedToGroup) { status = "bloqueada"; reason = "Tentativa anterior sem confirmação; verifique o grupo para evitar envio duplicado."; }
     else if (item.action === "comment" && state.commentAttempted && !state.commented) { status = "bloqueada"; reason = "Já houve uma tentativa de publicação sem confirmação. Confira manualmente os comentários antes de qualquer nova tentativa; o sistema não repetirá automaticamente."; }
+    else if (item.action === "like" && state.likeAttempted && !state.liked) { status = "bloqueada"; reason = "Tentativa anterior de curtida sem confirmação. Verifique manualmente o estado da publicação; não clicar novamente para não desfazer uma curtida."; }
+    else if (item.action === "saveToCollection" && state.saveAttempted && !(state.saved && state.savedFolderVerified)) { status = "bloqueada"; reason = "Tentativa anterior de salvamento sem confirmação da coleção correta. Verifique manualmente antes de qualquer nova alteração."; }
+    else if (item.action === "completionReaction" && state.reactionAttempted && !state.groupCheck) { status = "bloqueada"; reason = "Tentativa anterior de reação sem confirmação. Verifique a mensagem original manualmente; não clicar novamente para não alternar a reação."; }
     else if (!item.eligible) {
       status = "bloqueada";
       reason = item.action === "saveToCollection" ? "Informe a coleção obrigatória de destino." : item.action === "comment" ? "O comentário precisa ter pelo menos duas palavras e um emoji." : "A etapa não passou pela validação de elegibilidade.";
