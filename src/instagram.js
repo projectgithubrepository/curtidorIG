@@ -1433,11 +1433,14 @@ export async function executeCompletionReaction(page, item, emoji = "🌸") {
   if(reactionState!=="absent")throw new Error("Existe uma reação compatível ou a leitura falhou, mas não foi possível confirmar se pertence a esta conta. Reação não alterada para evitar duplicidade.");
   await message.hover();
   // Controle de reação: A) aria-label; B) title/data-testid; C) rótulo no SVG interno.
-  let reaction = message.locator('button[aria-label*="reagir" i],button[aria-label*="reação" i],button[aria-label*="reaction" i],button[aria-label*="emoji" i],[role="button"][aria-label*="reagir" i],[role="button"][aria-label*="reação" i],[role="button"][aria-label*="reaction" i]').first();
-  if (!(await reaction.count())) {
-    reaction = message.locator('button[title*="reagir" i],button[title*="reaction" i],button[data-testid*="react" i],button[data-testid*="emoji" i],[role="button"][title*="reaction" i],[role="button"][data-testid*="react" i]').first();
+  let reaction=null;
+  const strategyA=message.locator('button[aria-label*="reagir" i],button[aria-label*="reação" i],button[aria-label*="reaction" i],button[aria-label*="emoji" i],[role="button"][aria-label*="reagir" i],[role="button"][aria-label*="reação" i],[role="button"][aria-label*="reaction" i]');
+  if(await strategyA.count()===1)reaction=strategyA.first();
+  if(!reaction){
+    const strategyB=message.locator('button[title*="reagir" i],button[title*="reaction" i],button[data-testid*="react" i],button[data-testid*="emoji" i],[role="button"][title*="reaction" i],[role="button"][data-testid*="react" i]');
+    if(await strategyB.count()===1)reaction=strategyB.first();
   }
-  if (!(await reaction.count())) {
+  if(!reaction){
     const controls=message.locator('button,[role="button"]');
     const matchingIndexes=await controls.evaluateAll(nodes=>nodes.map((node,index)=>{
       const labels=[node.getAttribute("aria-label"),node.getAttribute("title"),node.getAttribute("data-testid"),node.innerText,
