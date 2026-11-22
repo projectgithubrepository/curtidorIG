@@ -1235,14 +1235,27 @@ export async function executeComment(page, url, comment, onBeforePublish = async
   const text = String(comment || "").trim();
   const words = text.match(/[\p{L}\p{N}]+/gu) || [];
   if (words.length < 2 || !/\p{Extended_Pictographic}/u.test(text)) throw new Error("Comentário bloqueado: precisa ter pelo menos duas palavras e um emoji.");
+  // Editor: A) placeholder/aria-label; B) data-placeholder; C) único campo visível restante.
   const boxes = page.locator('textarea,[contenteditable="true"][role="textbox"],[contenteditable="true"]');
   const count = await boxes.count();
-  let editor = null;
-  for (let i=0;i<count;i++) if (await boxes.nth(i).isVisible().catch(()=>false)) { editor=boxes.nth(i); break; }
-  if (!editor) throw new Error("Campo de comentário não identificado.");
+  const labeledEditors = [];
+  const visibleEditors = [];
+  for (let i=0;i<count;i++) {
+    const candidate=boxes.nth(i);
+    if (!(await candidate.isVisible().catch(()=>false))) continue;
+    visibleEditors.push(candidate);
+    const label=await candidate.evaluate(node=>[node.getAttribute("placeholder"),node.getAttribute("aria-label"),node.getAttribute("data-placeholder")].filter(Boolean).join(" "));
+    if (/coment|comment/i.test(label) && !/mensagem|message|responder|reply/i.test(label)) labeledEditors.push(candidate);
+  }
+  let editor = labeledEditors.length===1 ? labeledEditors[0] : labeledEditors.length===0 && visibleEditors.length===1 ? visibleEditors[0] : null;
+  if (!editor) throw new Error(labeledEditors.length>1 || visibleEditors.length>1 ? "Mais de um campo pode receber texto; comentário bloqueado por ambiguidade." : "Campo de comentário não localizado pelas alternativas A (rótulo), B (data-placeholder) e C (campo único visível).");
   await editor.fill(text);
-  const post = page.getByRole("button", { name: /publicar|postar|^post$|comment|comentar/i }).last();
-  if (!(await post.count()) || !(await post.isVisible().catch(() => false))) throw new Error("Botão de publicar comentário não identificado.");
+  // Botão: A) nome acessível; B) data-testid específico. Nunca usa botão genérico sem identificação.
+  let post = page.getByRole("button", { name: /publicar|postar|^post$|comment|comentar/i }).last();
+  if (!(await post.count()) || !(await post.isVisible().catch(() => false))) {
+    post = page.locator('button[data-testid*="comment" i],button[data-testid*="post" i]').last();
+  }
+  if (!(await post.count()) || !(await post.isVisible().catch(() => false))) throw new Error("Botão de publicar comentário não localizado pelas alternativas A (nome acessível) e B (data-testid).");
   // Registra a tentativa antes do clique. Se a confirmação falhar, uma nova execução
   // não repetirá o comentário automaticamente.
   await onBeforePublish();
@@ -1523,14 +1536,17 @@ export async function executeStoryComment(page, url, comment, onBeforePublish = 
   if(!state.publicCommentAvailable) throw new Error("Comentário público indisponível neste Story; nenhuma resposta privada será enviada.");
   if(!state.usernameKnown || state.stateKnown?.alreadyCommented !== true) throw new Error("A lista de comentários do Story não foi conferida integralmente; comentário bloqueado para evitar duplicidade.");
   if(state.alreadyCommented) return {commented:true,status:"comentário público já identificado — não repetido"};
+  // A/B/C: rótulo acessível, data-placeholder e campo público único visível.
   const fields=page.locator('textarea,input,[contenteditable="true"],[role="textbox"]');
-  let editor=null;
+  let editor=null;const labeled=[];const visible=[];
   for(let i=0;i<await fields.count();i++){
-    const el=fields.nth(i); if(!(await el.isVisible().catch(()=>false))) continue;
+    const el=fields.nth(i);if(!(await el.isVisible().catch(()=>false)))continue;visible.push(el);
     const label=await el.evaluate(node=>[node.getAttribute("placeholder"),node.getAttribute("aria-label"),node.getAttribute("data-placeholder")].filter(Boolean).join(" "));
-    if(/coment|comment/i.test(label)&&!/(mensagem|message|responder|reply)/i.test(label)){editor=el;break;}
+    if(/coment|comment/i.test(label)&&!/(mensagem|message|responder|reply)/i.test(label))labeled.push(el);
   }
-  if(!editor) throw new Error("Campo de comentário público do Story não identificado.");
+  if(labeled.length===1)editor=labeled[0];
+  else if(labeled.length===0&&visible.length===1)editor=visible[0];
+  if(!editor)throw new Error(labeled.length>1||visible.length>1?"Mais de um campo visível no Story; comentário bloqueado por ambiguidade.":"Campo de comentário público não localizado pelas alternativas A/B/C.");
   await editor.fill(text);
   const publish=page.getByRole("button",{name:/publicar|postar|^post$|comentar|comment/i}).last();
   if(!(await publish.count()) || !(await publish.isVisible().catch(()=>false))) throw new Error("Botão de publicação do comentário público não identificado.");
