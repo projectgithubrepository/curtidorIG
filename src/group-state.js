@@ -103,7 +103,7 @@ export function administrativeTargetsForRange(markers = [], startDate = "", endD
   });
   if (!marker) return null;
   // Uma data explícita (com ou sem ano) sempre prevalece sobre o marcador HOJE.
-  const markerDate = /^\\d{4}-\\d{2}-\\d{2}$/.test(String(marker.date || "")) || /^\\d{2}-\\d{2}$/.test(String(marker.date || ""))
+  const markerDate = /^\d{4}-\d{2}-\d{2}$/.test(String(marker.date || "")) || /^\d{2}-\d{2}$/.test(String(marker.date || ""))
     ? marker.date
     : marker.todayReference && marker.sharedAt
       ? (() => {
