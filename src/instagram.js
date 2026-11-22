@@ -890,7 +890,10 @@ export async function inspectPost(page, url) {
       });
       const structuredOwnRows = username ? structuredCommentRows.filter(belongsToUser) : [];
       const fallbackOwnRows = username ? genericCommentRows.filter(belongsToUser) : [];
-      const ownCommentRows = structuredOwnRows.length ? structuredOwnRows : fallbackOwnRows;
+      // Search both structures for a positive match. A wrapper <li> can make
+      // the structured selector see only one row while the nested comment is
+      // still identifiable through its smaller author-linked container.
+      const ownCommentRows = [...new Set([...structuredOwnRows, ...fallbackOwnRows])];
       const ownCommentTexts = ownCommentRows.map(item => (item.innerText || "").trim()).filter(Boolean);
       const commented = ownCommentRows.length > 0;
       const visibleText = (element.innerText || "").toLowerCase();
@@ -907,7 +910,7 @@ export async function inspectPost(page, url) {
           rootSelector, controlCount: controls.length, controlLabels: controlLabels.slice(0, 80),
           controlCandidates,\n          controlCandidateTotal: controlCandidates.length,
           controlCandidatesAvailable: controlCandidates.length,
-          profileLinkCount: profileLinks.length, profileCandidateHrefs: menuProfileLinks.map(node => node.getAttribute("href") || "").slice(0, 20), profileDetectionStrategy: labeledProfileLinks.length ? "A — rótulo acessível" : avatarProfileLinks.length ? "B — avatar do menu" : menuProfileLinks.length ? "C — link do menu" : "nenhuma", identifiedUsername: username || null, commentRowsInspected: commentRows.length,
+          profileLinkCount: profileLinks.length, profileCandidateHrefs: menuProfileLinks.map(node => node.getAttribute("href") || "").slice(0, 20), profileDetectionStrategy: labeledProfileLinks.length ? "A — rótulo acessível" : avatarProfileLinks.length ? "B — avatar do menu" : menuProfileLinks.length ? "C — link do menu" : "nenhuma", identifiedUsername: username || null, commentRowsInspected: commentRows.length, structuredCommentRowsInspected: structuredCommentRows.length, genericCommentRowsInspected: genericCommentRows.length, ownCommentRowsInspected: ownCommentRows.length,
           expectedCommentCount: expectedComments, commentListComplete, alreadyCommented: commented,
           commentInspectionReason: !username ? (profileLinks.length > 1 ? "Mais de um link de perfil compatível; identidade ambígua." : "Link do perfil do usuário não identificado na página.") : commented ? "Comentário do perfil encontrado; ação já concluída." : commentListComplete ? "Lista de comentários integralmente conferida; comentário do perfil não encontrado." : "Lista de comentários incompleta; ação bloqueada para evitar duplicidade."
         },
