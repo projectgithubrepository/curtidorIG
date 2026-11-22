@@ -762,7 +762,7 @@ export async function inspectPost(page, url) {
       // Três estruturas comuns para linhas de comentário; deduplica nós repetidos.
       const commentRows = [...new Set(element.querySelectorAll("li,[role='listitem'],[data-testid*='comment' i],[data-comment-id]"))].filter(item => item.querySelector("a[href]"));
       const ownCommentRows = username ? commentRows.filter(item => [...item.querySelectorAll("a[href]")].some(link => {
-        try { return new URL(link.getAttribute("href"), location.origin).pathname.replace(/\\/$/,"") === "/" + username; } catch { return false; }
+        try { return new URL(link.getAttribute("href"), location.origin).pathname.replace(/\/$/,"") === "/" + username; } catch { return false; }
       })) : [];
       const ownCommentTexts = ownCommentRows.map(item => (item.innerText || "").trim()).filter(Boolean);
       const commented = ownCommentRows.length > 0;
@@ -1501,7 +1501,7 @@ export async function inspectStory(page, url) {
     const username=usernames.length===1?usernames[0]:"";
     // A/B/C para comentários: li, listitem e atributos de comentário.
     const commentNodes=[...new Set(document.querySelectorAll("li,[role='listitem'],[data-testid*='comment' i],[data-comment-id]"))].filter(node=>node.querySelector("a[href]"));
-    const ownRows=username?commentNodes.filter(node=>[...node.querySelectorAll("a[href]")].some(a=>{try{return new URL(a.getAttribute("href"),location.origin).pathname.replace(/\\/$/,"")==="/"+username;}catch{return false;}})):[];
+    const ownRows=username?commentNodes.filter(node=>[...node.querySelectorAll("a[href]")].some(a=>{try{return new URL(a.getAttribute("href"),location.origin).pathname.replace(/\/$/,"")==="/"+username;}catch{return false;}})):[];
     const ownCommentTexts=ownRows.map(node=>(node.innerText||"").trim()).filter(Boolean);
     const alreadyCommented=ownRows.length>0;
     const lower=bodyText.toLowerCase();
