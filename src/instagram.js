@@ -1478,29 +1478,32 @@ export async function inspectStory(page, url) {
       [node.getAttribute("aria-label"),node.getAttribute("title"),node.innerText].filter(Boolean).join(" ").trim()
     );
     const bodyText=(document.body?.innerText||"").slice(0,4000);
-    const profile=[...document.querySelectorAll("nav a[href],a[href]")].filter(a=>{
-      const labels=[a.getAttribute("aria-label"),a.getAttribute("title"),a.innerText,...[...a.querySelectorAll("[aria-label],[title],svg")].flatMap(child=>[child.getAttribute("aria-label"),child.getAttribute("title")])].filter(Boolean).join(" ");
-      return /perfil|profile|your profile/i.test(labels);
-    });
+    // A/B/C para descobrir o perfil autenticado, mesmo quando o rótulo acessível muda.
+    const navLinks=[...document.querySelectorAll("nav a[href]")];
+    const validProfile=a=>{const parts=(a.getAttribute("href")||"").split("/").filter(Boolean);return parts.length===1&&!new Set(["accounts","direct","explore","reels","stories","p","reel","tv","saved"]).has((parts[0]||"").toLowerCase());};
+    const labeled=navLinks.filter(a=>validProfile(a)&&/perfil|profile|your profile/i.test([a.getAttribute("aria-label"),a.getAttribute("title"),a.innerText].filter(Boolean).join(" ")));
+    const avatar=navLinks.filter(a=>validProfile(a)&&a.querySelector("img"));
+    const fallback=navLinks.filter(validProfile);
+    const profile=labeled.length?labeled:avatar.length?avatar:fallback;
     const usernames=[...new Set(profile.map(a=>(a.getAttribute("href")||"").split("/").filter(Boolean)[0]).filter(Boolean))];
     const username=usernames.length===1?usernames[0]:"";
-    const commentNodes=[...document.querySelectorAll("li,[role='listitem']")].filter(node=>node.querySelector("a[href]"));
-    const alreadyCommented=Boolean(username && commentNodes.some(node =>
-      [...node.querySelectorAll("a[href]")].some(a=>a.getAttribute("href")==="/"+username+"/") &&
-      (node.innerText||"").trim().length>username.length
-    ));
+    // A/B/C para comentários: li, listitem e atributos de comentário.
+    const commentNodes=[...new Set(document.querySelectorAll("li,[role='listitem'],[data-testid*='comment' i],[data-comment-id]"))].filter(node=>node.querySelector("a[href]"));
+    const ownRows=username?commentNodes.filter(node=>[...node.querySelectorAll("a[href]")].some(a=>{try{return new URL(a.getAttribute("href"),location.origin).pathname.replace(/\\/$/,"")==="/"+username;}catch{return false;}})):[];
+    const ownCommentTexts=ownRows.map(node=>(node.innerText||"").trim()).filter(Boolean);
+    const alreadyCommented=ownRows.length>0;
     const lower=bodyText.toLowerCase();
     const totalMatch=lower.match(/(?:ver todos os|view all)\s+(\d+)\s+(?:comentários|comments)|(\d+)\s+(?:comentários|comments)/i);
     const expectedComments=totalMatch?Number(totalMatch[1]||totalMatch[2]):null;
     const explicitEmpty=/ainda não há comentários|seja o primeiro a comentar|no comments yet|be the first to comment/i.test(lower);
     const hasMoreComments=/ver todos os|view all|ver mais comentários|view more comments|carregar mais comentários|load more comments|comentários anteriores|previous comments/i.test(lower);
     const commentListComplete=explicitEmpty||(expectedComments!==null&&commentNodes.length>=expectedComments&&!hasMoreComments);
-    return { publicCommentAvailable:Boolean(publicField), publicCommentLabel:publicField ? [publicField.getAttribute("placeholder"),publicField.getAttribute("aria-label")].filter(Boolean).join(" ") : "", alreadyCommented, usernameKnown:Boolean(username), commentListComplete, expectedComments, commentRowsInspected:commentNodes.length, controls, bodyText };
+    return { publicCommentAvailable:Boolean(publicField), publicCommentLabel:publicField ? [publicField.getAttribute("placeholder"),publicField.getAttribute("aria-label")].filter(Boolean).join(" ") : "", alreadyCommented, ownCommentTexts, usernameKnown:Boolean(username), profileDetectionStrategy:labeled.length?"A — rótulo acessível":avatar.length?"B — avatar do menu":fallback.length?"C — link do menu":"nenhuma", commentListComplete, expectedComments, commentRowsInspected:commentNodes.length, controls, bodyText };
   });
   return { ...snapshot, storyOpen, stateKnown:{ publicCommentAvailable:snapshot.publicCommentAvailable, alreadyCommented:isCommentStateVerified({usernameKnown:snapshot.usernameKnown,alreadyCommented:snapshot.alreadyCommented,commentListComplete:snapshot.commentListComplete}) } };
 }
 
-export async function executeStoryComment(page, url, comment) {
+export async function executeStoryComment(page, url, comment, onBeforePublish = async () => {}) {
   const text=String(comment||"").trim();
   const words=text.match(/[\p{L}\p{N}]+/gu)||[];
   if(words.length<2 || !/\p{Extended_Pictographic}/u.test(text)) throw new Error("Comentário do Story precisa ter pelo menos duas palavras e um emoji.");
@@ -1518,11 +1521,13 @@ export async function executeStoryComment(page, url, comment) {
   if(!editor) throw new Error("Campo de comentário público do Story não identificado.");
   await editor.fill(text);
   const publish=page.getByRole("button",{name:/publicar|postar|^post$|comentar|comment/i}).last();
-  if(!(await publish.count())) throw new Error("Botão de publicação do comentário público não identificado.");
-  await publish.click(); await page.waitForTimeout(900);
-  const body=await page.locator("body").innerText().catch(()=>"");
-  if(!body.includes(text)) throw new Error("Comentário público do Story não foi confirmado na tela.");
-  return {commented:true,status:"comentário público no Story publicado e verificado"};
+  if(!(await publish.count()) || !(await publish.isVisible().catch(()=>false))) throw new Error("Botão de publicação do comentário público não identificado.");
+  await onBeforePublish();
+  await publish.click(); await page.waitForTimeout(1000);
+  const after=await inspectStory(page,url);
+  const confirmedByOwner=(after.ownCommentTexts||[]).some(row=>row.includes(text));
+  if(!confirmedByOwner) throw new Error("Envio solicitado, mas o texto exato não foi encontrado em comentário associado ao perfil autenticado. Tentativa registrada; não repetir automaticamente.");
+  return {commented:true,status:"comentário público do Story encontrado e associado ao perfil autenticado"};
 }
 
 export async function executeStoryShareToGroup(page, url, destinationGroupName, destinationGroupUrl, onBeforeSend=async()=>{}, groupInventory=null) {
