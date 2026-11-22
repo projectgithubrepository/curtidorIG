@@ -180,3 +180,11 @@ Na segunda revisão da classificação, foi identificado que `like_button` e `sa
 O diagnóstico também passa a registrar até 20 hrefs candidatos do menu de navegação, depois de excluir cabeçalhos internos de conteúdo. Isso permitirá conferir se o link identificado pertence à sessão autenticada sem confundi-lo com o autor da publicação.
 
 Foram executados manualmente no ambiente disponível quatro cenários isolados do classificador: controles não aplicados com rótulos, controles já aplicados, IDs genéricos sem rótulo (mantidos desconhecidos) e IDs explícitos `unlike/unsave`. Os quatro cenários passaram. Isso é uma verificação isolada da função, não substitui `npm test`, GitHub Actions ou a coleta autenticada.
+
+
+### Complemento — identificação positiva de comentários (22/11/2026)
+
+A inspeção de comentários agora combina as linhas estruturadas (`li`, `role=listitem`, atributos de comentário) com contêineres textuais menores que possuem link de autor. Isso cobre layouts em que o seletor estruturado encontra um `li` agregador, mas o comentário individual aparece em um descendente. Os nós são deduplicados. Essa união só é usada para encontrar positivamente um comentário da conta; não é usada para declarar a lista inteira vazia. A ausência continua dependendo da contagem integral de comentários ou de uma mensagem explícita de lista vazia.
+
+O diagnóstico registra separadamente quantas linhas estruturadas, linhas genéricas e linhas próprias foram encontradas, além dos hrefs candidatos de perfil. Foram adicionados testes para garantir que um comentário próprio encontrado seja reconhecido mesmo com lista parcial e que ausência em lista parcial permaneça desconhecida.
+
