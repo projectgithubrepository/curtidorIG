@@ -144,34 +144,45 @@ function collectUrls(value, output, seen = new WeakSet(), depth = 0) {
   else for (const child of Object.values(value)) collectUrls(child, output, seen, depth + 1);
 }
 
-function storyIdentity(value, depth = 0, seen = new WeakSet()) {
+function storyIdentity(value, depth = 0, seen = new WeakSet(), storyContext = false) {
   if (!value || typeof value !== "object" || depth > 20 || seen.has(value)) return { username: "", storyId: "" };
   seen.add(value);
-  const username = String(value.username ?? value.user?.username ?? value.user_info?.username ?? value.owner?.username ?? value.author?.username ?? "");
-  // IDs genéricos no objeto da mensagem (por exemplo, message.id) NÃO são
-  // IDs de Story. Priorize sempre os campos específicos e procure primeiro
-  // o objeto de mídia aninhado antes de aceitar pk/media_id/id.
+  const ownUsername = String(value.username ?? value.user?.username ?? value.user_info?.username ?? value.owner?.username ?? value.author?.username ?? "");
   const explicit = [value.story_id, value.story_pk, value.story_media_id]
     .find(item => item != null && /^\d+(?:_\d+)?$/.test(String(item)));
-  let nested = { username: "", storyId: "" };
-  for (const child of Object.values(value)) {
-    if (child && typeof child === "object") {
-      const candidate = storyIdentity(child, depth + 1, seen);
-      if (candidate.username && candidate.storyId) {
-        nested = candidate;
-        break;
-      }
-    }
-  }
-  if (explicit != null) return { username: username || nested.username, storyId: String(explicit).split("_")[0] };
-  if (nested.username && nested.storyId) return nested;
-  const mediaId = [value.pk, value.media_id, value.mediaId, value.id]
-    .find(item => item != null && /^\d+(?:_\d+)?$/.test(String(item)));
-  // Só aceite IDs genéricos quando o próprio nó identifica o dono da mídia.
-  if (username && mediaId != null) return { username, storyId: String(mediaId).split("_")[0] };
-  return { username: username || nested.username, storyId: "" };
-}
+  if (explicit != null) return { username: ownUsername, storyId: String(explicit).split("_")[0] };
 
+  // Em alguns payloads do Direct, o dono e a mídia são irmãos:
+  // { story_share: { user: { username }, media: { pk } } }.
+  // A versão anterior só aceitava um descendente que já contivesse ambos,
+  // descartando Stories válidos nessa estrutura.
+  let nestedUsername = "";
+  let nestedStoryId = "";
+  for (const [key, child] of Object.entries(value)) {
+    if (!child || typeof child !== "object") continue;
+    const childContext = storyContext || /story|stories/i.test(key);
+    const candidate = storyIdentity(child, depth + 1, seen, childContext);
+    nestedUsername ||= candidate.username;
+    nestedStoryId ||= candidate.storyId;
+    if (nestedUsername && nestedStoryId) break;
+  }
+  if (ownUsername && nestedStoryId) return { username: ownUsername, storyId: nestedStoryId };
+  if (nestedUsername && nestedStoryId) return { username: nestedUsername, storyId: nestedStoryId };
+  if (explicit != null) return { username: ownUsername || nestedUsername, storyId: String(explicit).split("_")[0] };
+
+  // IDs genéricos só podem vir de um nó de mídia identificado; nunca use
+  // message.id como ID de Story. "pk" e "media_id" são preferidos ao "id".
+  const mediaMarker = Boolean(value.product_type || value.media_type != null ||
+    value.image_versions2 || value.video_versions || value.carousel_media ||
+    value.__typename === "XDTMedia" || value.media);
+  const mediaId = [value.pk, value.media_id, value.mediaId,
+    (ownUsername || mediaMarker) ? value.id : null]
+    .find(item => item != null && /^\d+(?:_\d+)?$/.test(String(item)));
+  if (mediaId != null && (ownUsername || mediaMarker || storyContext)) {
+    return { username: ownUsername || nestedUsername, storyId: String(mediaId).split("_")[0] };
+  }
+  return { username: ownUsername || nestedUsername, storyId: nestedStoryId };
+}
 function collectStoryUrls(value, output, seen = new WeakSet(), depth = 0, storyContext = false) {
   if (!value || typeof value !== "object" || depth > MAX_DEPTH || seen.has(value)) return;
   seen.add(value);
