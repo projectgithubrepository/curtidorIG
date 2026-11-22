@@ -167,3 +167,15 @@ test("automatic plan blocks uncertain prior toggle attempts instead of clicking 
   assert.match(plan.find(item=>item.action==="saveToCollection").status,/^bloqueada/);
   assert.match(plan.find(item=>item.action==="completionReaction").status,/^bloqueada/);
 });
+
+test("test mode does not call a completion reaction ready when its previous state was not inspected", () => {
+  const plan = buildExecutionPlan({
+    mode:"test", collectionName:"Curtido",
+    comment:"Comentário válido 🌷",
+    taskState:{liked:true,saved:true,savedFolderVerified:true,commented:true,sharedToGroup:true},
+    stateKnown:{liked:true,savedStateKnown:true,saved:true,collectionInventoryAvailable:true,collectionMembership:true,commented:true,destinationGroupVerified:true,messageIdentityVerified:true,groupCheckKnown:false}
+  });
+  const reaction=plan.find(item=>item.action==="completionReaction");
+  assert.match(reaction.status,/^não verificada/);
+  assert.match(reaction.reason,/estado da reação não foi inspecionado/);
+});

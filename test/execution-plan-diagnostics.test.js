@@ -100,3 +100,12 @@ test("completion reaction is not apt without the original group message identity
   assert.match(reaction.status, /^não verificada/);
   assert.match(reaction.reason, /ID da mensagem original não foi capturado/);
 });
+
+test("completion reaction is not marked apt in TESTE when its state is unknown", () => {
+  const plan=buildExecutionPlan({
+    ...base,
+    taskState:{liked:true,saved:true,savedFolderVerified:true,commented:true,sharedToGroup:true},
+    stateKnown:{liked:true,savedStateKnown:true,saved:true,collectionInventoryAvailable:true,collectionMembership:true,commented:true,destinationGroupVerified:true,messageIdentityVerified:true,groupCheckKnown:false}
+  });
+  assert.match(plan.find(item=>item.action==="completionReaction").status,/^não verificada/);
+});

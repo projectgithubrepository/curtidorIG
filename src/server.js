@@ -597,7 +597,7 @@ app.post("/api/start", async (req, res) => {
             const reactionStatus = taskState.groupCheck ? "já concluída — não repetir" :
               taskState.reactionAttempted ? "bloqueada — tentativa anterior sem confirmação; verificar manualmente antes de nova ação" :
               !item.identityVerified ? "não verificada — mensagem original não identificada" :
-              storyRequiredDone ? (mode==="test" ? "simulada — nenhuma ação executada" : actionLog.find(entry=>entry.action==="completionReaction")?.status || "pronta para execução")
+              storyRequiredDone ? (mode==="test" ? "não verificada — reação anterior não inspecionada" : actionLog.find(entry=>entry.action==="completionReaction")?.status || "pronta para execução")
               : "aguardando etapas obrigatórias";
             const storyPlan = [
               {action:"commentStory",label:"Comentar publicamente no próprio Story",required:!commentForbidden,status:commentStatus,reason:commentForbidden?"Pedido original proíbe comentário.":!story.publicCommentAvailable?"O recurso de comentário público não está disponível; não enviar resposta privada.":story.stateKnown?.alreadyCommented!==true?"Não foi possível comprovar a identidade do perfil e a integralidade dos comentários.":""},
@@ -639,7 +639,9 @@ app.post("/api/start", async (req, res) => {
             commented: inspection.stateKnown?.commented === true,
             destinationGroupVerified: destinationGroupVerification.verified && destinationGroupVerification.sharedInventoryComplete,
             messageIdentityVerified: Boolean(item.identityVerified && item.threadId && item.messageId),
+            groupCheckKnown: false,
             reasons: {
+              groupCheck: "A inspeção da conversa ainda não comprovou se esta conta já aplicou a reação configurada à mensagem original.",
               liked: inspection.stateKnown?.liked
                 ? "Controle identificado; estado atual: " + (inspection.observedState.liked ? "já curtida" : "não curtida") + "."
                 : "Controle de curtida não reconhecido. Controles encontrados: " + (inspection.observedState.controlLabels || "nenhum") + ".",

@@ -94,6 +94,9 @@ export function buildExecutionPlan({
     } else if (item.requiresAllPrevious && !requiredStepsDone) {
       status = "aguardando etapas obrigatórias";
       reason = "A reação só pode ser aplicada após concluir as ações obrigatórias e as solicitadas.";
+    } else if (mode === "test" && item.action === "completionReaction" && stateKnown.groupCheckKnown !== true && !state.groupCheck) {
+      status = "não verificada — reação anterior não inspecionada";
+      reason = stateKnown.reasons?.groupCheck || "A mensagem original foi identificada, mas o estado da reação não foi inspecionado com segurança. O teste não pode afirmar que a reação está pendente nem que já foi aplicada.";
     } else if (mode === "test" && item.action === "completionReaction" && stateKnown.messageIdentityVerified !== true) {
       status = "não verificada — mensagem original não identificada";
       reason = stateKnown.reasons?.messageIdentityVerified || "O ID da mensagem original no grupo não foi confirmado; não é possível garantir que a reação será aplicada ao pedido correto.";
