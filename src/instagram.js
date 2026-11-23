@@ -2,6 +2,7 @@ import { chromium } from "playwright";
 import path from "node:path";
 import { isAdministrativeMessage, parseAdministrativeMilestone } from "./group-state.js";
 import { createInstagramNetworkCapture } from "./instagram-network-capture.js";
+import { parseDestinationGroupUrl } from "./instagram-url.js";
 
 const PROFILE_DIR = path.resolve("data", "instagram-profile");
 const MAX_STALLED_SCROLL_ROUNDS = 8;
@@ -1453,32 +1454,30 @@ export async function executeComment(page, url, comment, onBeforePublish = async
 
 export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
   const suppliedUrl = String(destinationGroupUrl || "").trim();
-  let groupName = "";
-  const directMatch = suppliedUrl.match(/^https:\/\/www\.instagram\.com\/direct\/t\/(\d+)\/?(?:[?#].*)?$/i);
-  if (!directMatch) {
-    return { verified:false, reason:"Informe a URL direta da conversa no formato https://www.instagram.com/direct/t/ID/.", threadId:"" };
+  const destination = parseDestinationGroupUrl(suppliedUrl);
+  if (!destination.valid) {
+    return { verified:false, reason:"URL do grupo inválida: " + destination.reason, threadId:"" };
   }
-  if (directMatch) {
-    const expectedThreadId = directMatch[1];
-    await page.goto(`https://www.instagram.com/direct/t/${expectedThreadId}/`, { waitUntil:"domcontentloaded", timeout:60000 });
-    if (page.url().includes("/accounts/login")) {
-      return { verified:false, reason:"Instagram redirecionou para o login; grupo coletivo não foi verificado.", threadId:"" };
-    }
-    const openedThreadId = page.url().match(/\/direct\/t\/(\d+)/)?.[1] || "";
-    if (openedThreadId !== expectedThreadId) {
-      return { verified:false, reason:`A URL direta não abriu a conversa esperada. ID solicitado: ${expectedThreadId}; ID aberto: ${openedThreadId || "não identificado"}.`, threadId:openedThreadId };
-    }
-    // A URL comprova o ID; o nome precisa vir do cabeçalho renderizado.
-    const header=await readDirectConversationHeader(page);
-    groupName=header.name;
-    if (!groupName) return {
-      verified:false,
-      reason:"A URL abriu a conversa correta, mas o nome não apareceu nos elementos acessíveis do cabeçalho após aguardar a renderização. Inventário e envios bloqueados.",
-      threadId:openedThreadId,
-      headerEvidence:header.evidence
-    };
+
+  const expectedThreadId = destination.threadId;
+  await page.goto(destination.url, { waitUntil:"domcontentloaded", timeout:60000 });
+  if (page.url().includes("/accounts/login")) {
+    return { verified:false, reason:"Instagram redirecionou para o login; grupo coletivo não foi verificado.", threadId:"" };
   }
-  const threadId = page.url().match(/\/direct\/t\/(\d+)/)?.[1] || "";
+  const openedThreadId = page.url().match(/\\/direct\\/t\\/([a-z0-9_-]+)/i)?.[1] || "";
+  if (openedThreadId !== expectedThreadId) {
+    return { verified:false, reason:`A URL direta não abriu a conversa esperada. ID solicitado: ${expectedThreadId}; ID aberto: ${openedThreadId || "não identificado"}.`, threadId:openedThreadId };
+  }
+  // A URL comprova o ID; o nome precisa vir do cabeçalho renderizado.
+  const header=await readDirectConversationHeader(page);
+  const groupName=header.name;
+  if (!groupName) return {
+    verified:false,
+    reason:"A URL abriu a conversa correta, mas o nome não apareceu nos elementos acessíveis do cabeçalho após aguardar a renderização. Inventário e envios bloqueados.",
+    threadId:openedThreadId,
+    headerEvidence:header.evidence
+  };
+  const threadId = page.url().match(/\\/direct\\/t\\/([a-z0-9_-]+)/i)?.[1] || "";
   if (!threadId) return { verified:false, reason:`A conversa “${groupName}” abriu, mas o ID da conversa não foi confirmado.`, threadId:"", sharedUrls:[], sharedInventoryComplete:false };
   // Percorre o histórico do destino antes de decidir se um link ainda precisa ser enviado.
   // A captura de rede complementa os links visíveis do DOM, pois cartões/anexos
