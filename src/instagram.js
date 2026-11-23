@@ -1464,7 +1464,7 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
   if (page.url().includes("/accounts/login")) {
     return { verified:false, reason:"Instagram redirecionou para o login; grupo coletivo não foi verificado.", threadId:"" };
   }
-  const openedThreadId = page.url().match(/\\/direct\\/t\\/([a-z0-9_-]+)/i)?.[1] || "";
+  const openedThreadId = page.url().match(/\/direct\/t\/([a-z0-9_-]+)/i)?.[1] || "";
   if (openedThreadId !== expectedThreadId) {
     return { verified:false, reason:`A URL direta não abriu a conversa esperada. ID solicitado: ${expectedThreadId}; ID aberto: ${openedThreadId || "não identificado"}.`, threadId:openedThreadId };
   }
@@ -1477,7 +1477,7 @@ export async function inspectDestinationGroup(page, destinationGroupUrl = "") {
     threadId:openedThreadId,
     headerEvidence:header.evidence
   };
-  const threadId = page.url().match(/\\/direct\\/t\\/([a-z0-9_-]+)/i)?.[1] || "";
+  const threadId = page.url().match(/\/direct\/t\/([a-z0-9_-]+)/i)?.[1] || "";
   if (!threadId) return { verified:false, reason:`A conversa “${groupName}” abriu, mas o ID da conversa não foi confirmado.`, threadId:"", sharedUrls:[], sharedInventoryComplete:false };
   // Percorre o histórico do destino antes de decidir se um link ainda precisa ser enviado.
   // A captura de rede complementa os links visíveis do DOM, pois cartões/anexos
