@@ -285,3 +285,15 @@ A expansão de comentários também foi corrigida: a rotina agora percorre todos
 A regra de segurança permanece: a ausência de comentário só é considerada comprovada quando o perfil autenticado foi identificado e a lista está completa; encontrar um comentário próprio é evidência positiva mesmo com lista parcial. A ausência de identidade ou de completude continua desconhecida e não dispara comentário automático.
 
 Commit desta extensão: e6532757235471206e2a5e97f5ce695d07928492. O novo CI precisa validar esta alteração também; não usar o resultado do commit anterior como prova desta extensão. A nova coleta TESTE autenticada ainda é necessária para verificar a captura real.
+
+
+### Complemento — estado explícito via aria-pressed (23/11/2026)
+
+A captura de cada controle agora inclui também o atributo `aria-pressed`. O classificador pode usar esse atributo como evidência do estado apenas quando:
+- o valor é explicitamente `true` ou `false`;
+- o próprio controle está identificado como `like_button`/Curtir ou `save_button`/Salvar;
+- não há evidência contraditória ou múltiplos controles candidatos.
+
+O atributo não é usado em botões genéricos (por exemplo, Seguir), e sua ausência não é convertida em estado negativo. Foram adicionados testes para estado pressionado, não pressionado e valores ausentes/inválidos.
+
+**Limite atual:** a correção melhora uma fonte explícita de estado, mas não comprova que a interface do Instagram usada na conta exponha `aria-pressed`. O teste automatizado de código não substitui a execução TESTE autenticada. Até essa execução, as 123 etapas do relatório anterior continuam consideradas não verificadas.
