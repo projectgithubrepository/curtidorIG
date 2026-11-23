@@ -6,6 +6,7 @@ import { createComment } from "./comments.js";
 import { appendHistory, getTaskState, getPendingUrlAttempts, getRecentComments, readHistory } from "./history.js";
 import { mergeTaskState, taskStateLabel, administrativeTargetsForRange } from "./group-state.js";
 import { buildExecutionPlan, interpretGroupInstructions } from "./execution-plan.js";
+import { parseDestinationGroupUrl } from "./instagram-url.js";
 
 // Keep Direct network diagnostics metadata-only.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -382,7 +383,10 @@ app.post("/api/start", async (req, res) => {
   if (mode === "automatic" && !confirmed) return res.status(400).json({ error: "A execução automática exige confirmação explícita." });
   if (mode === "test" || mode === "automatic") {
     if (!destinationGroupUrl) return res.status(400).json({ error: "Informe a URL direta da conversa do grupo coletivo (https://www.instagram.com/direct/t/ID/)." });
-    if (!/^https:\/\/www\.instagram\.com\/direct\/t\/\d+\/?(?:[?#].*)?$/i.test(destinationGroupUrl)) return res.status(400).json({ error: "URL do grupo inválida. Informe a URL direta do Instagram no formato https://www.instagram.com/direct/t/ID/." });
+    const destinationGroup = parseDestinationGroupUrl(destinationGroupUrl);
+    if (!destinationGroup.valid) return res.status(400).json({ error: "URL do grupo inválida: " + destinationGroup.reason });
+    // Navega pela URL canônica; parâmetros de compartilhamento não fazem parte do ID da conversa.
+    req.body.destinationGroupUrl = destinationGroup.url;
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
     return res.status(400).json({ error: "Informe um período válido, com data inicial anterior ou igual à final." });
