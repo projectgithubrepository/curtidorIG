@@ -370,7 +370,7 @@ app.post("/api/start", async (req, res) => {
   let collectionName = "";
   const collectionUrl = String(req.body.collectionUrl ?? "").trim();
   let destinationGroupName = "";
-  const destinationGroupUrl = String(req.body.destinationGroupUrl ?? "").trim();
+  let destinationGroupUrl = String(req.body.destinationGroupUrl ?? "").trim();
   const mode = String(req.body.mode ?? "test").toLowerCase();
   const completionEmoji = String(req.body.completionEmoji ?? "🌸").trim() || "🌸";
   const confirmed = req.body.confirm === true;
@@ -386,7 +386,7 @@ app.post("/api/start", async (req, res) => {
     const destinationGroup = parseDestinationGroupUrl(destinationGroupUrl);
     if (!destinationGroup.valid) return res.status(400).json({ error: "URL do grupo inválida: " + destinationGroup.reason });
     // Navega pela URL canônica; parâmetros de compartilhamento não fazem parte do ID da conversa.
-    req.body.destinationGroupUrl = destinationGroup.url;
+    destinationGroupUrl = destinationGroup.url;
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
     return res.status(400).json({ error: "Informe um período válido, com data inicial anterior ou igual à final." });
