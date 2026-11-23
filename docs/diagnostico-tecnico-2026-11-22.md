@@ -297,3 +297,12 @@ A captura de cada controle agora inclui também o atributo `aria-pressed`. O cla
 O atributo não é usado em botões genéricos (por exemplo, Seguir), e sua ausência não é convertida em estado negativo. Foram adicionados testes para estado pressionado, não pressionado e valores ausentes/inválidos.
 
 **Limite atual:** a correção melhora uma fonte explícita de estado, mas não comprova que a interface do Instagram usada na conta exponha `aria-pressed`. O teste automatizado de código não substitui a execução TESTE autenticada. Até essa execução, as 123 etapas do relatório anterior continuam consideradas não verificadas.
+
+
+### Complemento — validação da URL do grupo coletivo (23/11/2026)
+
+Foi removida a validação textual rígida que exigia exclusivamente `https://www.instagram.com/direct/t/NUMERO/`. Agora a URL é analisada com `URL` e validada por protocolo, host oficial e caminho da conversa. São aceitos `instagram.com`, `www.instagram.com` e `m.instagram.com`, com ou sem barra final, query string ou fragmento; IDs são preservados como texto (sem conversão numérica). A URL é normalizada antes de ser usada no fluxo, removendo parâmetros de rastreamento.
+
+A mensagem de erro agora diferencia URL malformada, domínio/protocolo incompatível e link sem identificador de conversa. Foram adicionados testes unitários para URLs canônicas, variações de host, parâmetros, IDs opacos e rejeições.
+
+**Segurança mantida:** aceitar sintaticamente a URL não confirma o grupo. `inspectDestinationGroup` continua responsável por abrir o destino e confirmar o ID e o nome antes de permitir envios. A execução automática continua bloqueada se essa verificação falhar.
