@@ -726,11 +726,15 @@ export function classifyPostControls(controlCandidates = []) {
   for (const [index, candidate] of controlCandidates.entries()) {
     const allLabels = (candidate?.labels || []).map(normalize);
     const testId = normalize(candidate?.testId || "");
-    // Generic like_button/save_button IDs identify a control, not its toggle state.
-    // Prefer accessible/text labels; only unlike/unsave IDs prove an applied state.
+    // Generic IDs identify the action, not its state. When Instagram exposes
+    // aria-pressed on that exact toggle, it is an explicit state signal.
     const labels = allLabels.filter(label => !testId || label !== testId);
     const likeStates = new Set();
     const saveStates = new Set();
+    const ariaPressed = String(candidate?.ariaPressed ?? "").trim().toLowerCase();
+    const pressedKnown = ariaPressed === "true" || ariaPressed === "false";
+    if (pressedKnown && /^(?:like button|like)$/.test(testId)) likeStates.add(ariaPressed === "true");
+    if (pressedKnown && /^(?:save button|save)$/.test(testId)) saveStates.add(ariaPressed === "true");
     for (const label of labels) {
       if (/^(?:curtir|like)(?:\s+(?:publicacao|post))?(?:\s*,?\s*(?:botao|button))?$/.test(label)) likeStates.add(false);
       if (/^(?:descurtir|unlike)(?:\s+(?:publicacao|post))?(?:\s*,?\s*(?:botao|button))?$/.test(label)) likeStates.add(true);
@@ -884,6 +888,7 @@ export async function inspectPost(page, url) {
           role: node.getAttribute("role") || "",
           ariaLabel: node.getAttribute("aria-label") || "",
           title: node.getAttribute("title") || "",
+          ariaPressed: node.getAttribute("aria-pressed") || "",
           text: (node.innerText || "").trim().slice(0, 100),
           svgLabels: [...node.querySelectorAll("svg,[aria-label],[title]")].map(child =>
             child.getAttribute("aria-label") || child.getAttribute("title") || child.getAttribute("data-testid") || ""
