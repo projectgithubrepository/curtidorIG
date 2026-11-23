@@ -346,3 +346,12 @@ A expansão de comentários também foi corrigida: a rotina agora percorre todos
 A regra de segurança permanece: a ausência de comentário só é considerada comprovada quando o perfil autenticado foi identificado e a lista está completa; encontrar um comentário próprio é evidência positiva mesmo com lista parcial. A ausência de identidade ou de completude continua desconhecida e não dispara comentário automático.
 
 Commit desta extensão: e6532757235471206e2a5e97f5ce695d07928492. O novo CI precisa validar esta alteração também; não usar o resultado do commit anterior como prova desta extensão. A nova coleta TESTE autenticada ainda é necessária para verificar a captura real.
+
+
+## Verificação de estado dos controles (curtidas e salvamentos)
+
+A inspeção de publicações reconhece os rótulos acessíveis de Curtir/Descurtir e Salvar/Remover dos salvos. Quando a interface fornece um `data-testid` genérico (`like_button` ou `save_button`) sem rótulo que revele o estado, esse identificador sozinho não comprova se a ação já foi aplicada. Como reforço, a inspeção também captura `aria-pressed` do próprio controle e o classificador só usa esse sinal quando o valor é explicitamente `true` ou `false` e o identificador corresponde ao controle de curtida/salvamento.
+
+A ausência de `aria-pressed`, um rótulo genérico ou evidências contraditórias continuam como estado desconhecido. Isso evita alternar uma curtida/salvamento já aplicado. O TESTE não executa ações.
+
+**Validação pendente:** os testes unitários cobrem os novos casos de `aria-pressed`, mas a confirmação de que a versão atual do Instagram expõe esse atributo nos controles reais depende de uma nova execução TESTE autenticada. Não considerar resolvidas as etapas não verificadas até que o relatório mostre `likedKnown` e `savedKnown` verdadeiros para cada publicação inspecionada. A verificação de comentários continua separada: exige identidade autenticada confirmada e comentário próprio encontrado ou lista integral de comentários comprovada.
