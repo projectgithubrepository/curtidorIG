@@ -107,3 +107,25 @@ test("recognizes English accessible labels with button suffix", () => {
   assert.equal(result.savedKnown, true);
   assert.equal(result.saved, true);
 });
+
+
+test("uses explicit aria-pressed state for generic Instagram like/save toggles", () => {
+  const result = classifyPostControls([
+    { testId: "like_button", labels: ["like_button"], ariaPressed: "true" },
+    { testId: "save_button", labels: ["save_button"], ariaPressed: "false" }
+  ]);
+  assert.equal(result.likedKnown, true);
+  assert.equal(result.liked, true);
+  assert.equal(result.savedKnown, true);
+  assert.equal(result.saved, false);
+});
+
+test("does not use aria-pressed from unrelated controls", () => {
+  const result = classifyPostControls([
+    { testId: "follow_button", labels: ["Follow"], ariaPressed: "true" },
+    { testId: "like_button", labels: ["like_button"], ariaPressed: "mixed" },
+    { testId: "save_button", labels: ["save_button"], ariaPressed: "" }
+  ]);
+  assert.equal(result.likedKnown, false);
+  assert.equal(result.savedKnown, false);
+});
