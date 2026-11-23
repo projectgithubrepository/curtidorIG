@@ -355,3 +355,10 @@ A inspeção de publicações reconhece os rótulos acessíveis de Curtir/Descur
 A ausência de `aria-pressed`, um rótulo genérico ou evidências contraditórias continuam como estado desconhecido. Isso evita alternar uma curtida/salvamento já aplicado. O TESTE não executa ações.
 
 **Validação pendente:** os testes unitários cobrem os novos casos de `aria-pressed`, mas a confirmação de que a versão atual do Instagram expõe esse atributo nos controles reais depende de uma nova execução TESTE autenticada. Não considerar resolvidas as etapas não verificadas até que o relatório mostre `likedKnown` e `savedKnown` verdadeiros para cada publicação inspecionada. A verificação de comentários continua separada: exige identidade autenticada confirmada e comentário próprio encontrado ou lista integral de comentários comprovada.
+
+
+## Validação da URL do grupo coletivo
+
+A URL da conversa coletiva é interpretada com o parser nativo `URL`, em vez de uma expressão regular aplicada ao texto completo. São aceitos os hosts oficiais `instagram.com`, `www.instagram.com` e `m.instagram.com`, desde que usem HTTPS e apontem para uma conversa específica em `/direct/t/ID/`. Barra final, parâmetros de compartilhamento e fragmentos não alteram a identificação da conversa. O ID é preservado como texto e a navegação usa a URL canônica `https://www.instagram.com/direct/t/ID/`.
+
+Links genéricos da caixa de entrada (`/direct/inbox/`), outros domínios e URLs sem ID de conversa continuam rejeitados, agora com motivo específico. A validação sintática não confirma o destino: a aplicação ainda precisa abrir a conversa e conferir o ID e o nome do grupo antes de liberar qualquer envio.
